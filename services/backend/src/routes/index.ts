@@ -9,6 +9,7 @@ import { transferRoutes } from './transferRoutes';
 import { transactionRoutes } from './transactionRoutes';
 import { billRoutes } from './billRoutes';
 import { listBillers } from '../controllers/billsController';
+import { listTelcos, createRecharge } from '../controllers/rechargesController';
 import { me } from '../controllers/authController';
 
 export const apiRouter = Router();
@@ -21,3 +22,5 @@ apiRouter.use('/transfers', requireAuth, transferRoutes);
 apiRouter.use('/transactions', requireAuth, transactionRoutes);
 apiRouter.use('/bills', requireAuth, billRoutes);
 apiRouter.get('/billers', requireAuth, handler(listBillers));
+apiRouter.get('/telcos', requireAuth, handler(listTelcos));
+apiRouter.post('/recharges', requireAuth, handler(createRecharge));
