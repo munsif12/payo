@@ -7,6 +7,8 @@ import { contactRoutes } from './contactRoutes';
 import { bankRoutes } from './bankRoutes';
 import { transferRoutes } from './transferRoutes';
 import { transactionRoutes } from './transactionRoutes';
+import { billRoutes } from './billRoutes';
+import { listBillers } from '../controllers/billsController';
 import { me } from '../controllers/authController';
 
 export const apiRouter = Router();
@@ -17,3 +19,5 @@ apiRouter.use('/contacts', requireAuth, contactRoutes);
 apiRouter.use('/banks', requireAuth, bankRoutes);
 apiRouter.use('/transfers', requireAuth, transferRoutes);
 apiRouter.use('/transactions', requireAuth, transactionRoutes);
+apiRouter.use('/bills', requireAuth, billRoutes);
+apiRouter.get('/billers', requireAuth, handler(listBillers));
