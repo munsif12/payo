@@ -1,0 +1,43 @@
+import request from 'supertest';
+import { createApp } from '../../app';
+import { runSeed } from '../seed';
+import { User, Account, Transaction, Bill, Pocket, Bank, Biller, Telco, Contact } from '../../models';
+
+const app = createApp();
+
+test('seed builds the Contract 4 demo world', async () => {
+  await runSeed();
+
+  expect(await User.countDocuments()).toBe(6);
+  const ammi = (await User.findOne({ email: 'ammi@payo.demo' }))!;
+  expect((await Account.findOne({ userId: ammi._id }))!.balancePaisa).toBe(8_450_000);
+
+  const txns = await Transaction.find({ userId: ammi._id });
+  expect(txns.length).toBeGreaterThanOrEqual(60);
+  const months = new Set(txns.map(t =>
+    `${(t as unknown as { createdAt: Date }).createdAt.getFullYear()}-${(t as unknown as { createdAt: Date }).createdAt.getMonth()}`));
+  expect(months.size).toBeGreaterThanOrEqual(3);
+
+  expect(await Bill.countDocuments({ status: 'due' })).toBe(1);
+  const pocket = (await Pocket.findOne({ userId: ammi._id }))!;
+  expect(pocket.balancePaisa).toBe(12_000_000);
+  expect(pocket.urduName).toBe('عمرہ فنڈ');
+
+  expect(await Bank.countDocuments()).toBe(5);
+  expect(await Biller.countDocuments()).toBe(4);
+  expect(await Telco.countDocuments()).toBe(4);
+  expect(await Contact.countDocuments({ userId: ammi._id })).toBe(4);
+
+  const login = await request(app).post('/api/v1/auth/login')
+    .send({ email: 'ammi@payo.demo', pin: '1234' });
+  expect(login.status).toBe(200);
+  expect(login.body.data.token).toBeTruthy();
+}, 60_000);
+
+test('seed is idempotent — re-run lands on the same world', async () => {
+  await runSeed();
+  await runSeed();
+  expect(await User.countDocuments()).toBe(6);
+  const ammi = (await User.findOne({ email: 'ammi@payo.demo' }))!;
+  expect((await Account.findOne({ userId: ammi._id }))!.balancePaisa).toBe(8_450_000);
+}, 120_000);
