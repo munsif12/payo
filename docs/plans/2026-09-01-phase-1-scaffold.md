@@ -1,6 +1,6 @@
 # PAYO Phase 1 — Scaffold + Infra Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** A booting monorepo — Mongo (replica set) in Docker, backend + AI service answering `/health` with green test harnesses, Expo app booting on iOS simulator & Android emulator with Urdu/RTL i18n, fonts, and design tokens in place.
 
@@ -24,7 +24,7 @@ See roadmap "Global constraints" — ports 4000/8000/8081/27017; `.env` gitignor
 **Interfaces:**
 - Produces: `mongodb://localhost:27017/payo?replicaSet=rs0&directConnection=true` — the connection string every service and test config uses.
 
-- [ ] **Step 1: Write `.gitignore`**
+- [x] **Step 1: Write `.gitignore`**
 
 ```gitignore
 node_modules/
@@ -43,7 +43,7 @@ android/app/build/
 coverage/
 ```
 
-- [ ] **Step 2: Write `docker-compose.yml`** (single-node replica set — required for Mongoose transactions)
+- [x] **Step 2: Write `docker-compose.yml`** (single-node replica set — required for Mongoose transactions)
 
 ```yaml
 services:
@@ -66,7 +66,7 @@ volumes:
 
 (The healthcheck doubles as replica-set initiation — first run initiates `rs0`, later runs return `ok`.)
 
-- [ ] **Step 3: Write `README.md`** — title "PAYO — voice-first Urdu banking MVP", one-paragraph description, prerequisites (Docker, Node 20+, uv, Xcode/Android Studio), and the run matrix:
+- [x] **Step 3: Write `README.md`** — title "PAYO — voice-first Urdu banking MVP", one-paragraph description, prerequisites (Docker, Node 20+, uv, Xcode/Android Studio), and the run matrix:
 
 ```markdown
 ## Run
@@ -80,12 +80,12 @@ volumes:
 Docs: `docs/` (spec, roadmap with all cross-service contracts, phase plans).
 ```
 
-- [ ] **Step 4: Verify Mongo comes up as replica set**
+- [x] **Step 4: Verify Mongo comes up as replica set**
 
 Run: `docker compose up -d mongo && sleep 8 && docker exec payo-mongo mongosh --quiet --eval "rs.status().set"`
 Expected: prints `rs0`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .gitignore README.md docker-compose.yml && git commit -m "chore: repo root — docker-compose mongo replica set, README"
@@ -102,7 +102,7 @@ git add .gitignore README.md docker-compose.yml && git commit -m "chore: repo ro
 **Interfaces:**
 - Produces: `createApp(): Express` (app without listener — tests import this); `ApiError(status: number, code: string, message: string)`; `ok(res, data)` responding `{ success: true, data }`; error middleware responding `{ success: false, message, code }`; `config` object reading env with defaults (`PORT=4000`, `MONGO_URI=mongodb://localhost:27017/payo?replicaSet=rs0&directConnection=true`, `JWT_SECRET`).
 
-- [ ] **Step 1: Init package + deps**
+- [x] **Step 1: Init package + deps**
 
 ```bash
 cd services/backend && npm init -y && npm pkg set name=payo-backend type=commonjs
@@ -112,7 +112,7 @@ npm pkg set scripts.dev="tsx watch src/server.ts" scripts.build="tsc" scripts.te
 npx tsc --init --rootDir src --outDir dist --esModuleInterop --strict --skipLibCheck --module commonjs --target es2022
 ```
 
-- [ ] **Step 2: jest config** — `jest.config.js`:
+- [x] **Step 2: jest config** — `jest.config.js`:
 
 ```js
 /** @type {import('jest').Config} */
@@ -125,7 +125,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 3: Write the failing test** — `src/__tests__/health.test.ts`:
+- [x] **Step 3: Write the failing test** — `src/__tests__/health.test.ts`:
 
 ```ts
 import request from 'supertest';
@@ -150,12 +150,12 @@ Also create an (initially empty-of-DB) `src/testUtils/setup.ts`:
 process.env.JWT_SECRET = 'test-secret';
 ```
 
-- [ ] **Step 4: Run test to verify it fails**
+- [x] **Step 4: Run test to verify it fails**
 
 Run: `npx jest src/__tests__/health.test.ts`
 Expected: FAIL — cannot find module '../app'
 
-- [ ] **Step 5: Implement skeleton**
+- [x] **Step 5: Implement skeleton**
 
 `src/lib/apiError.ts`:
 
@@ -251,17 +251,17 @@ MONGO_URI=mongodb://localhost:27017/payo?replicaSet=rs0&directConnection=true
 JWT_SECRET=change-me
 ```
 
-- [ ] **Step 6: Run tests to verify pass**
+- [x] **Step 6: Run tests to verify pass**
 
 Run: `npx jest`
 Expected: 2 passed
 
-- [ ] **Step 7: Smoke the dev server**
+- [x] **Step 7: Smoke the dev server**
 
 Run: `npm run dev & sleep 3 && curl -s localhost:4000/health && kill %1`
 Expected: `{"success":true,"data":{"service":"payo-backend","status":"ok"}}`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add services/backend && git commit -m "feat(backend): express+ts skeleton, ApiError/respond, health route, jest harness"
@@ -278,7 +278,7 @@ git add services/backend && git commit -m "feat(backend): express+ts skeleton, A
 **Interfaces:**
 - Produces: FastAPI `app` in `app.main`; `Settings` (pydantic-settings) with `gemini_api_key`, `cartesia_api_key`, `backend_base_url` (default `http://localhost:4000/api/v1`).
 
-- [ ] **Step 1: Init project**
+- [x] **Step 1: Init project**
 
 ```bash
 cd services/ai && uv init --name payo-ai --python 3.12 && rm -f hello.py main.py
@@ -289,7 +289,7 @@ mkdir -p app tests && touch app/__init__.py tests/__init__.py
 
 (LangGraph/google-genai/cartesia deps are added in Phase 4 — YAGNI now.)
 
-- [ ] **Step 2: Write the failing test** — `tests/test_health.py`:
+- [x] **Step 2: Write the failing test** — `tests/test_health.py`:
 
 ```python
 from fastapi.testclient import TestClient
@@ -301,12 +301,12 @@ def test_health():
     assert res.json() == {"service": "payo-ai", "status": "ok"}
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `uv run pytest`
 Expected: FAIL — ModuleNotFoundError: app.main
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `app/config.py`:
 
@@ -342,18 +342,18 @@ CARTESIA_API_KEY=
 BACKEND_BASE_URL=http://localhost:4000/api/v1
 ```
 
-- [ ] **Step 5: Run test to verify pass**
+- [x] **Step 5: Run test to verify pass**
 
 Run: `uv run pytest`
 Expected: 1 passed
 
-- [ ] **Step 6: Copy Gemini key from SIA into local `.env`** (local machine only, gitignored)
+- [x] **Step 6: Copy Gemini key from SIA into local `.env`** (local machine only, gitignored)
 
 ```bash
 grep -E '^GEMINI_API_KEY=' ~/work/stable-workspace/agentic-ai-sia/.env > services/ai/.env || echo "GEMINI_API_KEY not found — ask owner"
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add services/ai && git commit -m "feat(ai): fastapi skeleton with health route and pytest harness"
@@ -370,7 +370,7 @@ git add services/ai && git commit -m "feat(ai): fastapi skeleton with health rou
 **Interfaces:**
 - Produces: `tokens` (colors/spacing/type scale — single source for all styling), `t()` via i18next (ur default), `formatPaisa(paisa: number): string` → `"₨1,500"`, app boots to a placeholder voice-home.
 
-- [ ] **Step 1: Scaffold app**
+- [x] **Step 1: Scaffold app**
 
 ```bash
 cd apps && npx create-expo-app@latest mobile --template blank-typescript --yes && cd mobile
@@ -383,13 +383,13 @@ npm pkg set jest.preset="jest-expo"
 
 Follow NativeWind quickstart: `npx tailwindcss init`, set `content: ["./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"]`, add babel plugin per NativeWind v4 docs.
 
-- [ ] **Step 2: Download Urdu font**
+- [x] **Step 2: Download Urdu font**
 
 ```bash
 mkdir -p assets/fonts && curl -L -o assets/fonts/NotoNastaliqUrdu-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/notonastaliqurdu/NotoNastaliqUrdu%5Bwght%5D.ttf"
 ```
 
-- [ ] **Step 3: Design tokens** — `src/theme/tokens.ts`:
+- [x] **Step 3: Design tokens** — `src/theme/tokens.ts`:
 
 ```ts
 export const tokens = {
@@ -416,7 +416,7 @@ export const tokens = {
 } as const;
 ```
 
-- [ ] **Step 4: Write the failing money test** — `src/lib/__tests__/money.test.ts`:
+- [x] **Step 4: Write the failing money test** — `src/lib/__tests__/money.test.ts`:
 
 ```ts
 import { formatPaisa } from '../money';
@@ -428,12 +428,12 @@ test('formats paisa as rupees with grouping, no decimals when whole', () => {
 });
 ```
 
-- [ ] **Step 5: Run test to verify it fails**
+- [x] **Step 5: Run test to verify it fails**
 
 Run: `npx jest src/lib/__tests__/money.test.ts`
 Expected: FAIL — cannot find module '../money'
 
-- [ ] **Step 6: Implement** — `src/lib/money.ts`:
+- [x] **Step 6: Implement** — `src/lib/money.ts`:
 
 ```ts
 export function formatPaisa(paisa: number): string {
@@ -448,7 +448,7 @@ export function formatPaisa(paisa: number): string {
 
 Run: `npx jest` → Expected: PASS
 
-- [ ] **Step 7: i18n** — `src/i18n/ur.json`:
+- [x] **Step 7: i18n** — `src/i18n/ur.json`:
 
 ```json
 {
@@ -485,13 +485,13 @@ export const isRTL = () => i18n.language === 'ur';
 
 RTL approach: do **not** rely on `I18nManager.forceRTL` (needs app restart); layouts read `isRTL()` and use `flexDirection: isRTL() ? 'row-reverse' : 'row'` + `writingDirection` on text. Note this in a comment in `index.ts`.
 
-- [ ] **Step 8: Root layout + placeholder voice-home** — `app/_layout.tsx` loads the Nastaliq font (expo-font) behind splash, imports `src/i18n`, wraps `<Stack screenOptions={{ headerShown: false }} />` in a dark `View` using `tokens.color.bg`. `app/index.tsx`: centered screen with PAYO wordmark, a 96pt circular mic button (accent bg, mic emoji 🎙️ placeholder), caption `t('home.tapToSpeak')` in Nastaliq, and a 2×2 grid of the four suggestion tiles (surface bg, `radius.card`, emoji + Urdu label, min height `touch.primary`). No functionality — pure boot-and-look.
+- [x] **Step 8: Root layout + placeholder voice-home** — `app/_layout.tsx` loads the Nastaliq font (expo-font) behind splash, imports `src/i18n`, wraps `<Stack screenOptions={{ headerShown: false }} />` in a dark `View` using `tokens.color.bg`. `app/index.tsx`: centered screen with PAYO wordmark, a 96pt circular mic button (accent bg, mic emoji 🎙️ placeholder), caption `t('home.tapToSpeak')` in Nastaliq, and a 2×2 grid of the four suggestion tiles (surface bg, `radius.card`, emoji + Urdu label, min height `touch.primary`). No functionality — pure boot-and-look.
 
-- [ ] **Step 9: Verify on both platforms via Argent**
+- [x] **Step 9: Verify on both platforms via Argent**
 
 Boot iOS simulator + Android emulator (argent `list-devices`/`boot-device`), `npx expo start`, launch on both, screenshot both. Expected: dark screen, Urdu text renders in Nastaliq (not tofu), mic button centered, no red screen.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add apps/mobile && git commit -m "feat(mobile): expo scaffold — router, nativewind, tokens, ur/en i18n with RTL, voice-home placeholder"
@@ -504,7 +504,7 @@ git add apps/mobile && git commit -m "feat(mobile): expo scaffold — router, na
 **Files:**
 - Modify: `docs/plans/2026-09-01-payo-roadmap.md` (Phase index row 1 → `done`)
 
-- [ ] **Step 1:** All three services' checks green in one run:
+- [x] **Step 1:** All three services' checks green in one run:
 
 ```bash
 docker compose up -d mongo && (cd services/backend && npx jest) && (cd services/ai && uv run pytest) && (cd apps/mobile && npx jest)
@@ -512,4 +512,4 @@ docker compose up -d mongo && (cd services/backend && npx jest) && (cd services/
 
 Expected: all pass.
 
-- [ ] **Step 2:** Update roadmap Phase 1 status to `done`; commit `chore: phase 1 complete`.
+- [x] **Step 2:** Update roadmap Phase 1 status to `done`; commit `chore: phase 1 complete`.

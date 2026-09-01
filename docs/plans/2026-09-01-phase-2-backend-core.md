@@ -1,6 +1,6 @@
 # PAYO Phase 2 — Backend Core Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** The complete PAYO backend: auth (email+PIN+mock OTP), accounts, the pending-action money engine with PIN-gated atomic execution, transfers (P2P + fake bank), bills, recharges, requests, pockets, cards, statements (PDF), QR, chat persistence, and the seeded demo world — all per the roadmap contracts, fully tested.
 
@@ -30,7 +30,7 @@ Roadmap "Global constraints" apply to every task. Additionally, throughout this 
 **Interfaces:**
 - Produces: jest setup that boots a `MongoMemoryReplSet` once per test file, connects mongoose, wipes collections between tests; `handler(fn: (req,res)=>Promise<void>)` express wrapper forwarding rejections to `errorHandler`.
 
-- [ ] **Step 1: Failing test** — `src/__tests__/harness.test.ts`:
+- [x] **Step 1: Failing test** — `src/__tests__/harness.test.ts`:
 
 ```ts
 import mongoose from 'mongoose';
@@ -45,7 +45,7 @@ test('mongoose is connected to a replica-set memory server', async () => {
 
 Run: `npx jest harness` → Expected: FAIL (readyState 0)
 
-- [ ] **Step 2: Implement** — `src/testUtils/db.ts`:
+- [x] **Step 2: Implement** — `src/testUtils/db.ts`:
 
 ```ts
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -84,7 +84,7 @@ export const handler = (fn: (req: Request, res: Response) => Promise<unknown>) =
   (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
 ```
 
-- [ ] **Step 3: Run** `npx jest` → all pass (health tests unaffected). **Commit** `feat(backend): replica-set test harness + async handler wrapper`.
+- [x] **Step 3: Run** `npx jest` → all pass (health tests unaffected). **Commit** `feat(backend): replica-set test harness + async handler wrapper`.
 
 ---
 
@@ -110,7 +110,7 @@ export const handler = (fn: (req: Request, res: Response) => Promise<unknown>) =
   - `OtpCode`: `userId, code, expiresAt` · `ChatSession`: `userId, title?` · `ChatMessage`: `sessionId, userId, role('user'|'assistant'), text, cards?(Mixed[])`
 - All models exported from `src/models/index.ts`.
 
-- [ ] **Step 1: Failing test** — `src/models/__tests__/models.test.ts`:
+- [x] **Step 1: Failing test** — `src/models/__tests__/models.test.ts`:
 
 ```ts
 import { User, Account, PendingAction } from '..';
@@ -139,7 +139,7 @@ test('pending action defaults', async () => {
 
 Run → FAIL (models missing).
 
-- [ ] **Step 2: Implement all 16 models.** Representative pattern (`User.ts`; apply the same style to every model with the exact fields from Interfaces above):
+- [x] **Step 2: Implement all 16 models.** Representative pattern (`User.ts`; apply the same style to every model with the exact fields from Interfaces above):
 
 ```ts
 import { Schema, model, Types } from 'mongoose';
@@ -160,7 +160,7 @@ export type UserDoc = ReturnType<(typeof User)['hydrate']>;
 
 `Account.ts` key lines: `balancePaisa: { type: Number, required: true, default: 0, min: 0, validate: Number.isInteger }` and `userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true }`. `Transaction.ts` sets `refNo: { type: String, required: true, unique: true }` and an index `{ userId: 1, createdAt: -1 }`. `PendingAction.ts` uses `payload: { type: Schema.Types.Mixed, required: true }` and index `{ status: 1, expiresAt: 1 }`. `index.ts` re-exports all models.
 
-- [ ] **Step 3: Run** `npx jest models` → PASS. Full suite green. **Commit** `feat(backend): all mongoose models`.
+- [x] **Step 3: Run** `npx jest models` → PASS. Full suite green. **Commit** `feat(backend): all mongoose models`.
 
 ---
 
@@ -175,7 +175,7 @@ export type UserDoc = ReturnType<(typeof User)['hydrate']>;
 - Consumes: models, `handler`, `ApiError`, `ok`, `config`.
 - Produces: `requireAuth` middleware setting `req.userId: string` (augment Express.Request via `src/types/express.d.ts`); `signToken(user): string`; **`src/testUtils/factories.ts` exporting `createVerifiedUser(app, overrides?) → { token, userId, user }`** (signup → verify-otp via `demoOtp`; every later test uses this); signup creates User + Account (**welcome balance ₨10,000 = 1_000_000 paisa**) + Card (random fake PAN `4111 11xx xxxx xxxx`, cvv, expiry `09/29`) + OtpCode in one transaction.
 
-- [ ] **Step 1: Failing tests** — `src/controllers/__tests__/auth.test.ts`:
+- [x] **Step 1: Failing tests** — `src/controllers/__tests__/auth.test.ts`:
 
 ```ts
 import request from 'supertest';
@@ -226,9 +226,9 @@ test('protected route without token → 401', async () => {
 
 (The `/me` assertions also drive Task 4's controller — write `/me` here as part of auth wiring since signup owns its payload.)
 
-- [ ] **Step 2: Run** → FAIL (404s). 
+- [x] **Step 2: Run** → FAIL (404s). 
 
-- [ ] **Step 3: Implement.** `src/lib/tokens.ts`:
+- [x] **Step 3: Implement.** `src/lib/tokens.ts`:
 
 ```ts
 import jwt from 'jsonwebtoken';
@@ -286,7 +286,7 @@ export async function createVerifiedUser(app: Express, overrides: Record<string,
 }
 ```
 
-- [ ] **Step 4: Run** `npx jest auth` → PASS; full suite green. **Commit** `feat(backend): auth — signup/mock-otp/login/verify-pin, requireAuth, /me`.
+- [x] **Step 4: Run** `npx jest auth` → PASS; full suite green. **Commit** `feat(backend): auth — signup/mock-otp/login/verify-pin, requireAuth, /me`.
 
 ---
 
@@ -299,7 +299,7 @@ export async function createVerifiedUser(app: Express, overrides: Record<string,
 **Interfaces:**
 - Produces: `feeFor(kind): number` (paisa) — `send_money_bank: 2500`, all other kinds `0`; `postTransaction(session, { userId, type, direction, amountPaisa, feePaisa, counterparty, category }) → TxnDoc` — creates the Transaction doc (refNo `PAYO-` + 10-char nanoid alphanum upper) and applies the guarded balance `$inc`; **throws `ApiError(400,'INSUFFICIENT_FUNDS','Not enough balance')` when a debit can't cover `amountPaisa + feePaisa`**. `direction:'out'` decrements `amountPaisa + feePaisa`; `'in'` increments `amountPaisa`.
 
-- [ ] **Step 1: Failing tests** — `src/lib/__tests__/money.test.ts`:
+- [x] **Step 1: Failing tests** — `src/lib/__tests__/money.test.ts`:
 
 ```ts
 import mongoose from 'mongoose';
@@ -347,7 +347,7 @@ test('insufficient funds rejects atomically — no txn doc, balance unchanged', 
 
 Run → FAIL.
 
-- [ ] **Step 2: Implement.** `src/config/fees.ts`:
+- [x] **Step 2: Implement.** `src/config/fees.ts`:
 
 ```ts
 export const FEES_PAISA: Record<string, number> = { send_money_bank: 2500 };
@@ -382,7 +382,7 @@ export async function postTransaction(session: ClientSession, i: PostTxnInput) {
 }
 ```
 
-- [ ] **Step 3: Run** → PASS. **Commit** `feat(backend): fee table + atomic postTransaction money engine`.
+- [x] **Step 3: Run** → PASS. **Commit** `feat(backend): fee table + atomic postTransaction money engine`.
 
 ---
 
@@ -402,7 +402,7 @@ export async function postTransaction(session: ClientSession, i: PostTxnInput) {
   - `POST /actions/:id/cancel` → pending→cancelled, `ok(res, { cancelled: true })`.
   - `txnDto(txn)` → roadmap `Txn` shape (also exported from `src/lib/pendingActions.ts` for reuse).
 
-- [ ] **Step 1: Failing tests** — register a test-only executor and drive the routes:
+- [x] **Step 1: Failing tests** — register a test-only executor and drive the routes:
 
 ```ts
 import request from 'supertest';
@@ -496,7 +496,7 @@ test('cancel then execute → 410; insufficient funds → action returns to pend
 
 Run → FAIL.
 
-- [ ] **Step 2: Implement** `src/lib/pendingActions.ts`:
+- [x] **Step 2: Implement** `src/lib/pendingActions.ts`:
 
 ```ts
 import mongoose, { ClientSession } from 'mongoose';
@@ -564,7 +564,7 @@ export async function executeAction(userId: string, actionId: string, pin: strin
 
 `src/controllers/actionsController.ts` — `execute`: zod `{ pin: z.string().optional() }`, call `executeAction(req.userId, req.params.id, pin)`, respond `ok(res, { transaction: txnDto(txn) })`. `cancel`: `findOneAndUpdate({ _id, userId, status: 'pending' }, { status: 'cancelled' })`, 404 if none matched and action not yours/absent, else `ok(res, { cancelled: true })` (already-non-pending → 410 `ACTION_GONE`). Routes file + `apiRouter.use('/actions', requireAuth, actionRoutes)`.
 
-- [ ] **Step 3: Run** `npx jest pendingActions` → PASS, full suite green. **Commit** `feat(backend): pending-action engine — pin-gated, idempotent, expiring execution`.
+- [x] **Step 3: Run** `npx jest pendingActions` → PASS, full suite green. **Commit** `feat(backend): pending-action engine — pin-gated, idempotent, expiring execution`.
 
 ---
 
@@ -578,9 +578,9 @@ export async function executeAction(userId: string, actionId: string, pin: strin
 **Interfaces:**
 - Produces: `GET /contacts` → `{ items: ContactDto[] }` (`{ id, name, urduName, kind, phone?, bankId?, bankName?, iban?, linkedUserId? }`); `POST /contacts` (zod: kind `payo` requires `phone` — if a User with that phone exists, store `linkedUserId`; kind `bank` requires `bankId` + `iban` regex `/^PK\d{2}[A-Z]{4}\d{16}$/`); `GET /banks` → seeded-or-empty list; `POST /banks/resolve-title { bankId, iban }` → `{ accountTitle }`; `resolveFakeTitle(iban): string` deterministic — hash the IBAN to index a 12-name list (`'Bilal Ahmed', 'Sara Khan', 'Muhammad Hamza', 'Ayesha Siddiqui', 'Fatima Noor', 'Ali Raza', 'Zainab Bibi', 'Usman Ghani', 'Hina Shahid', 'Imran Malik', 'Khadija Tul Kubra', 'Abdul Rehman'`).
 
-- [ ] **Step 1: Failing tests** — create bank doc directly (`Bank.create({ name: 'Meezan Bank', urduName: 'میزان بینک' })`), then: create bank contact via API expect 201 + `bankName` populated; invalid IBAN → 400; resolve-title twice returns identical `accountTitle` (determinism); payo contact with an existing user's phone gets `linkedUserId`; contacts list is ownership-scoped (other user sees empty).
+- [x] **Step 1: Failing tests** — create bank doc directly (`Bank.create({ name: 'Meezan Bank', urduName: 'میزان بینک' })`), then: create bank contact via API expect 201 + `bankName` populated; invalid IBAN → 400; resolve-title twice returns identical `accountTitle` (determinism); payo contact with an existing user's phone gets `linkedUserId`; contacts list is ownership-scoped (other user sees empty).
 
-- [ ] **Step 2: Implement.** `fakeTitles.ts`:
+- [x] **Step 2: Implement.** `fakeTitles.ts`:
 
 ```ts
 const NAMES = ['Bilal Ahmed','Sara Khan','Muhammad Hamza','Ayesha Siddiqui','Fatima Noor','Ali Raza','Zainab Bibi','Usman Ghani','Hina Shahid','Imran Malik','Khadija Tul Kubra','Abdul Rehman'];
@@ -593,7 +593,7 @@ export function resolveFakeTitle(iban: string): string {
 
 Controllers per pattern established in Tasks 3–5 (zod → logic → `ok`). `resolve-title` 404s on unknown `bankId`.
 
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): contacts, banks directory, deterministic account-title resolve`.
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): contacts, banks directory, deterministic account-title resolve`.
 
 ---
 
@@ -608,7 +608,7 @@ Controllers per pattern established in Tasks 3–5 (zod → logic → `ok`). `re
 - Consumes: `createPendingAction`, `toActionDto`, `registerExecutor`, `postTransaction`, `feeFor`, `resolveFakeTitle`.
 - Produces: `POST /transfers` body per roadmap Contract 1. Resolution rules: `kind:'payo'` → User by phone (404 `RECIPIENT_NOT_FOUND` if absent; 400 `SELF_TRANSFER` if self); `kind:'bank'` → bank + `resolveFakeTitle(iban)`; `kind:'contact'` → own Contact by id, branch on its kind. Pending kinds: **`send_money`** (payload `{ recipientUserId, recipientName, recipientUrduName?, phone }`, fee 0) and **`send_money_bank`** (payload `{ bankId, bankName, iban, accountTitle }`, fee `feeFor('send_money_bank')`=2500). Summary example: en `Send ₨1,500 to Bilal Ahmed`, ur `بلال احمد کو ₨1,500 بھیجیں` (build with a small `fmtRs(paisa)` helper = `'₨' + (paisa/100).toLocaleString('en-PK')`). Executors: `send_money` → debit sender (`type:'p2p'`, counterparty recipient) **and** credit recipient (`direction:'in'`, counterparty sender) in the same session; `send_money_bank` → debit only (`type:'bank_transfer'`, detail `` `${bankName} ${iban.slice(-4).padStart(8,'*')}` ``).
 
-- [ ] **Step 1: Failing tests** (via factories; full flow through `/actions/:id/execute`):
+- [x] **Step 1: Failing tests** (via factories; full flow through `/actions/:id/execute`):
 
 ```ts
 // P2P: A sends ₨1,500 to B by phone → A -150000, B +150000, both have txn docs (out/in), action completed.
@@ -619,7 +619,7 @@ Controllers per pattern established in Tasks 3–5 (zod → logic → `ok`). `re
 
 Write these as real supertest tests in the style of Task 5 (four `test()` blocks, asserting exact balances `850_000` / `1_150_000` and `497_500` remaining).
 
-- [ ] **Step 2: Implement** controller + `src/executors/transferExecutors.ts`:
+- [x] **Step 2: Implement** controller + `src/executors/transferExecutors.ts`:
 
 ```ts
 import { registerExecutor, txnDto } from '../lib/pendingActions';
@@ -650,7 +650,7 @@ registerExecutor('send_money_bank', async (session, a) => {
 
 `src/executors/index.ts` imports all executor modules; `app.ts` adds `import './executors'`.
 
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): transfers — p2p and fake-bank with pending-action executors`.
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): transfers — p2p and fake-bank with pending-action executors`.
 
 ---
 
@@ -664,11 +664,11 @@ registerExecutor('send_money_bank', async (session, a) => {
 **Interfaces:**
 - Produces: `GET /transactions` — filters `type`, `category`, `from`/`to` (ISO date), `limit` (default 20, max 100), `cursor` (opaque = base64 of `createdAt|id`); sorted `createdAt` desc, `_id` desc; returns `{ items: Txn[], nextCursor: string | null }`. `GET /transactions/spending-summary?from&to` → aggregation over `direction:'out'` (and `in` total) grouped by category: `{ totalOutPaisa, totalInPaisa, byCategory: [{ category, totalPaisa, count }] }` sorted desc by total. (This exact payload is what the AI's `spending_summary` tool and the statement generator reuse.)
 
-- [ ] **Step 1: Failing tests** — seed 25 txns for one user via `Transaction.create` (mix of categories `food`/`transport`/`bills`, some `in`), then: pagination walks 20 + 5 with cursor and no overlap; `category=food` filters; summary returns correct totals (hand-computed in test constants); other user's data never appears.
+- [x] **Step 1: Failing tests** — seed 25 txns for one user via `Transaction.create` (mix of categories `food`/`transport`/`bills`, some `in`), then: pagination walks 20 + 5 with cursor and no overlap; `category=food` filters; summary returns correct totals (hand-computed in test constants); other user's data never appears.
 
-- [ ] **Step 2: Implement** with a Mongo aggregation for summary (`$match` userId+range, `$group` by direction/category) and cursor condition `{ $or: [{ createdAt: { $lt } }, { createdAt: eq, _id: { $lt } }] }`.
+- [x] **Step 2: Implement** with a Mongo aggregation for summary (`$match` userId+range, `$group` by direction/category) and cursor condition `{ $or: [{ createdAt: { $lt } }, { createdAt: eq, _id: { $lt } }] }`.
 
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): transactions list with cursor pagination + spending summary`.
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): transactions list with cursor pagination + spending summary`.
 
 ---
 
@@ -682,11 +682,11 @@ registerExecutor('send_money_bank', async (session, a) => {
 **Interfaces:**
 - Produces: `GET /billers` → `{ items }`; `POST /bills/lookup { billerId, consumerNo(10–14 digits) }` → finds existing `due` Bill for `(billerId, consumerNo)` or **deterministically fabricates + persists one**: `consumerName = resolveFakeTitle(consumerNo)`, `amountPaisa = 150000 + (hash(consumerNo) % 700000)` rounded to nearest 1000 paisa, `month` = previous calendar month `"YYYY-MM"`, `dueDate` = 10th of current month; re-lookup returns the same bill (idempotent). `POST /bills/pay { billId }` → 404 unknown, 410 `ALREADY_PAID` if paid, else pending action kind **`pay_bill`** (payload `{ billId }`, fee 0, summary en `Pay K-Electric bill ₨4,320`, ur `کے الیکٹرک کا بل ₨4,320 ادا کریں`, lines: consumer name, consumer no, month, due date). Executor `pay_bill`: debit (`type:'bill'`, category `'bills'`, counterparty `{ name: biller.name, urduName: biller.urduName, detail: consumerNo }`) then `Bill.status = 'paid'` in-session; **executor throws `ApiError(410,'ALREADY_PAID',…)` if bill no longer due** (guarded `findOneAndUpdate status due→paid`).
 
-- [ ] **Step 1: Failing tests** — create Biller directly; lookup twice → same `billId`+amount; pay → execute → balance debited by bill amount, bill `paid`; paying same bill again → 410; second pending on same bill then execute → 410 from executor, action returns pending.
+- [x] **Step 1: Failing tests** — create Biller directly; lookup twice → same `billId`+amount; pay → execute → balance debited by bill amount, bill `paid`; paying same bill again → 410; second pending on same bill then execute → 410 from executor, action returns pending.
 
-- [ ] **Step 2: Implement** (reuse `hash` from `fakeTitles.ts` — export it as `djb2(s: string): number`).
+- [x] **Step 2: Implement** (reuse `hash` from `fakeTitles.ts` — export it as `djb2(s: string): number`).
 
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): bills — deterministic lookup and pin-gated payment`.
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): bills — deterministic lookup and pin-gated payment`.
 
 ---
 
@@ -700,9 +700,9 @@ registerExecutor('send_money_bank', async (session, a) => {
 **Interfaces:**
 - Produces: `GET /telcos` → `{ items }`; `POST /recharges { telcoId, phone(+92…), amountPaisa (min ₨50 = 5000, max ₨5,000 = 500000) }` → pending kind **`recharge`** (payload `{ telcoId, telcoName, telcoUrduName, phone }`, fee 0, summary en `Recharge ₨500 on Jazz 0300…`, ur `جاز 0300… پر ₨500 لوڈ کریں`). Executor: debit `type:'recharge'`, category `'recharge'`, counterparty `{ name: telcoName, urduName, detail: phone }`.
 
-- [ ] **Step 1: Failing tests** — telco created directly; below-min amount → 400 VALIDATION; happy path executes and debits; unknown telco → 404.
-- [ ] **Step 2: Implement** per Task 9 pattern (full code, same shape, different domain).
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): mobile recharges`.
+- [x] **Step 1: Failing tests** — telco created directly; below-min amount → 400 VALIDATION; happy path executes and debits; unknown telco → 404.
+- [x] **Step 2: Implement** per Task 9 pattern (full code, same shape, different domain).
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): mobile recharges`.
 
 ---
 
@@ -716,9 +716,9 @@ registerExecutor('send_money_bank', async (session, a) => {
 **Interfaces:**
 - Produces: `POST /requests { fromPhone, amountPaisa, note? }` — requester asks the user at `fromPhone` (must be a Payo user; 404 otherwise; 400 on self) → creates `MoneyRequest{ requesterId, payerId, status:'pending' }` → `{ request: RequestDto }` (`{ id, direction: 'outgoing'|'incoming', counterparty: { name, urduName?, phone }, amountPaisa, note, status, createdAt }` — direction computed per viewer). `GET /requests` → both incoming and outgoing for the caller, newest first. `POST /requests/:id/approve` — **payer only** (404 for others; 410 if not pending) → pending action kind **`request_settlement`** (payer's action; payload `{ requestId, requesterId, requesterName, requesterUrduName?, requesterPhone }`, fee 0, ur summary `… کو ₨… بھیجیں (درخواست)`) → returns the action DTO. Executor: same double-post as `send_money` (payer debit, requester credit, type `'request_settlement'`) **plus** `MoneyRequest.status → 'approved'` in-session (guarded pending→approved, 410 `REQUEST_GONE` if raced). `POST /requests/:id/decline` — payer only, pending→declined.
 
-- [ ] **Step 1: Failing tests** — A requests ₨700 from B: B sees it `incoming`, A `outgoing`; B approves → executes with PIN → A +70000, B −70000, request `approved`; C cannot approve B's request (404); declining a settled request → 410; approve→execute twice → one settlement only.
-- [ ] **Step 2: Implement** (full controller + executor code following Task 7's double-post pattern).
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): money requests with approve-to-pending settlement`.
+- [x] **Step 1: Failing tests** — A requests ₨700 from B: B sees it `incoming`, A `outgoing`; B approves → executes with PIN → A +70000, B −70000, request `approved`; C cannot approve B's request (404); declining a settled request → 410; approve→execute twice → one settlement only.
+- [x] **Step 2: Implement** (full controller + executor code following Task 7's double-post pattern).
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): money requests with approve-to-pending settlement`.
 
 ---
 
@@ -732,9 +732,9 @@ registerExecutor('send_money_bank', async (session, a) => {
 **Interfaces:**
 - Produces: `GET /pockets` → `{ items: PocketDto[] }` (`{ id, name, urduName?, emoji, goalPaisa?, balancePaisa }` — matches roadmap `pocket` card); `POST /pockets { name, urduName?, emoji, goalPaisa? }` → 201 PocketDto. `POST /pockets/:id/deposit { amountPaisa }` → pending kind **`pocket_deposit`** (payload `{ pocketId, pocketName, pocketUrduName? }`, `requiresPin: false` — moving your own money into savings needs confirm but not PIN; ur summary `عمرہ فنڈ میں ₨2,000 ڈالیں`); `/withdraw` → kind **`pocket_withdraw`** (`requiresPin: false`). Executors: deposit = guarded main-account debit (`postTransaction type:'pocket_deposit'`, category `'savings'`, counterparty `{ name: pocketName, urduName: pocketUrduName, detail: 'pocket' }`) + `Pocket.updateOne({_id}, { $inc: { balancePaisa: amount } })` in-session; withdraw = guarded pocket decrement (`updateOne({ _id, balancePaisa: { $gte } }, …)`, else `ApiError(400,'INSUFFICIENT_POCKET_FUNDS',…)`) + main credit (`direction:'in'`, type `'pocket_withdraw'`).
 
-- [ ] **Step 1: Failing tests** — create pocket; deposit ₨2,000 executes **without** `pin` in body; main −200000, pocket +200000; withdraw more than pocket holds → 400 `INSUFFICIENT_POCKET_FUNDS`, balances unchanged; ownership: other user's pocket id → 404.
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): savings pockets with pending-gated moves`.
+- [x] **Step 1: Failing tests** — create pocket; deposit ₨2,000 executes **without** `pin` in body; main −200000, pocket +200000; withdraw more than pocket holds → 400 `INSUFFICIENT_POCKET_FUNDS`, balances unchanged; ownership: other user's pocket id → 404.
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): savings pockets with pending-gated moves`.
 
 ---
 
@@ -748,9 +748,9 @@ registerExecutor('send_money_bank', async (session, a) => {
 **Interfaces:**
 - Produces: `GET /cards/mine` → `{ id, pan, cvv, expiry, frozen }` (full reveal — display-only fake card); `POST /cards/mine/freeze { frozen: boolean }` → updated card DTO.
 
-- [ ] **Step 1: Failing tests** — `/cards/mine` returns the card signup created (pan starts `4111 11`); freeze true then false round-trips.
-- [ ] **Step 2: Implement** (5-line controller each).
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): virtual card reveal and freeze`.
+- [x] **Step 1: Failing tests** — `/cards/mine` returns the card signup created (pan starts `4111 11`); freeze true then false round-trips.
+- [x] **Step 2: Implement** (5-line controller each).
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): virtual card reveal and freeze`.
 
 ---
 
@@ -765,9 +765,9 @@ registerExecutor('send_money_bank', async (session, a) => {
 - Produces: `POST /statements { year: int 2020–2100, month?: 1–12 }` → computes period range, aggregates the caller's transactions (reusing the Task 8 aggregation, extracted to `summarizeTransactions(userId, from, to)` exported from `transactionsController.ts`), upserts a `Statement` for `(userId, year, month)` → `{ statementId, summary: { period: { en, ur }, totalInPaisa, totalOutPaisa, byCategory, txnCount } }`; 404 `NO_ACTIVITY` when zero txns in period. Urdu month names map for `period.ur` (e.g. `اگست 2026`; yearly = `سال 2025`). `GET /statements` → caller's statements newest first `{ items: [{ id, year, month, totalInPaisa, totalOutPaisa, txnCount, createdAt }] }`. `GET /statements/:id/pdf` → `Content-Type: application/pdf`, pdfkit doc: PAYO header, account holder, period, totals table, per-category rows, per-transaction rows (date, type, counterparty name, ±amount) — **English-only PDF** (Nastaliq shaping in pdfkit is unreliable; spec notes this; in-app view is Urdu).
 - Consumes: `summarizeTransactions` (extract during this task from Task 8 code).
 
-- [ ] **Step 1: Failing tests** — seed txns across two months; monthly statement totals match hand-computed constants; empty month → 404 NO_ACTIVITY; regenerate (POST twice) → same `statementId` (upsert, not duplicate); pdf endpoint → status 200, `content-type` pdf, body length > 1000, first bytes `%PDF`.
-- [ ] **Step 2: Implement** (`statementPdf.ts` builds the doc into a Buffer via `doc.on('data')` collection; route pipes buffer).
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): statements with english pdf download`.
+- [x] **Step 1: Failing tests** — seed txns across two months; monthly statement totals match hand-computed constants; empty month → 404 NO_ACTIVITY; regenerate (POST twice) → same `statementId` (upsert, not duplicate); pdf endpoint → status 200, `content-type` pdf, body length > 1000, first bytes `%PDF`.
+- [x] **Step 2: Implement** (`statementPdf.ts` builds the doc into a Buffer via `doc.on('data')` collection; route pipes buffer).
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): statements with english pdf download`.
 
 ---
 
@@ -781,9 +781,9 @@ registerExecutor('send_money_bank', async (session, a) => {
 **Interfaces:**
 - Produces: `GET /qr/mine` → `{ payload }` where payload = `payo:v1:<userId>:<phone>:<sig>`, `sig = HMAC-SHA256(jwtSecret, 'payo:v1:<userId>:<phone>').hex.slice(0,16)` (crypto builtin). `POST /qr/resolve { payload }` → verifies format + sig (400 `INVALID_QR`), loads user → `{ user: { name, urduName, phone, avatar } }` — mobile then calls `POST /transfers { to: { kind:'payo', phone } }`.
 
-- [ ] **Step 1: Failing tests** — mine→resolve round-trip returns the owner's name; tampered payload (flip a char) → 400 INVALID_QR.
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): signed QR payloads`.
+- [x] **Step 1: Failing tests** — mine→resolve round-trip returns the owner's name; tampered payload (flip a char) → 400 INVALID_QR.
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): signed QR payloads`.
 
 ---
 
@@ -797,9 +797,9 @@ registerExecutor('send_money_bank', async (session, a) => {
 **Interfaces:**
 - Produces (consumed by AI service in Phase 4): `POST /chat/sessions {}` → 201 `{ id, title: null, createdAt }`; `GET /chat/sessions` → caller's, newest first; `GET /chat/sessions/:id/messages` → `{ items: [{ id, role, text, cards, createdAt }] }` ascending; `POST /chat/sessions/:id/messages { role: 'user'|'assistant', text, cards? }` → 201 message; first user message also sets session `title` = first 40 chars of text. Ownership-scoped 404s throughout.
 
-- [ ] **Step 1: Failing tests** — session create/list; message round-trip preserves a `cards` array with an arbitrary JSON card; title set from first user message; cross-user access → 404.
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): chat session and message persistence`.
+- [x] **Step 1: Failing tests** — session create/list; message round-trip preserves a `cards` array with an arbitrary JSON card; title set from first user message; cross-user access → 404.
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): chat session and message persistence`.
 
 ---
 
@@ -814,9 +814,9 @@ registerExecutor('send_money_bank', async (session, a) => {
 - Produces: `runSeed(): Promise<void>` exported (tests call it against the memory server); npm script `seed` runs it against local Mongo. Creates exactly the Contract 4 world: 6 users (PIN `1234`, emails `<name>@payo.demo`, phones `+92300111000{1..6}`), accounts with target balances (Ammi ₨84,500 = 8_450_000 after history nets out — the generator works backwards: write the 3 months of txn docs with fees/categories, then set each account balance to opening 0 + sum of history, asserting Ammi lands on 8_450_000 by construction), cards, banks (HBL, Meezan, UBL, MCB, Allied), billers (K-Electric electricity, SSGC gas, PTCL internet, Karachi Water water), telcos (Jazz, Zong, Telenor, Ufone), Ammi's due K-Electric bill (`consumerNo 0400012345678`, ₨4,320 = 432_000), Ammi's pocket `عمرہ فنڈ` (goal 50_000_000, balance 12_000_000), Ammi's contacts (Bilal payo-linked, both Saras payo-linked, `بھائی جان` Meezan `PK36MEZN0000001123456702`).
 - `data.ts` holds the static tables (users, banks, billers, telcos, txn templates per month: salary in on the 1st, 8–12 outs across `food`/`transport`/`bills`/`recharge`/`transfer` with fixed pseudo-random generator seeded per user index — `mulberry32(userIndex)` so output is stable).
 
-- [ ] **Step 1: Failing test** — `runSeed()` then assert: 6 users; Ammi balance `8_450_000`; Ammi has ≥ 60 transactions spanning 3 calendar months; one due bill; pocket exists with balance `12_000_000`; 5 banks, 4 billers, 4 telcos; login works via API for `ammi@payo.demo`/`1234`.
-- [ ] **Step 2: Implement** `data.ts` + `seed.ts` (include `mulberry32` PRNG inline — 6 lines).
-- [ ] **Step 3: Run → PASS. Commit** `feat(backend): deterministic demo-world seed`.
+- [x] **Step 1: Failing test** — `runSeed()` then assert: 6 users; Ammi balance `8_450_000`; Ammi has ≥ 60 transactions spanning 3 calendar months; one due bill; pocket exists with balance `12_000_000`; 5 banks, 4 billers, 4 telcos; login works via API for `ammi@payo.demo`/`1234`.
+- [x] **Step 2: Implement** `data.ts` + `seed.ts` (include `mulberry32` PRNG inline — 6 lines).
+- [x] **Step 3: Run → PASS. Commit** `feat(backend): deterministic demo-world seed`.
 
 ---
 
@@ -826,6 +826,6 @@ registerExecutor('send_money_bank', async (session, a) => {
 - Test: `src/__tests__/e2e.smoke.test.ts`
 - Modify: `docs/plans/2026-09-01-payo-roadmap.md` (Phase 2 → done)
 
-- [ ] **Step 1: Write the smoke test** — one long test through the public API only: seed → login as Ammi → `GET /me` (balance 8_450_000) → lookup K-Electric bill → pay → execute with PIN → balance drops 432_000 → `POST /transfers` ₨1,500 to Bilal → execute → both balances move → `POST /statements` current month → `GET pdf` 200 → `GET /transactions` shows the two new txns first. Run → PASS.
-- [ ] **Step 2: Full suite + dev-server curl smoke** (`npm test`; then `docker compose up -d mongo && npm run seed && npm run dev &` + curl login → me → kill). Expected: suite green, curl returns Ammi's real balance.
-- [ ] **Step 3:** Update roadmap Phase 2 status → done. **Commit** `feat(backend): phase 2 complete — e2e smoke green`.
+- [x] **Step 1: Write the smoke test** — one long test through the public API only: seed → login as Ammi → `GET /me` (balance 8_450_000) → lookup K-Electric bill → pay → execute with PIN → balance drops 432_000 → `POST /transfers` ₨1,500 to Bilal → execute → both balances move → `POST /statements` current month → `GET pdf` 200 → `GET /transactions` shows the two new txns first. Run → PASS.
+- [x] **Step 2: Full suite + dev-server curl smoke** (`npm test`; then `docker compose up -d mongo && npm run seed && npm run dev &` + curl login → me → kill). Expected: suite green, curl returns Ammi's real balance.
+- [x] **Step 3:** Update roadmap Phase 2 status → done. **Commit** `feat(backend): phase 2 complete — e2e smoke green`.
