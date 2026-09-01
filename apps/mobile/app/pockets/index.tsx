@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Pressable, Modal } from 'react-native';
+import { ScrollView, View, Pressable, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen, T, Mono, Card, Field, PrimaryButton, ErrorBanner, Spacer, Row, useUrdu } from '../../src/components/ui';
@@ -77,7 +77,7 @@ export default function Pockets() {
       </ScrollView>
 
       <Modal visible={!!move} transparent animationType="slide" onRequestClose={() => setMove(null)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
           <View style={{ backgroundColor: tokens.color.surface, borderTopLeftRadius: tokens.radius.card, borderTopRightRadius: tokens.radius.card, padding: tokens.space.l }}>
             <T size={tokens.type.h2} center>
               {move ? t(move.op === 'deposit' ? 'pockets.deposit' : 'pockets.withdraw') : ''}
@@ -90,7 +90,7 @@ export default function Pockets() {
             <Spacer h={tokens.space.s} />
             <PrimaryButton label={t('common.cancel')} onPress={() => { setMove(null); setError(null); }} danger />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </Screen>
   );

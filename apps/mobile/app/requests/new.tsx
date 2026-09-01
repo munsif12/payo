@@ -30,7 +30,7 @@ export default function NewRequest() {
   return (
     <Screen>
       <T size={tokens.type.h1} style={{ marginVertical: tokens.space.s }}>{t('requests.new')}</T>
-      <ScrollView>
+      <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <T color={tokens.color.textMuted}>{t('requests.fromWhom')}</T>
         <Spacer h={tokens.space.s} />
         {(contacts?.items ?? []).filter(c => c.kind === 'payo').map(c => (

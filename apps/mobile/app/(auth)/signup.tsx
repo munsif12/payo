@@ -32,7 +32,7 @@ export default function Signup() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ paddingVertical: tokens.space.xl }}>
+      <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: tokens.space.xl }}>
         <T size={tokens.type.h1} center>{t('auth.signup')}</T>
         <Spacer h={tokens.space.xl} />
         <Field testID="signup-name" placeholder={t('auth.name')} value={form.name} onChangeText={set('name')} />

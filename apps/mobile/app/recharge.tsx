@@ -34,7 +34,7 @@ export default function Recharge() {
   return (
     <Screen>
       <T size={tokens.type.h1} style={{ marginVertical: tokens.space.s }}>{t('recharge.title')}</T>
-      <ScrollView>
+      <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <T color={tokens.color.textMuted}>{t('recharge.chooseTelco')}</T>
         <Spacer h={tokens.space.s} />
         {(telcos?.items ?? []).map(tc => (

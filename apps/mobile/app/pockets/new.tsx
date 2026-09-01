@@ -35,7 +35,7 @@ export default function NewPocket() {
   return (
     <Screen>
       <T size={tokens.type.h1} style={{ marginVertical: tokens.space.s }}>{t('pockets.new')}</T>
-      <ScrollView>
+      <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <Row style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
           {EMOJIS.map(e => (
             <T key={e} size={30}

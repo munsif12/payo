@@ -51,7 +51,7 @@ export default function SendPick() {
         ))}
       </View>
 
-      <ScrollView>
+      <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         {mode === 'contacts' && (contacts?.items ?? []).map(c => (
           <ListRow
             key={c.id}

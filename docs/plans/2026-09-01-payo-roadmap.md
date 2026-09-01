@@ -28,9 +28,9 @@ replica set (required for multi-doc transactions).
 
 | # | Phase | Plan file | Status |
 |---|-------|-----------|--------|
-| 1 | Scaffold + infra | `plans/2026-09-01-phase-1-scaffold.md` | ready |
-| 2 | Backend core | `plans/2026-09-01-phase-2-backend-core.md` | ready |
-| 3 | Mobile classic layer | authored at phase start (from real backend) | pending |
+| 1 | Scaffold + infra | `plans/2026-09-01-phase-1-scaffold.md` | done |
+| 2 | Backend core | `plans/2026-09-01-phase-2-backend-core.md` | done |
+| 3 | Mobile classic layer | `plans/2026-09-01-phase-3-mobile-classic.md` | done |
 | 4 | AI service (voice loop) | authored at phase start | pending |
 | 5 | Voice home + confirmation gate | authored at phase start | pending |
 | 6 | Polish + demo pass | authored at phase start | pending |
