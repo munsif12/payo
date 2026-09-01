@@ -25,3 +25,5 @@ movement, no payment gateways.
 | Seed demo data | `cd services/backend && npm run seed` |
 
 Docs: `docs/` (spec, roadmap with all cross-service contracts, phase plans).
+
+> **Note:** PAYO's Mongo is published on host port **27018** (container 27017) to avoid clashing with any locally installed MongoDB.

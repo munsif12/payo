@@ -56,7 +56,7 @@ for that phase is written.
 - **Backend conventions:** controller-owns-logic (no service layer), thin routes,
   zod validation at route entry, `ApiError` for all failures, jest tests colocated
   under `src/**/__tests__/`.
-- **Ports (dev):** backend `4000`, AI service `8000`, Metro `8081`, Mongo `27017`.
+- **Ports (dev):** backend `4000`, AI service `8000`, Metro `8081`, Mongo `27018` (changed from 27017: dev machines often run a local standalone mongod on the default port, which would shadow the replica set).
 - **Env files:** each service has `.env` (gitignored) + `.env.example` (committed).
   Gemini key copied from SIA's local `.env` (`GEMINI_API_KEY`); Cartesia key
   (`CARTESIA_API_KEY`) provided by owner at Phase 4. Never commit keys.
