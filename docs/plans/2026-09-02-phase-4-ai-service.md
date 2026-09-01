@@ -41,27 +41,27 @@ a send_money turn matches PendingAction golden file, contact disambiguation retu
 ## Tasks
 
 ### Task 1: deps + backend client + cards
-- [ ] `uv add langgraph langchain-google-genai google-genai cartesia python-multipart langchain-core`
-- [ ] Failing tests: `tests/test_backend_client.py` (MockTransport: /me happy, ApiError mapping), `tests/test_cards.py` (golden card shapes).
-- [ ] Implement `backend_client.py`, `cards.py`. Run green. Commit `feat(ai): backend client + card models`.
+- [x] `uv add langgraph langchain-google-genai google-genai cartesia python-multipart langchain-core`
+- [x] Failing tests: `tests/test_backend_client.py` (MockTransport: /me happy, ApiError mapping), `tests/test_cards.py` (golden card shapes).
+- [x] Implement `backend_client.py`, `cards.py`. Run green. Commit `feat(ai): backend client + card models`.
 
 ### Task 2: tools
-- [ ] Failing tests `tests/test_tools.py`: get_balance→balance card; send_money(payo phone)→confirmation card w/ actionId+requiresPin; lookup_bill→bill card; search_contacts two-Sara query→contact_chips card; pay_bill→confirmation; spending_summary text; freeze_card→confirmation? (freeze is non-money: backend freezes directly → success text, no pending), list_pockets→pocket card(s).
-- [ ] Implement `tools.py`. Green. Commit `feat(ai): agent tools over backend api`.
+- [x] Failing tests `tests/test_tools.py`: get_balance→balance card; send_money(payo phone)→confirmation card w/ actionId+requiresPin; lookup_bill→bill card; search_contacts two-Sara query→contact_chips card; pay_bill→confirmation; spending_summary text; freeze_card→confirmation? (freeze is non-money: backend freezes directly → success text, no pending), list_pockets→pocket card(s).
+- [x] Implement `tools.py`. Green. Commit `feat(ai): agent tools over backend api`.
 
 ### Task 3: agent graph + fake-LLM harness
-- [ ] Failing tests `tests/test_agent.py`: scripted fake model calls get_balance then answers; agent returns reply text + collected cards; system prompt injected per language.
-- [ ] Implement `agent.py` (`run_agent(jwt, history, user_text, language) -> (reply_text, cards)`). Green. Commit `feat(ai): langgraph agent with injectable model`.
+- [x] Failing tests `tests/test_agent.py`: scripted fake model calls get_balance then answers; agent returns reply text + collected cards; system prompt injected per language.
+- [x] Implement `agent.py` (`run_agent(jwt, history, user_text, language) -> (reply_text, cards)`). Green. Commit `feat(ai): langgraph agent with injectable model`.
 
 ### Task 4: tts + stt providers
-- [ ] Failing tests `tests/test_tts.py`: StubTts stores bytes retrievable via store; provider selection by env.
-- [ ] Implement `tts.py`, `stt.py`. Green. Commit `feat(ai): tts/stt provider layer with stub fallback`.
+- [x] Failing tests `tests/test_tts.py`: StubTts stores bytes retrievable via store; provider selection by env.
+- [x] Implement `tts.py`, `stt.py`. Green. Commit `feat(ai): tts/stt provider layer with stub fallback`.
 
 ### Task 5: /converse SSE + chat persistence
-- [ ] Failing tests `tests/test_converse.py`: text turn streams transcript-less token(s)→card→audio→done in order; audio turn emits transcript first (FakeTranscriber); messages persisted to backend (MockTransport records POSTs); backend 401 → error event.
-- [ ] Implement `conversation.py` + `main.py` routes. Green. Commit `feat(ai): converse SSE loop with chat persistence`.
+- [x] Failing tests `tests/test_converse.py`: text turn streams transcript-less token(s)→card→audio→done in order; audio turn emits transcript first (FakeTranscriber); messages persisted to backend (MockTransport records POSTs); backend 401 → error event.
+- [x] Implement `conversation.py` + `main.py` routes. Green. Commit `feat(ai): converse SSE loop with chat persistence`.
 
 ### Task 6: live smoke + phase gate
-- [ ] `uv run pytest` all green; backend jest + mobile jest still green.
-- [ ] Live smoke with real backend running: `curl -N POST /converse` (text "بیلنس بتاؤ") — with GEMINI_API_KEY absent expect graceful `error` event mentioning missing key (documented in BLOCKERS.md); with key present expect balance card. 
-- [ ] Roadmap Phase 4 → done. Commit `feat(ai): phase 4 complete`.
+- [x] `uv run pytest` all green; backend jest + mobile jest still green.
+- [x] Live smoke with real backend running: `curl -N POST /converse` (text "بیلنس بتاؤ") — with GEMINI_API_KEY absent expect graceful `error` event mentioning missing key (documented in BLOCKERS.md); with key present expect balance card. 
+- [x] Roadmap Phase 4 → done. Commit `feat(ai): phase 4 complete`.

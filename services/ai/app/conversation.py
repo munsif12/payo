@@ -44,11 +44,11 @@ async def converse_turn(
     model: BaseChatModel | None = None,
 ) -> AsyncIterator[dict[str, str]]:
     try:
+        if model is None and not settings.gemini_api_key:
+            yield sse("error", {"code": "NO_GEMINI_KEY",
+                                "message": "GEMINI_API_KEY is not configured on the AI service"})
+            return
         if audio is not None:
-            if not settings.gemini_api_key:
-                yield sse("error", {"code": "NO_GEMINI_KEY",
-                                    "message": "GEMINI_API_KEY is not configured on the AI service"})
-                return
             text = await transcriber.transcribe(audio, audio_mime or "audio/m4a", language)
             yield sse("transcript", {"text": text})
         if not text or not text.strip():
@@ -64,11 +64,6 @@ async def converse_turn(
             history = []
 
         await client.add_message(session_id, "user", text)
-
-        if model is None and not settings.gemini_api_key:
-            yield sse("error", {"code": "NO_GEMINI_KEY",
-                                "message": "GEMINI_API_KEY is not configured on the AI service"})
-            return
 
         reply, cards = await run_agent(client, history, text, language, model=model)
 
