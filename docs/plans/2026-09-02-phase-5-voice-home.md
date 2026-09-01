@@ -37,7 +37,7 @@ it as a graceful Urdu bubble (proof screenshot) — live-agent proof deferred to
 BLOCKERS.md if the key still hasn't been provided.
 
 ## Tasks
-- [ ] Task 1: `aiUrl` + `sse.ts` + jest tests green. Commit `feat(mobile): sse client for ai service`.
-- [ ] Task 2: `useRecorder` + `useConverse` + CardView (all card kinds) + confirm-card routing. Commit `feat(mobile): converse state machine + native cards`.
-- [ ] Task 3: voice home rebuild (transcript, mic states, typed fallback, tiles). Commit `feat(mobile): voice-first home`.
-- [ ] Task 4: Argent verification both platforms — typed turn shows user bubble + (agent reply | graceful no-key bubble); chips/card render path exercised via mocked screenshots if no key. Screenshots → `docs/qa/phase-5/`. Roadmap Phase 5 → done. Commit `feat(mobile): phase 5 complete`.
+- [x] Task 1: `aiUrl` + `sse.ts` + jest tests green. Commit `feat(mobile): sse client for ai service`.
+- [x] Task 2: `useRecorder` + `useConverse` + CardView (all card kinds) + confirm-card routing. Commit `feat(mobile): converse state machine + native cards`.
+- [x] Task 3: voice home rebuild (transcript, mic states, typed fallback, tiles). Commit `feat(mobile): voice-first home`.
+- [x] Task 4: Argent verification both platforms — typed turn shows user bubble + (agent reply | graceful no-key bubble); chips/card render path exercised via mocked screenshots if no key. Screenshots → `docs/qa/phase-5/`. Roadmap Phase 5 → done. Commit `feat(mobile): phase 5 complete`.
