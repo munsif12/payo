@@ -5,9 +5,15 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cartesia>=4.1.0",
     "fastapi>=0.141.1",
+    "google-genai>=2.21.0",
     "httpx>=0.28.1",
+    "langchain-core>=1.6.1",
+    "langchain-google-genai>=4.3.7",
+    "langgraph>=1.2.11",
     "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
     "sse-starlette>=3.4.8",
     "uvicorn[standard]>=0.52.4",
 ]
@@ -17,3 +23,6 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
