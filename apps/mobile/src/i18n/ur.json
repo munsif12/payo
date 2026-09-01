@@ -16,12 +16,10 @@
   "common.amount": "رقم",
   "common.note": "نوٹ",
   "common.save": "محفوظ کریں",
-
   "tabs.home": "ہوم",
   "tabs.activity": "سرگرمی",
   "tabs.pay": "ادائیگی",
   "tabs.more": "مزید",
-
   "auth.welcome": "PAYO میں خوش آمدید",
   "auth.tagline": "آواز سے چلنے والا آسان بینک",
   "auth.email": "ای میل",
@@ -39,10 +37,8 @@
   "auth.verify": "تصدیق کریں",
   "auth.wrongCreds": "ای میل یا پن غلط ہے",
   "auth.logout": "لاگ آؤٹ",
-
   "home.balance": "بیلنس",
   "home.tapToReveal": "دیکھنے کے لیے دبائیں",
-
   "activity.title": "سرگرمی",
   "activity.empty": "ابھی کوئی لین دین نہیں",
   "activity.all": "سب",
@@ -56,14 +52,12 @@
   "activity.type": "قسم",
   "activity.in": "موصول",
   "activity.out": "ادا",
-
   "pay.title": "ادائیگی",
   "pay.send": "پیسے بھیجیں",
   "pay.qr": "کیو آر کوڈ",
   "pay.bills": "بل ادا کریں",
   "pay.recharge": "موبائل لوڈ",
   "pay.requests": "درخواستیں",
-
   "send.title": "کس کو بھیجنا ہے؟",
   "send.contacts": "محفوظ رابطے",
   "send.newPhone": "نئے PAYO نمبر پر",
@@ -74,13 +68,11 @@
   "send.titleResolved": "اکاؤنٹ کا نام",
   "send.howMuch": "کتنے پیسے بھیجنے ہیں؟",
   "send.recipientNotFound": "اس نمبر پر کوئی PAYO صارف نہیں",
-
   "qr.myCode": "میرا کوڈ",
   "qr.scan": "اسکین کریں",
   "qr.myCodeHint": "یہ کوڈ دکھا کر پیسے وصول کریں",
   "qr.pasteHint": "یا کوڈ یہاں پیسٹ کریں (سمولیٹر)",
   "qr.invalid": "یہ PAYO کوڈ نہیں ہے",
-
   "bills.title": "بل ادا کریں",
   "bills.consumerNo": "صارف نمبر",
   "bills.lookup": "بل معلوم کریں",
@@ -88,11 +80,9 @@
   "bills.month": "مہینہ",
   "bills.payNow": "ابھی ادا کریں",
   "bills.alreadyPaid": "یہ بل پہلے ہی ادا ہو چکا ہے",
-
   "recharge.title": "موبائل لوڈ",
   "recharge.phone": "کس نمبر پر؟",
   "recharge.chooseTelco": "نیٹ ورک چنیں",
-
   "requests.title": "درخواستیں",
   "requests.new": "پیسے مانگیں",
   "requests.incoming": "موصولہ",
@@ -104,7 +94,6 @@
   "requests.approved": "ادا شدہ",
   "requests.declined": "انکار شدہ",
   "requests.empty": "کوئی درخواست نہیں",
-
   "pockets.title": "بچت",
   "pockets.new": "نئی بچت بنائیں",
   "pockets.name": "نام (انگریزی)",
@@ -114,7 +103,6 @@
   "pockets.withdraw": "پیسے نکالیں",
   "pockets.of": "ہدف",
   "pockets.empty": "ابھی کوئی بچت نہیں",
-
   "card.title": "میرا کارڈ",
   "card.reveal": "نمبر دیکھیں",
   "card.hide": "چھپائیں",
@@ -122,7 +110,6 @@
   "card.unfreeze": "کارڈ کھولیں",
   "card.frozen": "کارڈ بند ہے",
   "card.expiry": "میعاد",
-
   "statements.title": "گوشوارے",
   "statements.generate": "نیا گوشوارہ",
   "statements.year": "سال",
@@ -134,7 +121,6 @@
   "statements.moneyOut": "ادا",
   "statements.noActivity": "اس مدت میں کوئی لین دین نہیں",
   "statements.empty": "ابھی کوئی گوشوارہ نہیں",
-
   "more.title": "مزید",
   "more.pockets": "بچت",
   "more.card": "میرا کارڈ",
@@ -144,7 +130,6 @@
   "profile.language": "زبان",
   "profile.urdu": "اردو",
   "profile.english": "English",
-
   "confirm.title": "تصدیق کریں",
   "confirm.enterPin": "اپنا پن ڈالیں",
   "confirm.wrongPin": "پن غلط ہے، دوبارہ کوشش کریں",
@@ -152,5 +137,14 @@
   "confirm.insufficient": "بیلنس کافی نہیں",
   "success.title": "کامیاب!",
   "success.sent": "رقم بھیج دی گئی",
-  "success.refNo": "حوالہ نمبر"
+  "success.refNo": "حوالہ نمبر",
+  "voice.networkError": "نیٹ ورک کا مسئلہ — دوبارہ کوشش کریں",
+  "voice.thinking": "سوچ رہی ہوں…",
+  "voice.listening": "سن رہی ہوں…",
+  "voice.typePlaceholder": "یہاں لکھیں…",
+  "voice.errorPrefix": "معذرت!",
+  "voice.suggest.balance": "میرا بیلنس کتنا ہے؟",
+  "voice.suggest.payBill": "بجلی کا بل ادا کرنا ہے",
+  "voice.suggest.sendMoney": "پیسے بھیجنے ہیں",
+  "voice.suggest.statement": "پچھلے مہینے کا گوشوارہ چاہیے"
 }

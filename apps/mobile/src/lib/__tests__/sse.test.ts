@@ -14,3 +14,13 @@ test('flushing rest with terminator yields the final event', () => {
   const { events } = parseSseChunk('event: done\ndata: {"sessionId":"s1","messageId":"m1"}\n\n');
   expect(events).toEqual([{ event: 'done', data: { sessionId: 's1', messageId: 'm1' } }]);
 });
+
+test('parses CRLF-delimited SSE (sse-starlette style)', () => {
+  const chunk = 'event: token\r\ndata: {"text":"a "}\r\n\r\nevent: token\r\ndata: {"text":"b "}\r\n\r\n';
+  const { events, rest } = parseSseChunk(chunk);
+  expect(events).toEqual([
+    { event: 'token', data: { text: 'a ' } },
+    { event: 'token', data: { text: 'b ' } },
+  ]);
+  expect(rest).toBe('');
+});

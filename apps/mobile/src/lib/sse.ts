@@ -9,7 +9,8 @@ export interface SseEvent {
 
 export function parseSseChunk(buffer: string): { events: SseEvent[]; rest: string } {
   const events: SseEvent[] = [];
-  const blocks = buffer.split(/\n\n/);
+  // SSE allows \r\n line endings (sse-starlette uses them) — normalize first.
+  const blocks = buffer.replace(/\r\n/g, '\n').split(/\n\n/);
   const rest = blocks.pop() ?? '';
   for (const block of blocks) {
     let event = 'message';
