@@ -1,2 +1,9 @@
 import { Router } from 'express';
+import { handler } from '../lib/handler';
+import { requireAuth } from '../middleware/requireAuth';
+import { authRoutes } from './authRoutes';
+import { me } from '../controllers/authController';
+
 export const apiRouter = Router();
+apiRouter.use('/auth', authRoutes);
+apiRouter.get('/me', requireAuth, handler(me));
