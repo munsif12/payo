@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+__pycache__/
+.venv/
+*.pyc
+.expo/
+ios/build/
+android/build/
+android/app/build/
+*.log
+.DS_Store
+coverage/
