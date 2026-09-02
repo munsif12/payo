@@ -788,7 +788,7 @@ def ai_home_header(t, rtl=False, balance="₨84,500", name="Ammi Jaan", greet="G
             f'<div class="pill num" style="height:36px;padding:0 14px;background:{t["surface"]};color:{t["ink"]};font-size:14px;box-shadow:0 1px 2px rgba(14,34,51,0.06);gap:8px;">{ico("eye", 16, t["ink3"])}{balance}</div></div>')
 
 def suggestion(t, icon, label, sub, delay_cls):
-    return (f'<div class="card rise {delay_cls}" style="padding:14px 16px;display:flex;align-items:center;gap:14px;min-height:72px;">'
+    return (f'<div class="card rise {delay_cls}" style="padding:10px 14px;display:flex;align-items:center;gap:12px;min-height:64px;">'
             f'<div class="icoCircle" style="background:{t["amberTint"]};">{ico(icon, 22, t["navy"], 2.2)}</div>'
             f'<div style="flex:1;"><div class="hl">{label}</div><div class="foot">{sub}</div></div>{ico("chev", 20, t["ink3"])}</div>')
 
@@ -816,7 +816,7 @@ def screen_ai_home(t, state="greet", rtl=False):
     if state == "greet":
         chat = (f'<div class="rise d1" style="display:flex;gap:10px;align-items:flex-end;">{ai_avatar(t)}'
                 f'<div class="bubbleA" style="font-size:19px;line-height:{"38px" if rtl else "27px"};">{L2["hello"]}</div></div>'
-                f'<div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">{sug}</div>')
+                f'<div style="display:flex;flex-direction:column;gap:8px;margin-top:2px;">{sug}</div>')
         comp = composer(t, rtl, L2["ph"], hint=L2["hint"])
     elif state == "listening":
         bars = ''.join(f'<div class="bar" style="height:{h}px;animation-delay:{d}ms;"></div>' for h, d in [(14,0),(26,120),(38,240),(22,360),(30,480),(16,600),(28,720),(20,840),(34,960),(18,1080)])
@@ -830,11 +830,11 @@ def screen_ai_home(t, state="greet", rtl=False):
     else:  # conversation
         chat = (f'<div style="display:flex;gap:10px;align-items:flex-end;">{ai_avatar(t)}<div class="bubbleA">How can I help you today?</div></div>'
                 f'<div class="bubbleU rise">Pay a bill</div>'
-                f'<div class="rise d2" style="display:flex;gap:10px;align-items:flex-end;">{ai_avatar(t)}<div class="bubbleA">You have one bill due. K-Electric, ₨4,320, due Sep 10. Shall I pay it from your wallet?</div></div>'
+                f'<div class="rise d2" style="display:flex;gap:10px;align-items:flex-end;">{ai_avatar(t)}<div class="bubbleA">One bill is due: K-Electric, ₨4,320 by Sep 10. Pay it from your wallet?</div></div>'
                 f'<div class="card rise d4" style="align-self:flex-start;width:300px;padding:16px;display:flex;flex-direction:column;gap:12px;border:1.5px solid {t["amber"]};margin-left:46px;">'
                 f'<div style="display:flex;align-items:center;gap:12px;"><div class="icoCircle" style="background:{t["redTint"]};">{ico("zap", 22, t["red"], 2.2)}</div><div style="flex:1;"><div class="hl">K-Electric</div><div class="foot">Consumer ···5678 · Aug bill</div></div><div class="pill" style="background:{t["redTint"]};color:{t["red"]};">Due Sep 10</div></div>'
                 f'<div style="display:flex;justify-content:space-between;align-items:baseline;"><span class="money num" style="font-size:32px;line-height:38px;">₨4,320</span><span class="foot">Balance after ₨80,180</span></div>'
-                f'<div class="btn" style="height:48px;">Yes, pay ₨4,320</div><div class="btnGhost" style="height:40px;">Not now</div></div>'
+                f'<div style="display:flex;gap:8px;"><div class="btn2" style="height:48px;flex:2;">Not now</div><div class="btn" style="height:48px;flex:3;">Yes, pay ₨4,320</div></div></div>'
                 f'<div class="rise d6" style="display:flex;gap:10px;align-items:center;margin-left:46px;"><div class="bubbleA" style="display:flex;gap:6px;padding:14px 18px;"><div class="dot1" style="width:8px;height:8px;border-radius:4px;background:{t["ink2"]};"></div><div class="dot2" style="width:8px;height:8px;border-radius:4px;background:{t["ink2"]};"></div><div class="dot3" style="width:8px;height:8px;border-radius:4px;background:{t["ink2"]};"></div></div></div>')
         comp = composer(t, rtl, L2["ph"], hint="You'll confirm with your PIN before anything is paid")
     body = f"""
