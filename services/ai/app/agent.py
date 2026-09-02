@@ -5,6 +5,7 @@ tests inject a scripted fake. Tools are built per-run as closures over the
 caller's BackendClient and a card sink, so cards surface to the app while the
 model only sees text.
 """
+from datetime import date
 from typing import Annotated, Any, Sequence
 
 from langchain_core.language_models import BaseChatModel
@@ -21,7 +22,9 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — بزرگ اور غ�
 اصول:
 - ہمیشہ سادہ، مختصر اردو جملوں میں جواب دیں (بولا جائے گا، اس لیے مختصر رکھیں)۔
 - اکاؤنٹ کی کوئی بھی حقیقت (بیلنس، لین دین، بل) بتانے سے پہلے متعلقہ ٹول ضرور استعمال کریں — کبھی اندازہ نہ لگائیں۔
-- پیسے بھیجنے/بل/لوڈ کے ٹول صرف تصدیقی کارڈ بناتے ہیں؛ رقم صارف کی تصدیق اور PIN کے بعد ہی منتقل ہوتی ہے۔ کبھی نہ کہیں کہ رقم بھیج دی گئی — کہیں: «تصدیق کے لیے کارڈ دیکھیں»۔
+- آپ خود کوئی کارڈ نہیں دکھا سکتیں — کارڈ صرف ٹول کال سے بنتا ہے۔ «تصدیق کے لیے کارڈ دیکھیں» صرف تب کہیں جب اسی باری میں send_money / pay_bill / recharge / pocket_deposit ٹول کال ہو چکا ہو۔
+- پیسے بھیجنے کا طریقہ: پہلے search_contacts(نام) کال کریں؛ ایک رابطہ ملے تو فوراً send_money(contact_id, amount_paisa) کال کریں (روپے × 100 = پیسے)؛ پھر جواب دیں۔ بل: lookup_bill پھر pay_bill۔ لوڈ: recharge۔
+- رقم صارف کی تصدیق اور PIN کے بعد ہی منتقل ہوتی ہے۔ کبھی نہ کہیں کہ رقم بھیج دی گئی۔
 - کارڈ نمبر کبھی پورا نہ پڑھیں۔
 - اگر ایک نام کے کئی رابطے ملیں تو chips کارڈ دکھا کر پوچھیں، خود انتخاب نہ کریں۔
 - رقم ہمیشہ روپے میں کہیں (مثلاً «پندرہ سو روپے»)۔"""
@@ -30,11 +33,29 @@ SYSTEM_PROMPT_EN = """You are PAYO's assistant — a voice-first bank for elderl
 Rules:
 - Reply in short, simple English sentences (they will be spoken aloud).
 - Always use a tool before stating any account fact (balance, transactions, bills) — never guess.
-- Money-moving tools only CREATE a confirmation card; money moves only after the user taps
-  confirm and enters their PIN. Never claim money was sent — say "please confirm on the card shown".
+- You cannot show a card yourself — a card exists ONLY when a tool is called. Say "please confirm
+  on the card shown" only if send_money / pay_bill / recharge / pocket_deposit was called this turn.
+- To send money: call search_contacts(name) first; if exactly one contact matches, immediately call
+  send_money(contact_id, amount_paisa) (rupees x 100 = paisa); then reply. Bills: lookup_bill then
+  pay_bill. Top-ups: recharge.
+- Money moves only after the user taps confirm and enters their PIN. Never claim money was sent.
 - Never read a full card number aloud.
 - If several contacts match one name, show the chips card and ask — never pick yourself.
 - Say amounts in rupees."""
+
+
+URDU_MONTHS = ["جنوری", "فروری", "مارچ", "اپریل", "مئی", "جون", "جولائی", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"]
+
+
+def system_prompt(language: str, today: date | None = None) -> str:
+    """Base rules + today's date. Without the date the model resolves 'last month' against
+    its training cutoff and queries empty ranges (seen live: 'no food spending last month')."""
+    today = today or date.today()
+    if language == "ur":
+        line = f"آج کی تاریخ: {today.isoformat()} ({today.day} {URDU_MONTHS[today.month - 1]} {today.year})۔ «پچھلا مہینہ» = {today.month - 1 or 12}/{today.year if today.month > 1 else today.year - 1}۔ تاریخوں کے لیے from_date/to_date ISO (YYYY-MM-DD) میں دیں۔"
+        return f"{SYSTEM_PROMPT_UR}\n- {line}"
+    line = f"Today is {today.isoformat()}. 'Last month' means {today.month - 1 or 12}/{today.year if today.month > 1 else today.year - 1}. Pass from_date/to_date as ISO dates (YYYY-MM-DD)."
+    return f"{SYSTEM_PROMPT_EN}\n- {line}"
 
 
 def build_model() -> BaseChatModel:
@@ -167,11 +188,53 @@ async def run_agent(
     cards: list[dict[str, Any]] = []
     model = model or build_model()
     agent = create_react_agent(model, build_tools(client, cards))
-    system = SYSTEM_PROMPT_UR if language == "ur" else SYSTEM_PROMPT_EN
-    messages: list[BaseMessage] = [SystemMessage(content=system), *history, HumanMessage(content=user_text)]
+    messages: list[BaseMessage] = [SystemMessage(content=system_prompt(language)), *history, HumanMessage(content=user_text)]
     state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
-    reply = next(
-        (m.content for m in reversed(state["messages"]) if isinstance(m, AIMessage) and m.content),
-        "",
-    )
+    reply = _last_reply(state)
+
+    # Guard: the model must not promise a card it never created. If it talks about a
+    # card/confirmation but no tool produced one, re-prompt exactly once with the
+    # tool context intact so it performs the action instead of narrating it.
+    if not cards and _mentions_card(reply):
+        nudged = [*state["messages"], HumanMessage(content=NUDGE)]
+        state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+        reply = _last_reply(state)
     return str(reply), cards
+
+
+NUDGE = (
+    "[SYSTEM CHECK] No card was created because you did not call any action tool. "
+    "Do it now: search_contacts → send_money, or lookup_bill → pay_bill, or recharge / "
+    "pocket_deposit / get_statement — then reply. Never describe a card that does not exist."
+)
+_CARD_WORDS = ("کارڈ", "تصدیق", "card", "confirm")
+
+
+def _mentions_card(reply: str) -> bool:
+    low = reply.lower()
+    return any(w in low for w in _CARD_WORDS)
+
+
+def _content_text(content: Any) -> str:
+    """Gemini 2.5 may return content as blocks [{type:'text', text, extras:{signature}}]."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("type", "text") == "text" and block.get("text"):
+                    parts.append(str(block["text"]))
+            elif isinstance(block, str):
+                parts.append(block)
+        return " ".join(parts).strip()
+    return str(content)
+
+
+def _last_reply(state: dict[str, Any]) -> str:
+    for m in reversed(state["messages"]):
+        if isinstance(m, AIMessage):
+            text = _content_text(m.content)
+            if text:
+                return text
+    return ""
