@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Noto+Nastaliq+Urdu:wght@400;600;700&amp;display=swap">
+  <style>
+body { margin:0; background:#0B141C; }
+a { color:#E19A2A; } a:hover { color:#F5B34D; }
+.phone { width:390px; height:844px; background:#0B141C; color:#F3F6F8; font-family:'Plus Jakarta Sans', 'Helvetica Neue', Arial, system-ui, sans-serif; position:relative; overflow:hidden; box-sizing:border-box; direction:ltr; }
+.phone * { box-sizing:border-box; }
+.num { font-variant-numeric: tabular-nums; direction:ltr; unicode-bidi:isolate; }
+.scroll { position:absolute; top:0; left:0; right:0; bottom:176px; overflow:hidden; }
+.fade { position:absolute; left:0; right:0; bottom:176px; height:44px; background:linear-gradient(to bottom, #0B141C00, #0B141C); }
+.h1 { font-size:28px; font-weight:800; line-height:34px; letter-spacing:-0.4px; }
+.h2 { font-size:22px; font-weight:700; line-height:28px; letter-spacing:-0.2px; }
+.hl { font-size:17px; font-weight:600; line-height:22px; }
+.body { font-size:17px; font-weight:400; line-height:24px; }
+.sub { font-size:15px; font-weight:500; line-height:20px; color:#A7B4BF; }
+.foot { font-size:13px; font-weight:500; line-height:18px; color:#6F7E8A; }
+.cap { font-size:12px; font-weight:600; line-height:16px; letter-spacing:0.4px; text-transform:uppercase; color:#6F7E8A; }
+.money { font-size:40px; font-weight:800; line-height:48px; letter-spacing:-1px; font-variant-numeric:tabular-nums; }
+.card { background:#14202A; border-radius:20px; box-shadow:0 1px 2px rgba(14,34,51,0.04), 0 8px 24px rgba(14,34,51,0.06); }
+.btn { display:flex; align-items:center; justify-content:center; height:56px; border-radius:28px; background:#F5B34D; color:#0D2A3D; font-size:17px; font-weight:700; }
+.btn2 { display:flex; align-items:center; justify-content:center; height:56px; border-radius:28px; background:#1C2A35; color:#F3F6F8; font-size:17px; font-weight:600; }
+.btnGhost { display:flex; align-items:center; justify-content:center; height:52px; border-radius:26px; color:#A7B4BF; font-size:17px; font-weight:600; }
+.chip { display:inline-flex; align-items:center; white-space:nowrap; flex-shrink:0; height:36px; padding:0 14px; border-radius:18px; background:#1C2A35; color:#A7B4BF; font-size:14px; font-weight:600; }
+.chipOn { background:#0D2A3D; color:#FFFFFF; }
+.row { display:flex; align-items:center; gap:14px; padding:14px 0; border-bottom:1px solid #243441; }
+.avatar { width:44px; height:44px; border-radius:22px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; flex-shrink:0; }
+.icoCircle { width:44px; height:44px; border-radius:22px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.input { height:56px; border-radius:16px; background:#14202A; border:1.5px solid #243441; display:flex; align-items:center; padding:0 16px; gap:10px; color:#6F7E8A; font-size:17px; }
+.inputOn { border-color:#F5B34D; color:#F3F6F8; }
+.header { display:flex; align-items:center; justify-content:space-between; padding:56px 20px 8px; }
+.title { font-size:22px; font-weight:800; letter-spacing:-0.3px; }
+.content { padding:0 20px; }
+.aiBar { position:absolute; left:16px; right:16px; bottom:96px; height:60px; border-radius:30px; background:#1C2A35; display:flex; align-items:center; padding:6px 8px 6px 6px; gap:12px; box-shadow:0 10px 30px rgba(14,34,51,0.28); }
+.tab { position:absolute; left:0; right:0; bottom:0; height:84px; background:#14202A; border-top:1px solid #243441; display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); padding:8px 8px 24px; }
+.tabItem { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:11px; font-weight:600; color:#6F7E8A; }
+.tabOn { color:#E19A2A; }
+.kpad { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
+.key { height:64px; border-radius:20px; background:#14202A; display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:600; box-shadow:0 1px 2px rgba(14,34,51,0.05); }
+.dot { width:16px; height:16px; border-radius:8px; border:2px solid #6F7E8A; }
+.dotOn { background:#F5B34D; border-color:#F5B34D; }
+.bubbleU { align-self:flex-end; max-width:280px; background:#0D2A3D; color:#FFFFFF; padding:12px 16px; border-radius:20px 20px 6px 20px; font-size:16px; line-height:22px; }
+.bubbleA { align-self:flex-start; max-width:300px; background:#14202A; color:#F3F6F8; padding:12px 16px; border-radius:20px 20px 20px 6px; font-size:16px; line-height:22px; box-shadow:0 1px 2px rgba(14,34,51,0.05); }
+.pill { display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 10px; border-radius:14px; font-size:12px; font-weight:700; }
+</style>
+</helmet>
+<div class="phone">
+
+<div class="scroll">
+<div class="header" style="padding-top:60px;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="avatar" style="width:40px;height:40px;border-radius:20px;background:#3A2E19;color:#0D2A3D;">AJ</div>
+    <div><div class="foot">Good morning</div><div class="hl">Ammi Jaan</div></div>
+  </div>
+  <div style="width:44px;height:44px;border-radius:22px;background:#14202A;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(14,34,51,0.06);"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F3F6F8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
+</div>
+<div class="content" style="display:flex;flex-direction:column;gap:20px;padding-top:8px;">
+  <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:14px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div class="cap">Available balance</div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6F7E8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></div><div class="num" style="display:flex;align-items:baseline;gap:2px;"><span class="money">₨84,500</span><span class="h2 num" style="color:#6F7E8A;">.00</span></div><div class="foot">Ammi Jaan · PAYO wallet · PKR</div><div style="display:flex;gap:10px;margin-top:4px;"><div class="btn" style="flex:1;height:48px;border-radius:24px;gap:8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0D2A3D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>Send</div><div class="btn2" style="flex:1;height:48px;border-radius:24px;gap:8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F3F6F8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 7 7 17"/><path d="M17 17H7V7"/></svg>Request</div><div class="btn2" style="width:48px;height:48px;border-radius:24px;flex:none;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F3F6F8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3"/><path d="M21 14v7h-7"/><path d="M17 17h.01"/></svg></div></div></div>
+  <div style="display:flex;gap:8px;">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;"><div style="width:56px;height:56px;border-radius:18px;background:#14202A;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(14,34,51,0.05), 0 6px 16px rgba(14,34,51,0.06);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0D2A3D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></div><div style="font-size:13px;font-weight:600;color:#A7B4BF;text-align:center;">Send money</div></div><div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;"><div style="width:56px;height:56px;border-radius:18px;background:#14202A;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(14,34,51,0.05), 0 6px 16px rgba(14,34,51,0.06);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0D2A3D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><div style="font-size:13px;font-weight:600;color:#A7B4BF;text-align:center;">Pay bills</div></div><div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;"><div style="width:56px;height:56px;border-radius:18px;background:#14202A;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(14,34,51,0.05), 0 6px 16px rgba(14,34,51,0.06);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0D2A3D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div><div style="font-size:13px;font-weight:600;color:#A7B4BF;text-align:center;">Top-up</div></div><div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;"><div style="width:56px;height:56px;border-radius:18px;background:#14202A;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(14,34,51,0.05), 0 6px 16px rgba(14,34,51,0.06);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0D2A3D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/></svg></div><div style="font-size:13px;font-weight:600;color:#A7B4BF;text-align:center;">Savings</div></div>
+  </div>
+  <div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:12px;border:1px solid #243441;box-shadow:none;background:#1C2A35;">
+    <div class="icoCircle" style="width:40px;height:40px;background:#3A1C1C;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F06A6A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+    <div style="flex:1;"><div class="hl">K-Electric bill due Sep 10</div><div class="foot">₨4,320 · Consumer ···5678</div></div>
+    <div class="pill" style="background:#F5B34D;color:#0D2A3D;height:32px;">Pay</div>
+  </div>
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <div class="hl">Recent activity</div><div class="sub" style="color:#E19A2A;">See all</div>
+    </div>
+    <div class="row"><div class="avatar" style="background:#E3EEF7;color:#2E5B7A;">BA</div><div style="flex:1;min-width:0;"><div class="hl" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Bilal Ahmed</div><div class="foot">Today, 3:20 PM · Transfer</div></div><div class="hl num" style="color:#F3F6F8;">−₨1,500</div></div>
+    <div class="row"><div class="avatar" style="background:#E3EEF7;color:#2E5B7A;">SK</div><div style="flex:1;min-width:0;"><div class="hl" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Sara Khan</div><div class="foot">Today, 3:26 PM · Transfer</div></div><div class="hl num" style="color:#F3F6F8;">−₨500</div></div>
+    <div class="row"><div class="avatar" style="background:#E3EEF7;color:#2E5B7A;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2E5B7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></div><div style="flex:1;min-width:0;"><div class="hl" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Meezan Savings</div><div class="foot">Aug 28 · Transfer</div></div><div class="hl num" style="color:#F3F6F8;">−₨142,928</div></div>
+  </div>
+</div>
+</div>
+<div class="fade"></div>
+<div class="aiBar"><div style="width:48px;height:48px;border-radius:24px;background:#F5B34D;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0D2A3D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg></div><div style="flex:1;color:#FFFFFF;font-size:16px;font-weight:600;opacity:0.92;">Ask PAYO — say or type…</div><div style="width:40px;height:40px;border-radius:20px;background:rgba(255,255,255,0.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01"/><path d="M10 8h.01"/><path d="M14 8h.01"/><path d="M18 8h.01"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/><path d="M7 16h10"/></svg></div></div>
+<div class="tab"><div class="tabItem tabOn"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E19A2A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg><span>Home</span></div><div class="tabItem"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6F7E8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg><span>Activity</span></div><div class="tabItem"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6F7E8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg><span>Pay</span></div><div class="tabItem"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6F7E8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg><span>More</span></div></div>
+
+</div>
+</x-dc>
+</body>
+</html>

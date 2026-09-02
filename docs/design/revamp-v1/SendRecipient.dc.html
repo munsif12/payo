@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Noto+Nastaliq+Urdu:wght@400;600;700&amp;display=swap">
+  <style>
+body { margin:0; background:#F7F4EE; }
+a { color:#D98F1F; } a:hover { color:#F2A93B; }
+.phone { width:390px; height:844px; background:#F7F4EE; color:#0E2233; font-family:'Plus Jakarta Sans', 'Helvetica Neue', Arial, system-ui, sans-serif; position:relative; overflow:hidden; box-sizing:border-box; direction:ltr; }
+.phone * { box-sizing:border-box; }
+.num { font-variant-numeric: tabular-nums; direction:ltr; unicode-bidi:isolate; }
+.scroll { position:absolute; top:0; left:0; right:0; bottom:176px; overflow:hidden; }
+.fade { position:absolute; left:0; right:0; bottom:176px; height:44px; background:linear-gradient(to bottom, #F7F4EE00, #F7F4EE); }
+.h1 { font-size:28px; font-weight:800; line-height:34px; letter-spacing:-0.4px; }
+.h2 { font-size:22px; font-weight:700; line-height:28px; letter-spacing:-0.2px; }
+.hl { font-size:17px; font-weight:600; line-height:22px; }
+.body { font-size:17px; font-weight:400; line-height:24px; }
+.sub { font-size:15px; font-weight:500; line-height:20px; color:#5B6B78; }
+.foot { font-size:13px; font-weight:500; line-height:18px; color:#8A98A4; }
+.cap { font-size:12px; font-weight:600; line-height:16px; letter-spacing:0.4px; text-transform:uppercase; color:#8A98A4; }
+.money { font-size:40px; font-weight:800; line-height:48px; letter-spacing:-1px; font-variant-numeric:tabular-nums; }
+.card { background:#FFFFFF; border-radius:20px; box-shadow:0 1px 2px rgba(14,34,51,0.04), 0 8px 24px rgba(14,34,51,0.06); }
+.btn { display:flex; align-items:center; justify-content:center; height:56px; border-radius:28px; background:#F2A93B; color:#0D2A3D; font-size:17px; font-weight:700; }
+.btn2 { display:flex; align-items:center; justify-content:center; height:56px; border-radius:28px; background:#F1EDE4; color:#0E2233; font-size:17px; font-weight:600; }
+.btnGhost { display:flex; align-items:center; justify-content:center; height:52px; border-radius:26px; color:#5B6B78; font-size:17px; font-weight:600; }
+.chip { display:inline-flex; align-items:center; white-space:nowrap; flex-shrink:0; height:36px; padding:0 14px; border-radius:18px; background:#F1EDE4; color:#5B6B78; font-size:14px; font-weight:600; }
+.chipOn { background:#0D2A3D; color:#FFFFFF; }
+.row { display:flex; align-items:center; gap:14px; padding:14px 0; border-bottom:1px solid #E7E1D6; }
+.avatar { width:44px; height:44px; border-radius:22px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; flex-shrink:0; }
+.icoCircle { width:44px; height:44px; border-radius:22px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.input { height:56px; border-radius:16px; background:#FFFFFF; border:1.5px solid #E7E1D6; display:flex; align-items:center; padding:0 16px; gap:10px; color:#8A98A4; font-size:17px; }
+.inputOn { border-color:#F2A93B; color:#0E2233; }
+.header { display:flex; align-items:center; justify-content:space-between; padding:56px 20px 8px; }
+.title { font-size:22px; font-weight:800; letter-spacing:-0.3px; }
+.content { padding:0 20px; }
+.aiBar { position:absolute; left:16px; right:16px; bottom:96px; height:60px; border-radius:30px; background:#0E2233; display:flex; align-items:center; padding:6px 8px 6px 6px; gap:12px; box-shadow:0 10px 30px rgba(14,34,51,0.28); }
+.tab { position:absolute; left:0; right:0; bottom:0; height:84px; background:#FFFFFF; border-top:1px solid #E7E1D6; display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); padding:8px 8px 24px; }
+.tabItem { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:11px; font-weight:600; color:#8A98A4; }
+.tabOn { color:#D98F1F; }
+.kpad { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
+.key { height:64px; border-radius:20px; background:#FFFFFF; display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:600; box-shadow:0 1px 2px rgba(14,34,51,0.05); }
+.dot { width:16px; height:16px; border-radius:8px; border:2px solid #8A98A4; }
+.dotOn { background:#F2A93B; border-color:#F2A93B; }
+.bubbleU { align-self:flex-end; max-width:280px; background:#0D2A3D; color:#FFFFFF; padding:12px 16px; border-radius:20px 20px 6px 20px; font-size:16px; line-height:22px; }
+.bubbleA { align-self:flex-start; max-width:300px; background:#FFFFFF; color:#0E2233; padding:12px 16px; border-radius:20px 20px 20px 6px; font-size:16px; line-height:22px; box-shadow:0 1px 2px rgba(14,34,51,0.05); }
+.pill { display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 10px; border-radius:14px; font-size:12px; font-weight:700; }
+</style>
+</helmet>
+<div class="phone">
+
+<div class="header"><div style="display:flex;align-items:center;gap:8px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0E2233" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><div><div class="title">Send money</div></div></div><div style="display:flex;gap:8px;"></div></div>
+<div class="content" style="display:flex;flex-direction:column;gap:20px;">
+  <div class="input inputOn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8A98A4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span style="color:#0E2233;">Sara</span></div>
+  <div style="display:flex;gap:10px;">
+    <div class="chip chipOn" style="gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Contacts</div><div class="chip" style="gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6B78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>PAYO number</div><div class="chip" style="gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6B78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>Bank account</div>
+  </div>
+  <div>
+    <div class="cap" style="margin-bottom:4px;">2 matches</div>
+    <div class="row"><div class="avatar" style="background:#FBEBD0;color:#0D2A3D;">SK</div><div style="flex:1;"><div class="hl">Sara Khan</div><div class="foot">PAYO · +92 300 1110003</div></div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8A98A4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+    <div class="row"><div class="avatar" style="background:#DDF3E9;color:#1F9D6A;">SM</div><div style="flex:1;"><div class="hl">Sara Malik</div><div class="foot">PAYO · +92 300 1110004</div></div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8A98A4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+    <div class="cap" style="margin:16px 0 4px;">All contacts</div>
+    <div class="row"><div class="avatar" style="background:#E3EEF7;color:#2E5B7A;">BA</div><div style="flex:1;"><div class="hl">Bilal Ahmed</div><div class="foot">PAYO · +92 300 1110002</div></div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8A98A4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+    <div class="row"><div class="avatar" style="background:#EEE6F7;color:#6B4E9B;">BJ</div><div style="flex:1;"><div class="hl">Bhai Jan</div><div class="foot">Meezan Bank · PK36 ···· 6702</div></div><span class="pill" style="background:#F1EDE4;color:#5B6B78;height:24px;">Bank</span></div>
+  </div>
+</div>
+<div style="position:absolute;left:20px;right:20px;bottom:34px;"><div class="btn2" style="gap:8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E2233" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add new recipient</div></div>
+
+</div>
+</x-dc>
+</body>
+</html>
