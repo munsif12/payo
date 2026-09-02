@@ -1,7 +1,7 @@
 import mongoose, { ClientSession } from 'mongoose';
-import bcrypt from 'bcryptjs';
 import { PendingAction, Transaction, User } from '../models';
 import { ApiError } from './apiError';
+import { assertPinOk } from './pinAuth';
 
 type PADoc = InstanceType<typeof PendingAction>;
 type TxnDoc = InstanceType<typeof Transaction>;
@@ -41,8 +41,8 @@ export async function executeAction(userId: string, actionId: string, pin: strin
     throw new ApiError(410, 'ACTION_GONE', 'Action expired or already handled');
   if (found.requiresPin) {
     const user = await User.findById(userId);
-    if (!pin || !user || !(await bcrypt.compare(pin, user.pinHash)))
-      throw new ApiError(401, 'INVALID_PIN', 'Wrong PIN');
+    if (!user) throw new ApiError(401, 'INVALID_PIN', 'Wrong PIN');
+    await assertPinOk(user, pin);
   }
   const exec = executors.get(found.kind);
   if (!exec) throw new ApiError(500, 'NO_EXECUTOR', `No executor for ${found.kind}`);

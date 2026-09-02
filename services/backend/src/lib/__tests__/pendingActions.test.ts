@@ -3,7 +3,7 @@ import { createApp } from '../../app';
 import { createVerifiedUser } from '../../testUtils/factories';
 import { createPendingAction, registerExecutor } from '../pendingActions';
 import { postTransaction } from '../money';
-import { Account, PendingAction } from '../../models';
+import { Account, PendingAction, User } from '../../models';
 
 const app = createApp();
 registerExecutor('test_debit', async (session, action) =>
@@ -68,6 +68,28 @@ test("cannot execute another user's action → 404", async () => {
   const res = await request(app).post(`/api/v1/actions/${a._id}/execute`)
     .set('Authorization', `Bearer ${other.token}`).send({ pin: '1234' });
   expect(res.status).toBe(404);
+});
+
+test('pinHash unset on the user → 401 INVALID_PIN, not 500', async () => {
+  const { userId, token } = await createVerifiedUser(app);
+  await User.updateOne({ _id: userId }, { $unset: { pinHash: 1 } });
+  const a = await makeAction(userId);
+  const res = await request(app).post(`/api/v1/actions/${a._id}/execute`)
+    .set('Authorization', `Bearer ${token}`).send({ pin: '1234' });
+  expect(res.status).toBe(401);
+  expect(res.body.code).toBe('INVALID_PIN');
+});
+
+test('PIN lockout (5 wrong verify-pin attempts) also blocks /actions/:id/execute → 429', async () => {
+  const { userId, token } = await createVerifiedUser(app);
+  for (let i = 0; i < 5; i++) {
+    await request(app).post('/api/v1/auth/verify-pin').set('Authorization', `Bearer ${token}`).send({ pin: '0000' });
+  }
+  const a = await makeAction(userId);
+  const res = await request(app).post(`/api/v1/actions/${a._id}/execute`)
+    .set('Authorization', `Bearer ${token}`).send({ pin: '1234' }); // correct PIN, still locked
+  expect(res.status).toBe(429);
+  expect(res.body.code).toBe('PIN_LOCKED');
 });
 
 test('cancel then execute → 410; insufficient funds → action returns to pending', async () => {

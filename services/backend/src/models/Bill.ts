@@ -2,6 +2,7 @@ import { Schema, model } from 'mongoose';
 
 const billSchema = new Schema({
   billerId: { type: Schema.Types.ObjectId, ref: 'Biller', required: true },
+  userId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
   consumerNo: { type: String, required: true },
   consumerName: { type: String, required: true },
   amountPaisa: { type: Number, required: true, min: 1, validate: Number.isInteger },
@@ -10,6 +11,6 @@ const billSchema = new Schema({
   status: { type: String, required: true, default: 'due', enum: ['due', 'paid'] },
 }, { timestamps: true });
 
-billSchema.index({ billerId: 1, consumerNo: 1 });
+billSchema.index({ userId: 1, billerId: 1, consumerNo: 1 });
 
 export const Bill = model('Bill', billSchema);

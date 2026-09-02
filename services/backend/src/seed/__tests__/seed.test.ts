@@ -28,8 +28,13 @@ test('seed builds the Contract 4 demo world', async () => {
   expect(await Telco.countDocuments()).toBe(4);
   expect(await Contact.countDocuments({ userId: ammi._id })).toBe(4);
 
-  const login = await request(app).post('/api/v1/auth/login')
-    .send({ email: 'ammi@payo.demo', pin: '1234' });
+  // seeded users are already onboarded — phone + OTP + PIN, no signup step
+  const r = await request(app).post('/api/v1/auth/request-otp').send({ phone: ammi.phone });
+  expect(r.body.data.isNewUser).toBe(false);
+  const v = await request(app).post('/api/v1/auth/verify-otp').send({ phone: ammi.phone, otp: r.body.data.demoOtp });
+  expect(v.body.data.pinSet).toBe(true);
+  const login = await request(app).post('/api/v1/auth/verify-pin')
+    .set('Authorization', `Bearer ${v.body.data.otpToken}`).send({ pin: '1234' });
   expect(login.status).toBe(200);
   expect(login.body.data.token).toBeTruthy();
 }, 60_000);

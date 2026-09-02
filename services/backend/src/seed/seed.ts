@@ -40,7 +40,7 @@ export async function runSeed() {
   const users = [];
   for (const [idx, su] of SEED_USERS.entries()) {
     const user = await User.create({
-      name: su.name, urduName: su.urduName, email: su.email, phone: su.phone, pinHash,
+      name: su.name, urduName: su.urduName, email: su.email, phone: su.phone, pinHash, pinSet: true,
     });
     const rand = mulberry32(idx + 1);
     const panRest = String(Math.floor(rand() * 1e10)).padStart(10, '0');
@@ -117,6 +117,7 @@ export async function runSeed() {
     dueDate: new Date(now.getFullYear(), now.getMonth(), 10),
     month: `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`,
     status: 'due',
+    userId: ammi._id,
   });
 
   await Pocket.create({ userId: ammi._id, ...AMMI.pocket });

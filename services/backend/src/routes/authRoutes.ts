@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { handler } from '../lib/handler';
-import { requireAuth } from '../middleware/requireAuth';
-import { signup, verifyOtp, login, verifyPin } from '../controllers/authController';
+import { requireOtpOrSession } from '../middleware/requireAuth';
+import { requestOtp, verifyOtp, setPin, verifyPin } from '../controllers/authController';
 
 export const authRoutes = Router();
-authRoutes.post('/signup', handler(signup));
+authRoutes.post('/request-otp', handler(requestOtp));
 authRoutes.post('/verify-otp', handler(verifyOtp));
-authRoutes.post('/login', handler(login));
-authRoutes.post('/verify-pin', requireAuth, handler(verifyPin));
+authRoutes.post('/set-pin', requireOtpOrSession, handler(setPin));
+authRoutes.post('/verify-pin', requireOtpOrSession, handler(verifyPin));

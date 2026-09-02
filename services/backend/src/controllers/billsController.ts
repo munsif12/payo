@@ -13,6 +13,25 @@ export async function listBillers(_req: Request, res: Response) {
   return ok(res, { items: items.map(b => ({ id: String(b._id), name: b.name, urduName: b.urduName, category: b.category })) });
 }
 
+/** GET /bills/due — the caller's own due bills (bill.userId, stamped on lookup and by seed). */
+export async function listDueBills(req: Request, res: Response) {
+  const bills = await Bill.find({ userId: req.userId, status: 'due' }).sort({ dueDate: 1 });
+  const billers = await Biller.find({ _id: { $in: bills.map(b => b.billerId) } });
+  const billerMap = new Map(billers.map(b => [String(b._id), b]));
+  return ok(res, {
+    items: bills.map((b) => {
+      const biller = billerMap.get(String(b.billerId));
+      if (!biller) throw new ApiError(404, 'NOT_FOUND', 'Biller not found');
+      return {
+        billId: String(b._id),
+        biller: { id: String(biller._id), name: biller.name, urduName: biller.urduName, category: biller.category },
+        consumerNo: b.consumerNo, amountPaisa: b.amountPaisa,
+        dueDate: b.dueDate.toISOString(), month: b.month,
+      };
+    }),
+  });
+}
+
 export async function lookupBill(req: Request, res: Response) {
   const { billerId, consumerNo } = z.object({
     billerId: z.string(),
@@ -21,17 +40,21 @@ export async function lookupBill(req: Request, res: Response) {
   const biller = await Biller.findById(billerId).catch(() => null);
   if (!biller) throw new ApiError(404, 'NOT_FOUND', 'Biller not found');
 
-  let bill = await Bill.findOne({ billerId: biller._id, consumerNo, status: 'due' });
+  let bill = await Bill.findOne({ userId: req.userId, billerId: biller._id, consumerNo, status: 'due' });
   if (!bill) {
     const now = new Date();
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const month = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+    // Deterministic on consumerNo alone so every user looking up the same consumer number
+    // sees the same amount/name — but each user gets their OWN bill document (never
+    // shares or re-stamps another user's bill).
     const amountPaisa = Math.round((150000 + (djb2(consumerNo) % 700000)) / 1000) * 1000;
     bill = await Bill.create({
       billerId: biller._id, consumerNo,
       consumerName: resolveFakeTitle(consumerNo),
       amountPaisa, month,
       dueDate: new Date(now.getFullYear(), now.getMonth(), 10),
+      userId: req.userId,
     });
   }
   return ok(res, {

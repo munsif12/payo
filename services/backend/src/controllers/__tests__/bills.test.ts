@@ -75,3 +75,39 @@ test('unknown bill → 404; billers list works', async () => {
   expect(billers.body.data.items).toHaveLength(1);
   expect(billers.body.data.items[0].category).toBe('electricity');
 });
+
+test('lookup stamps bill.userId; GET /bills/due is scoped per user', async () => {
+  const { token: tokenA, userId: userIdA } = await createVerifiedUser(app);
+  const { token: tokenB, userId: userIdB } = await createVerifiedUser(app);
+  const biller = await makeBiller();
+
+  const lookup = await request(app).post('/api/v1/bills/lookup')
+    .set('Authorization', `Bearer ${tokenA}`).send({ billerId: String(biller._id), consumerNo: CONSUMER_NO });
+  const bill = (await Bill.findById(lookup.body.data.billId))!;
+  expect(String(bill.userId)).toBe(userIdA);
+
+  const dueA = await request(app).get('/api/v1/bills/due').set('Authorization', `Bearer ${tokenA}`);
+  expect(dueA.body.data.items).toHaveLength(1);
+  expect(dueA.body.data.items[0].billId).toBe(lookup.body.data.billId);
+  expect(dueA.body.data.items[0].biller.name).toBe('K-Electric');
+
+  const dueB = await request(app).get('/api/v1/bills/due').set('Authorization', `Bearer ${tokenB}`);
+  expect(dueB.body.data.items).toHaveLength(0);
+
+  // a second user looking up the SAME consumer number gets their OWN bill document —
+  // same deterministic amount/name, but A's bill is never touched or re-stamped.
+  const relookup = await request(app).post('/api/v1/bills/lookup')
+    .set('Authorization', `Bearer ${tokenB}`).send({ billerId: String(biller._id), consumerNo: CONSUMER_NO });
+  expect(relookup.body.data.billId).not.toBe(lookup.body.data.billId);
+  expect(relookup.body.data.amountPaisa).toBe(lookup.body.data.amountPaisa);
+  expect(relookup.body.data.consumerName).toBe(lookup.body.data.consumerName);
+  const billB = (await Bill.findById(relookup.body.data.billId))!;
+  expect(String(billB.userId)).toBe(userIdB);
+
+  const dueBAfter = await request(app).get('/api/v1/bills/due').set('Authorization', `Bearer ${tokenB}`);
+  expect(dueBAfter.body.data.items).toHaveLength(1);
+  expect(dueBAfter.body.data.items[0].billId).toBe(relookup.body.data.billId);
+  const dueAAfter = await request(app).get('/api/v1/bills/due').set('Authorization', `Bearer ${tokenA}`);
+  expect(dueAAfter.body.data.items).toHaveLength(1);
+  expect(dueAAfter.body.data.items[0].billId).toBe(lookup.body.data.billId);
+});

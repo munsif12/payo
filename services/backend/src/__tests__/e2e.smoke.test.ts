@@ -5,18 +5,34 @@ import { Biller } from '../models';
 
 const app = createApp();
 
+async function loginByPhone(phone: string, pin = '1234') {
+  const r = await request(app).post('/api/v1/auth/request-otp').send({ phone });
+  const v = await request(app).post('/api/v1/auth/verify-otp').send({ phone, otp: r.body.data.demoOtp });
+  const login = await request(app).post('/api/v1/auth/verify-pin')
+    .set('Authorization', `Bearer ${v.body.data.otpToken}`).send({ pin });
+  return login.body.data.token as string;
+}
+
 test('demo-world end-to-end smoke through the public API', async () => {
   await runSeed();
 
-  // login as Ammi
-  const login = await request(app).post('/api/v1/auth/login')
-    .send({ email: 'ammi@payo.demo', pin: '1234' });
-  const token = login.body.data.token;
+  // login as Ammi (phone + OTP + PIN — no email/password)
+  const token = await loginByPhone('+923001110001');
   const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
 
   // balance
   const me = await auth(request(app).get('/api/v1/me'));
   expect(me.body.data.account.balancePaisa).toBe(8_450_000);
+
+  // due bills — K-Electric is scoped to Ammi by seed
+  const due = await auth(request(app).get('/api/v1/bills/due'));
+  expect(due.body.data.items).toHaveLength(1);
+  expect(due.body.data.items[0].biller.name).toBe('K-Electric');
+  expect(due.body.data.items[0].amountPaisa).toBe(432_000);
+
+  // profile edit
+  const patched = await auth(request(app).patch('/api/v1/me')).send({ language: 'en' });
+  expect(patched.body.data.language).toBe('en');
 
   // K-Electric bill lookup → pay → execute with PIN
   const kElectric = (await Biller.findOne({ name: 'K-Electric' }))!;
@@ -30,6 +46,10 @@ test('demo-world end-to-end smoke through the public API', async () => {
   const afterBill = await auth(request(app).get('/api/v1/me'));
   expect(afterBill.body.data.account.balancePaisa).toBe(8_450_000 - 432_000);
 
+  // the paid bill drops out of the due list
+  const dueAfter = await auth(request(app).get('/api/v1/bills/due'));
+  expect(dueAfter.body.data.items).toHaveLength(0);
+
   // send ₨1,500 to Bilal
   const transfer = await auth(request(app).post('/api/v1/transfers'))
     .send({ to: { kind: 'payo', phone: '+923001110002' }, amountPaisa: 150_000 });
@@ -39,10 +59,8 @@ test('demo-world end-to-end smoke through the public API', async () => {
   const afterSend = await auth(request(app).get('/api/v1/me'));
   expect(afterSend.body.data.account.balancePaisa).toBe(8_450_000 - 432_000 - 150_000);
 
-  const bilalLogin = await request(app).post('/api/v1/auth/login')
-    .send({ email: 'bilal@payo.demo', pin: '1234' });
-  const bilalMe = await request(app).get('/api/v1/me')
-    .set('Authorization', `Bearer ${bilalLogin.body.data.token}`);
+  const bilalToken = await loginByPhone('+923001110002');
+  const bilalMe = await request(app).get('/api/v1/me').set('Authorization', `Bearer ${bilalToken}`);
   expect(bilalMe.body.data.account.balancePaisa).toBe(6_230_000 + 150_000);
 
   // statement for the current month (bill + transfer just made activity)

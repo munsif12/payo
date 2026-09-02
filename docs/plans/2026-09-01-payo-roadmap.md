@@ -48,7 +48,8 @@ for that phase is written.
   error `{ "success": false, "message": string, "code": string }` (HTTP status set
   accordingly). Thrown as `ApiError(status, code, message)`.
 - **Auth:** `Authorization: Bearer <JWT>` on every route except `/auth/*` and
-  `/health`. JWT payload: `{ sub: <userId>, email }`, HS256, `JWT_SECRET` env.
+  `/health`. JWT payload: `{ sub: <userId>, email?, scope: 'session' | 'otp' }`, HS256,
+  `JWT_SECRET` env. `requireAuth` rejects `scope:'otp'` tokens (401 `OTP_SCOPE`).
 - **Multi-document writes use Mongoose sessions** (`withTransaction`). Mongo must run
   as a replica set (docker-compose handles it; tests use `MongoMemoryReplSet`).
 - **Money-moving endpoints never execute directly.** They create a `PendingAction`;
@@ -70,13 +71,18 @@ for that phase is written.
 Base URL `http://localhost:4000/api/v1`. All amounts integer paisa. `id` fields are
 Mongo ObjectId strings. Routes marked 🔒 require JWT.
 
+**Auth is phone-only** (`Phone → OTP → Create PIN | Enter PIN`, see revamp design spec §3).
+`signup`/`login` (email+password) are removed. `requireAuth` rejects otp-scope tokens
+with 401 `OTP_SCOPE`.
+
 | Method & path | Body (zod-validated) → `data` payload |
 |---|---|
-| `POST /auth/signup` | `{ name, urduName?, email, phone, pin(4 digits) }` → `{ userId, demoOtp }` (OTP also stored; mock flow) |
-| `POST /auth/verify-otp` | `{ userId, otp }` → `{ token, user }` |
-| `POST /auth/login` | `{ email, pin }` → `{ token, user }` |
-| 🔒 `POST /auth/verify-pin` | `{ pin }` → `{ valid: true }` (401 ApiError on wrong PIN) |
-| 🔒 `GET /me` | → `{ user, account: { id, balancePaisa }, card: { id, last4, frozen } }` |
+| `POST /auth/request-otp` | `{ phone }` → `{ demoOtp, isNewUser }`. Creates the user (+account with welcome balance, +card) in one transaction if the phone is unknown; name defaults to "PAYO user". Always (re)issues a fresh demo OTP, 5-min expiry. |
+| `POST /auth/verify-otp` | `{ phone, otp }` → `{ otpToken, isNewUser, pinSet }`. Max 5 wrong attempts → 429 `OTP_LOCKED`; wrong/expired → 400 `INVALID_OTP`. `otpToken` is a 10-min JWT, `scope:'otp'`, accepted only by `set-pin`/`verify-pin`. |
+| `POST /auth/set-pin` *(otpToken)* | `{ pin(4 digits) }` → `{ token, user }` (full session). 409 `PIN_ALREADY_SET` if the user already has a PIN. |
+| 🔒\* `POST /auth/verify-pin` | `{ pin }` → with an **otpToken**: `{ token, user }` (completes login) or 401 `INVALID_PIN`; with a **session token**: `{ valid: true }` (unchanged in-app re-check) or 401 `INVALID_PIN`. \*accepts otp-scope OR session-scope token. |
+| 🔒 `GET /me` | → `{ user: { id, name, urduName?, email?, phone, avatar?, language, pinSet }, account: { id, balancePaisa }, card: { id, last4, frozen } }` |
+| 🔒 `PATCH /me` | `{ name?, urduName?, language? }` → updated `user` (partial update). |
 | 🔒 `GET /transactions?type&category&from&to&limit&cursor` | → `{ items: Txn[], nextCursor }` |
 | 🔒 `GET /transactions/spending-summary?from&to` | → `{ totalOutPaisa, totalInPaisa, byCategory: [{ category, totalPaisa, count }] }` |
 | 🔒 `GET /contacts` / `POST /contacts` | create: `{ name, urduName?, kind: 'payo'\|'bank', phone?, bankId?, iban? }` → `Contact` |
@@ -84,7 +90,8 @@ Mongo ObjectId strings. Routes marked 🔒 require JWT.
 | 🔒 `POST /banks/resolve-title` | `{ bankId, iban }` → `{ accountTitle }` (deterministic fake) |
 | 🔒 `POST /transfers` | `{ to: { kind: 'payo', phone } \| { kind: 'bank', bankId, iban } \| { kind: 'contact', contactId }, amountPaisa, note? }` → `PendingAction` |
 | 🔒 `GET /billers` | → `{ items: [{ id, name, urduName, category }] }` (categories: electricity, gas, internet, water) |
-| 🔒 `POST /bills/lookup` | `{ billerId, consumerNo }` → `{ billId, consumerName, amountPaisa, dueDate, month }` (deterministic fake) |
+| 🔒 `GET /bills/due` | → `{ items: [{ billId, biller: {id,name,urduName,category}, consumerNo, amountPaisa, dueDate, month }] }` — the caller's own due bills (`Bill.userId`, stamped on lookup and by seed). |
+| 🔒 `POST /bills/lookup` | `{ billerId, consumerNo }` → `{ billId, consumerName, amountPaisa, dueDate, month }` (deterministic fake; stamps `bill.userId` to the caller) |
 | 🔒 `POST /bills/pay` | `{ billId }` → `PendingAction` |
 | 🔒 `GET /telcos` | → `{ items: [{ id, name, urduName }] }` (Jazz, Zong, Telenor, Ufone) |
 | 🔒 `POST /recharges` | `{ telcoId, phone, amountPaisa }` → `PendingAction` |

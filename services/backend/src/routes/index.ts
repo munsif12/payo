@@ -17,10 +17,12 @@ import { chatRoutes } from './chatRoutes';
 import { listBillers } from '../controllers/billsController';
 import { listTelcos, createRecharge } from '../controllers/rechargesController';
 import { me } from '../controllers/authController';
+import { updateMe } from '../controllers/meController';
 
 export const apiRouter = Router();
 apiRouter.use('/auth', authRoutes);
 apiRouter.get('/me', requireAuth, handler(me));
+apiRouter.patch('/me', requireAuth, handler(updateMe));
 apiRouter.use('/actions', requireAuth, actionRoutes);
 apiRouter.use('/contacts', requireAuth, contactRoutes);
 apiRouter.use('/banks', requireAuth, bankRoutes);
