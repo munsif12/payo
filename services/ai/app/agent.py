@@ -27,7 +27,10 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — بزرگ اور غ�
 - رقم صارف کی تصدیق اور PIN کے بعد ہی منتقل ہوتی ہے۔ کبھی نہ کہیں کہ رقم بھیج دی گئی۔
 - کارڈ نمبر کبھی پورا نہ پڑھیں۔
 - اگر ایک نام کے کئی رابطے ملیں تو chips کارڈ دکھا کر پوچھیں، خود انتخاب نہ کریں۔
-- رقم ہمیشہ روپے میں کہیں (مثلاً «پندرہ سو روپے»)۔"""
+- رقم ہمیشہ روپے میں کہیں (مثلاً «پندرہ سو روپے»)۔
+- صارف انگریزی، اردو رسم الخط، یا رومن اردو میں لکھ یا بول سکتا ہے (مثلاً «bijli ka bill pay karna hai»)۔ تینوں کو سمجھیں — لیکن جواب ہمیشہ اردو میں ہی دیں، چاہے صارف نے کسی بھی زبان میں لکھا ہو۔
+- تجویز کردہ ارادے اور شروع کرنے کا ٹول: «میں پیسے بھیجنا چاہتا ہوں» → search_contacts؛ «میں بل ادا کرنا چاہتا ہوں» → list_due_bills؛ «میرا بیلنس کیا ہے؟» → get_balance؛ «میں موبائل لوڈ کرانا چاہتا ہوں» → recharge؛ «مجھے اسٹیٹمنٹ چاہیے» → get_statement۔
+- بل ادا کرنے کے لیے: پہلے list_due_bills کال کریں۔ اگر صرف ایک بل واجب الادا ہو تو فوراً pay_bill(bill_id) کال کریں — اگر کنزیومر نمبر پہلے سے محفوظ ہے تو دوبارہ نہ پوچھیں۔ اگر ایک سے زیادہ بل ہوں تو پوچھیں کون سا؛ نامعلوم بلر یا کنزیومر نمبر کے لیے lookup_bill استعمال کریں۔"""
 
 SYSTEM_PROMPT_EN = """You are PAYO's assistant — a voice-first bank for elderly, non-technical users.
 Rules:
@@ -41,7 +44,15 @@ Rules:
 - Money moves only after the user taps confirm and enters their PIN. Never claim money was sent.
 - Never read a full card number aloud.
 - If several contacts match one name, show the chips card and ask — never pick yourself.
-- Say amounts in rupees."""
+- Say amounts in rupees.
+- The user may type or speak in English, Urdu script, or Roman Urdu (e.g. "bijli ka bill pay
+  karna hai"). Understand all three — but ALWAYS reply in English, regardless of the input language.
+- Suggested intents and the tool to start from: "I want to send money" -> search_contacts;
+  "I want to pay a bill" -> list_due_bills; "What is my balance?" -> get_balance;
+  "I want to top up a phone" -> recharge; "I need my statement" -> get_statement.
+- To pay a bill: call list_due_bills first. If exactly one bill is due, immediately call
+  pay_bill(bill_id) — do not ask for a biller or consumer number when one is already on file. If
+  several are due, ask the user which one; use lookup_bill for an unlisted biller/consumer number."""
 
 
 URDU_MONTHS = ["جنوری", "فروری", "مارچ", "اپریل", "مئی", "جون", "جولائی", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"]
@@ -142,8 +153,11 @@ def build_tools(client: BackendClient, cards_sink: list[dict[str, Any]]) -> list
     def wrap(fn, name: str, description: str, schema: type[BaseModel]) -> StructuredTool:
         async def runner(**kwargs: Any) -> str:
             result = await fn(client, **kwargs)
-            if result.get("card"):
-                cards_sink.append(result["card"])
+            card = result.get("card")
+            if isinstance(card, list):
+                cards_sink.extend(card)
+            elif card:
+                cards_sink.append(card)
             return result["text"]
 
         return StructuredTool.from_function(
@@ -161,6 +175,11 @@ def build_tools(client: BackendClient, cards_sink: list[dict[str, Any]]) -> list
              SearchContactsArgs),
         wrap(t.list_billers, "list_billers", "List bill companies (electricity/gas/internet/water) with their ids.", NoArgs),
         wrap(t.lookup_bill, "lookup_bill", "Look up a due bill for a consumer number.", LookupBillArgs),
+        wrap(t.list_due_bills, "list_due_bills",
+             "List the user's currently due bills (each due bill returns its own bill card). "
+             "For a 'pay a bill' request, call this FIRST. If exactly one bill is due, immediately "
+             "call pay_bill(bill_id) — do not ask for a biller or consumer number when one is already "
+             "on file. If several are due, ask the user which one before calling pay_bill.", NoArgs),
         wrap(t.list_pockets, "list_pockets", "List the user's savings pockets with balances and goals.", NoArgs),
         wrap(t.get_card_status, "get_card_status", "Whether the user's virtual debit card is active or frozen.", NoArgs),
         wrap(t.list_requests, "list_requests", "List incoming and outgoing money requests.", NoArgs),

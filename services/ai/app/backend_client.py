@@ -67,6 +67,9 @@ class BackendClient:
     async def lookup_bill(self, biller_id: str, consumer_no: str) -> Any:
         return await self.post("/bills/lookup", {"billerId": biller_id, "consumerNo": consumer_no})
 
+    async def due_bills(self) -> Any:
+        return await self.get("/bills/due")
+
     async def pay_bill(self, bill_id: str) -> Any:
         return await self.post("/bills/pay", {"billId": bill_id})
 

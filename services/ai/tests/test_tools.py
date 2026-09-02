@@ -47,6 +47,35 @@ async def test_lookup_bill_returns_bill_card(fake_backend):
     assert r["card"]["amountPaisa"] == 432000
 
 
+async def test_list_due_bills_returns_a_card_per_bill(fake_backend):
+    fake_backend.route("GET", "/api/v1/bills/due", {"items": [
+        {
+            "billId": "b1", "biller": {"id": "kel", "name": "K-Electric", "urduName": "کے الیکٹرک", "category": "electricity"},
+            "consumerNo": "0400012345678", "amountPaisa": 432000, "dueDate": "2026-09-10T00:00:00.000Z", "month": "2026-08",
+        },
+        {
+            "billId": "b2", "biller": {"id": "ssgc", "name": "SSGC", "urduName": "ایس ایس جی سی", "category": "gas"},
+            "consumerNo": "1122334455", "amountPaisa": 158000, "dueDate": "2026-09-15T00:00:00.000Z", "month": "2026-08",
+        },
+    ]})
+    r = await tools.list_due_bills(await client_for(fake_backend))
+    assert isinstance(r["card"], list) and len(r["card"]) == 2
+    assert [c["kind"] for c in r["card"]] == ["bill", "bill"]
+    assert r["card"][0] == {
+        "kind": "bill", "billId": "b1", "biller": "K-Electric", "consumerName": "0400012345678",
+        "amountPaisa": 432000, "dueDate": "2026-09-10T00:00:00.000Z", "month": "2026-08",
+    }
+    assert r["card"][1]["billId"] == "b2"
+    assert "K-Electric" in r["text"] and "SSGC" in r["text"]
+
+
+async def test_list_due_bills_empty(fake_backend):
+    fake_backend.route("GET", "/api/v1/bills/due", {"items": []})
+    r = await tools.list_due_bills(await client_for(fake_backend))
+    assert r["card"] is None
+    assert "No bills" in r["text"]
+
+
 async def test_two_saras_disambiguation_returns_contact_chips(fake_backend):
     fake_backend.route("GET", "/api/v1/contacts", {"items": [
         {"id": "c1", "name": "Sara Khan", "urduName": "سارہ خان", "kind": "payo", "phone": "+923001110003"},

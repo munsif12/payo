@@ -143,6 +143,35 @@ async def lookup_bill(client: BackendClient, biller_id: str, consumer_no: str) -
     )
 
 
+async def list_due_bills(client: BackendClient) -> Result:
+    try:
+        data = await client.due_bills()
+    except BackendError as e:
+        return _fail(e)
+    items = data["items"]
+    if not items:
+        return _ok("No bills currently due.")
+    cards = []
+    lines = []
+    for b in items:
+        biller = b["biller"]
+        consumer = b.get("consumerName") or b["consumerNo"]
+        card = BillCard(
+            billId=b["billId"], biller=biller["name"], consumerName=consumer,
+            amountPaisa=b["amountPaisa"], dueDate=b["dueDate"], month=b["month"],
+        )
+        cards.append(card.model_dump(exclude_none=True))
+        lines.append(
+            f"{biller['name']}: {_rs(b['amountPaisa'])}, due {b['dueDate'][:10]}, "
+            f"month {b['month']}, billId {b['billId']}"
+        )
+    text = (
+        f"{len(items)} bill(s) due:\n" + "\n".join(lines)
+        + ". If exactly one bill is due, call pay_bill(bill_id) immediately."
+    )
+    return {"text": text, "card": cards}
+
+
 async def list_pockets(client: BackendClient) -> Result:
     try:
         data = await client.pockets()
