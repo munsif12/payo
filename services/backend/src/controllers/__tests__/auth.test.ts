@@ -42,3 +42,14 @@ test('protected route without token → 401', async () => {
   const res = await request(app).get('/api/v1/me');
   expect(res.status).toBe(401);
 });
+
+test('token for a user that no longer exists → 401 SESSION_EXPIRED (stale JWT after reseed)', async () => {
+  const s = await request(app).post('/api/v1/auth/signup').send(signupBody);
+  const v = await request(app).post('/api/v1/auth/verify-otp').send({ userId: s.body.data.userId, otp: s.body.data.demoOtp });
+  const token = v.body.data.token;
+  const { User } = await import('../../models');
+  await User.deleteOne({ _id: s.body.data.userId });
+  const res = await request(app).get('/api/v1/me').set('Authorization', `Bearer ${token}`);
+  expect(res.status).toBe(401);
+  expect(res.body.code).toBe('SESSION_EXPIRED');
+});

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { signedOut } from '../store/authSlice';
 import { aiUrl } from '../lib/aiUrl';
 import { postSse } from '../lib/sse';
 import type { RootState } from '../store';
@@ -21,6 +22,7 @@ const mid = () => `local-${Date.now().toString(36)}-${++nextId}`;
 
 export function useConverse() {
   const token = useSelector((s: RootState) => s.auth.token);
+  const dispatch = useDispatch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<ConverseStatus>('idle');
   const sessionId = useRef<string | null>(null);
@@ -103,6 +105,8 @@ export function useConverse() {
           case 'error':
             append({ id: mid(), role: 'error', text: String(d.message ?? 'Error'), cards: [] });
             setStatus('idle');
+            // The AI service forwards backend auth failures verbatim: the stored session is dead.
+            if (d.code === 'UNAUTHORIZED' || d.code === 'SESSION_EXPIRED') dispatch(signedOut());
             break;
         }
       },

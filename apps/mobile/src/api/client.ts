@@ -1,6 +1,8 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
 import { apiBase } from '../lib/backendUrl';
 import type { RootState } from '../store';
+import { signedOut } from '../store/authSlice';
+import { shouldSignOut } from './authGuard';
 import type {
   Me, Txn, PendingAction, ContactDto, PocketDto, RequestDto, CardDto,
   StatementMeta, BillLookup, NamedItem, PublicUser,
@@ -8,16 +10,31 @@ import type {
 
 interface Ok<T> { success: true; data: T }
 
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl: apiBase(),
+  prepareHeaders: (headers, { getState }) => {
+    const token = (getState() as RootState).auth.token;
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    return headers;
+  },
+});
+
+/** Any 401 on an authenticated call means the stored session is dead (expired, or the
+ *  user no longer exists after a reseed) — sign out so the app returns to login instead
+ *  of behaving like an empty ghost account. Auth endpoints are exempt (wrong PIN is 401). */
+export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
+  async (args, api, extra) => {
+    const result = await rawBaseQuery(args, api, extra);
+    const url = typeof args === 'string' ? args : args.url;
+    if (shouldSignOut(result.error?.status, url, !!(api.getState() as RootState).auth.token)) {
+      api.dispatch(signedOut());
+    }
+    return result;
+  };
+
 export const payoApi = createApi({
   reducerPath: 'payoApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: apiBase(),
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.token;
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithAuth,
   tagTypes: ['Me', 'Txns', 'Contacts', 'Pockets', 'Requests', 'Card', 'Statements'],
   endpoints: (b) => ({
     me: b.query<Me, void>({

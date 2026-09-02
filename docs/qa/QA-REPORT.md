@@ -5,7 +5,9 @@
 Expo Go), against the live local stack (Mongo replica set in Docker on :27018,
 backend :4000, AI service :8000, Metro :8081, seeded demo world).
 
-**Model caveat (read first):** `GEMINI_API_KEY` could not be copied into
+**Update 2026-09-02 — live agent verified; see "Live-agent QA" at the end.** The mock-model caveat below applies to the original run only.
+
+**Model caveat (original run):** `GEMINI_API_KEY` could not be copied into
 `services/ai/.env` by the build agent (its permission system blocks reading
 credential files — see `docs/BLOCKERS.md` for the one-line manual fix). All
 conversational QA below therefore ran against `scripts/mock-ai/mock_ai.py` — a
@@ -56,3 +58,26 @@ backend (84,500 → … → 70,180 over the QA session, every step arithmeticall
 6. **Android matrix is partial** (login, send+PIN, activity, converse flow); remaining screens share the exact JS code path with iOS but were not individually re-run.
 7. Chat history persists via the backend when the real AI service runs; the mock server does not persist turns (`sessionId: "mock"`).
 8. Mongo runs on host port **27018** (not the roadmap's original 27017) because this machine has a local standalone mongod on 27017 that would shadow the replica set; the roadmap was amended in the same commit.
+
+
+## Live-agent QA (2026-09-02) — real Gemini + real Cartesia, iOS simulator
+
+Stack: seeded Mongo (:27018), backend :4000, **real** AI service :8000 with
+`GEMINI_API_KEY` + `CARTESIA_API_KEY`, Metro in watch mode, Expo Go on iPhone 17 Pro.
+Voice input still can't be exercised in the simulator (no real speech), so the typed
+fallback was used with **Roman-Urdu code-mixed input**, exactly as many real users type.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Stale session after reseed → app signs out to login (new guard) | **PASS** — cold start hit `/me`, got 401 `SESSION_EXPIRED`, landed on login | `phase-7-live-agent/ios-stale-session-signed-out.png` |
+| Login امی (email + PIN pad) | PASS | — |
+| Typed "Bilal ko 1500 rupees bhejo" → real agent resolves بلال احمد, calls `send_money`, renders confirmation card (~4 s) | **PASS** | `ios-live-agent-confirmation-card.png` |
+| تصدیق → full-screen confirm (recipient, phone, amount) → تصدیق → PIN gate → 1234 → success `PAYO-PW46VCDQV2` | **PASS** | `ios-live-agent-confirm-screen.png`, `ios-live-agent-pin-gate.png`, `ios-live-agent-success.png` |
+| Ledger: امی 8,300,000 → 8,150,000 paisa; بلال credited 150,000; pending action `completed` | **PASS** (verified in Mongo) | — |
+| API-level real-agent turns: balance ("چوراسی ہزار پانچ سو روپے" + balance card), two-Saras disambiguation chips, last-month food spend (₨5,152, matches DB), last 3 transactions card | **PASS** | scripted runs, see BLOCKERS §1 |
+| Cartesia Urdu TTS (Sonic 3.6, Zara) | **PASS** — real MP3 audio returned for Urdu replies (26–94 KB) | `docs/BLOCKERS.md` §2 |
+
+Not re-run live: Android (same JS path as before), bill-pay and statement via chat with
+the real model, on-device audio playback of the real voice (audio events flowed; the
+simulator's speaker output was not captured). Cartesia account credit is minimal — keep
+demo turns short; TTS is capped at 400 chars per reply with silent fallback on errors.
