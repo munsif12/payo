@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Screen, T, Mono, MoneyText, Card, PrimaryButton, ErrorBanner, Spacer, Row, useUrdu } from '../../src/components/ui';
 import { PinPad, usePinPad } from '../../src/components/PinPad';
 import { tokens } from '../../src/theme/tokens';
-import { takeAction } from '../../src/store/pendingActionHolder';
+import { takeAction, markActionDone } from '../../src/store/pendingActionHolder';
 import { useExecuteActionMutation, useCancelActionMutation, apiErr } from '../../src/api/client';
 
 export default function ConfirmAction() {
@@ -29,6 +29,7 @@ export default function ConfirmAction() {
     setError(null);
     try {
       const { transaction } = await execute({ id: action.id, pin: pinValue }).unwrap();
+      markActionDone(action.id);
       router.replace({ pathname: '/success', params: { refNo: transaction.refNo, amountPaisa: String(transaction.amountPaisa) } });
     } catch (e) {
       const { code } = apiErr(e);

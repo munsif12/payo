@@ -146,5 +146,6 @@
   "voice.suggest.balance": "میرا بیلنس کتنا ہے؟",
   "voice.suggest.payBill": "بجلی کا بل ادا کرنا ہے",
   "voice.suggest.sendMoney": "پیسے بھیجنے ہیں",
-  "voice.suggest.statement": "پچھلے مہینے کا گوشوارہ چاہیے"
+  "voice.suggest.statement": "پچھلے مہینے کا گوشوارہ چاہیے",
+  "confirm.completed": "✅ مکمل ہو گیا"
 }

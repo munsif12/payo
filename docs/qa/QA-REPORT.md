@@ -75,6 +75,7 @@ fallback was used with **Roman-Urdu code-mixed input**, exactly as many real use
 | تصدیق → full-screen confirm (recipient, phone, amount) → تصدیق → PIN gate → 1234 → success `PAYO-PW46VCDQV2` | **PASS** | `ios-live-agent-confirm-screen.png`, `ios-live-agent-pin-gate.png`, `ios-live-agent-success.png` |
 | Ledger: امی 8,300,000 → 8,150,000 paisa; بلال credited 150,000; pending action `completed` | **PASS** (verified in Mongo) | — |
 | API-level real-agent turns: balance ("چوراسی ہزار پانچ سو روپے" + balance card), two-Saras disambiguation chips, last-month food spend (₨5,152, matches DB), last 3 transactions card | **PASS** | scripted runs, see BLOCKERS §1 |
+| Typed "Sara ko 500 rupees bhejo" → real agent asks which Sara, renders chips (سارہ خان / سارہ ملک with phones) → tap chip → agent keeps the ₨500 context → confirmation card → confirm → PIN → success; card flips to **✅ مکمل ہو گیا** (new done-state) | **PASS** — ledger: امی → 8,100,000; سارہ خان +50,000 | `ios-live-agent-two-saras-chips.png`, `ios-live-agent-chip-tap-turn.png`, `ios-live-agent-card-done-state.png` |
 | Cartesia Urdu TTS (Sonic 3.6, Zara) | **PASS** — real MP3 audio returned for Urdu replies (26–94 KB) | `docs/BLOCKERS.md` §2 |
 
 Not re-run live: Android (same JS path as before), bill-pay and statement via chat with

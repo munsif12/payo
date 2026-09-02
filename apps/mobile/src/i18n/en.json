@@ -146,5 +146,6 @@
   "voice.suggest.balance": "What is my balance?",
   "voice.suggest.payBill": "I want to pay my electricity bill",
   "voice.suggest.sendMoney": "I want to send money",
-  "voice.suggest.statement": "I need last month's statement"
+  "voice.suggest.statement": "I need last month's statement",
+  "confirm.completed": "✅ Completed"
 }

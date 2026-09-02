@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { tokens } from '../../theme/tokens';
 import { T, Mono, MoneyText, Card, Row, Spacer, useUrdu } from '../ui';
-import { holdAction } from '../../store/pendingActionHolder';
+import { holdAction, useActionDone } from '../../store/pendingActionHolder';
 import type { PendingAction } from '../../api/types';
 import type { ChatCard } from '../../voice/useConverse';
 
@@ -32,6 +32,7 @@ function ConfirmationCardView({ card }: { card: ChatCard }) {
   const urdu = useUrdu();
   const router = useRouter();
   const summary = card.summary as { en: string; ur: string };
+  const done = useActionDone(String(card.actionId));
 
   const onConfirm = () => {
     const action: PendingAction = {
@@ -50,14 +51,18 @@ function ConfirmationCardView({ card }: { card: ChatCard }) {
       <MoneyText paisa={Number(card.amountPaisa)} size={32} center color={tokens.color.accent} />
       <Spacer h={tokens.space.s} />
       <Pressable
-        testID="chat-confirm"
-        onPress={onConfirm}
+        testID={done ? 'chat-confirm-done' : 'chat-confirm'}
+        onPress={done ? undefined : onConfirm}
+        disabled={done}
         style={{
           minHeight: tokens.touch.primary, borderRadius: tokens.radius.button,
-          backgroundColor: tokens.color.accent, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: done ? tokens.color.surfaceRaised : tokens.color.accent,
+          alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <T color={tokens.color.bg}>{t('common.confirm')}</T>
+        <T color={done ? tokens.color.textMuted : tokens.color.bg}>
+          {done ? t('confirm.completed') : t('common.confirm')}
+        </T>
       </Pressable>
     </Card>
   );
