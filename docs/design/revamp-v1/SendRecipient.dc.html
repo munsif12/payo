@@ -49,6 +49,18 @@ a { color:#D98F1F; } a:hover { color:#F2A93B; }
 .bubbleU { align-self:flex-end; max-width:280px; background:#0D2A3D; color:#FFFFFF; padding:12px 16px; border-radius:20px 20px 6px 20px; font-size:16px; line-height:22px; }
 .bubbleA { align-self:flex-start; max-width:300px; background:#FFFFFF; color:#0E2233; padding:12px 16px; border-radius:20px 20px 20px 6px; font-size:16px; line-height:22px; box-shadow:0 1px 2px rgba(14,34,51,0.05); }
 .pill { display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 10px; border-radius:14px; font-size:12px; font-weight:700; }
+@keyframes rise { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+@keyframes breathe { 0%,100% { transform:scale(1); } 50% { transform:scale(1.04); } }
+@keyframes ring { 0% { transform:scale(1); opacity:0.5; } 100% { transform:scale(2.1); opacity:0; } }
+@keyframes dots { 0%,80%,100% { opacity:0.25; transform:translateY(0); } 40% { opacity:1; transform:translateY(-3px); } }
+@keyframes bars { 0%,100% { transform:scaleY(0.35); } 50% { transform:scaleY(1); } }
+.rise { animation: rise 300ms cubic-bezier(0, 0, 0.2, 1) both; }
+.d1 { animation-delay:60ms; } .d2 { animation-delay:120ms; } .d3 { animation-delay:180ms; } .d4 { animation-delay:240ms; } .d5 { animation-delay:300ms; } .d6 { animation-delay:360ms; } .d7 { animation-delay:420ms; } .d8 { animation-delay:480ms; }
+.breathe { animation: breathe 2400ms cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.ringA { animation: ring 1800ms cubic-bezier(0, 0, 0.2, 1) infinite; } .ringB { animation: ring 1800ms cubic-bezier(0, 0, 0.2, 1) 600ms infinite; } .ringC { animation: ring 1800ms cubic-bezier(0, 0, 0.2, 1) 1200ms infinite; }
+.dot1 { animation: dots 1200ms ease-in-out infinite; } .dot2 { animation: dots 1200ms ease-in-out 150ms infinite; } .dot3 { animation: dots 1200ms ease-in-out 300ms infinite; }
+.bar { width:4px; border-radius:2px; background:#0D2A3D; transform-origin:center; animation: bars 900ms ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .rise, .breathe, .ringA, .ringB, .ringC, .dot1, .dot2, .dot3, .bar { animation:none !important; opacity:1; transform:none; } }
 </style>
 </helmet>
 <div class="phone">

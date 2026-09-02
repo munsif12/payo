@@ -59,6 +59,18 @@ a {{ color:{t['amberDeep']}; }} a:hover {{ color:{t['amber']}; }}
 .bubbleU {{ align-self:flex-end; max-width:280px; background:{t['navy']}; color:{t['white']}; padding:12px 16px; border-radius:20px 20px 6px 20px; font-size:16px; line-height:22px; }}
 .bubbleA {{ align-self:flex-start; max-width:300px; background:{t['surface']}; color:{t['ink']}; padding:12px 16px; border-radius:20px 20px 20px 6px; font-size:16px; line-height:22px; box-shadow:0 1px 2px rgba(14,34,51,0.05); }}
 .pill {{ display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 10px; border-radius:14px; font-size:12px; font-weight:700; }}
+@keyframes rise {{ from {{ opacity:0; transform:translateY(12px); }} to {{ opacity:1; transform:none; }} }}
+@keyframes breathe {{ 0%,100% {{ transform:scale(1); }} 50% {{ transform:scale(1.04); }} }}
+@keyframes ring {{ 0% {{ transform:scale(1); opacity:0.5; }} 100% {{ transform:scale(2.1); opacity:0; }} }}
+@keyframes dots {{ 0%,80%,100% {{ opacity:0.25; transform:translateY(0); }} 40% {{ opacity:1; transform:translateY(-3px); }} }}
+@keyframes bars {{ 0%,100% {{ transform:scaleY(0.35); }} 50% {{ transform:scaleY(1); }} }}
+.rise {{ animation: rise 300ms cubic-bezier(0, 0, 0.2, 1) both; }}
+.d1 {{ animation-delay:60ms; }} .d2 {{ animation-delay:120ms; }} .d3 {{ animation-delay:180ms; }} .d4 {{ animation-delay:240ms; }} .d5 {{ animation-delay:300ms; }} .d6 {{ animation-delay:360ms; }} .d7 {{ animation-delay:420ms; }} .d8 {{ animation-delay:480ms; }}
+.breathe {{ animation: breathe 2400ms cubic-bezier(0.4, 0, 0.2, 1) infinite; }}
+.ringA {{ animation: ring 1800ms cubic-bezier(0, 0, 0.2, 1) infinite; }} .ringB {{ animation: ring 1800ms cubic-bezier(0, 0, 0.2, 1) 600ms infinite; }} .ringC {{ animation: ring 1800ms cubic-bezier(0, 0, 0.2, 1) 1200ms infinite; }}
+.dot1 {{ animation: dots 1200ms ease-in-out infinite; }} .dot2 {{ animation: dots 1200ms ease-in-out 150ms infinite; }} .dot3 {{ animation: dots 1200ms ease-in-out 300ms infinite; }}
+.bar {{ width:4px; border-radius:2px; background:{t['navy']}; transform-origin:center; animation: bars 900ms ease-in-out infinite; }}
+@media (prefers-reduced-motion: reduce) {{ .rise, .breathe, .ringA, .ringB, .ringC, .dot1, .dot2, .dot3, .bar {{ animation:none !important; opacity:1; transform:none; }} }}
 """ + ("""
 .foot {{ line-height:26px; }} .sub {{ line-height:28px; }} .cap {{ line-height:24px; text-transform:none; letter-spacing:0; }}
 .hl {{ line-height:32px; }} .body {{ line-height:36px; }} .tabItem {{ line-height:20px; font-size:12px; }} .chip {{ line-height:30px; }}
@@ -113,8 +125,8 @@ def ico(name, size=24, color="currentColor", sw=2):
             f'stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{P[name]}</svg>')
 
 # ---------- building blocks ----------
-def tabbar(t, active, labels=("Home", "Activity", "Pay", "More")):
-    items = [("home", labels[0]), ("list", labels[1]), ("send", labels[2]), ("menu", labels[3])]
+def tabbar(t, active, labels=("Home", "Wallet", "Pay", "More")):
+    items = [("sparkle", labels[0]), ("wallet", labels[1]), ("send", labels[2]), ("menu", labels[3])]
     out = '<div class="tab">'
     for i, (n, lab) in enumerate(items):
         on = i == active
@@ -297,7 +309,7 @@ def screen_home_urdu(t):
 </div>
 <div class="fade"></div>
 {aibar(t, "PAYO سے پوچھیں — بولیں یا لکھیں…")}
-{tabbar(t, 0, ("ہوم", "سرگرمی", "ادائیگی", "مزید"))}
+{tabbar(t, 0, ("ہوم", "بٹوہ", "ادائیگی", "مزید"))}
 """
     return wrap(t, body, rtl=True)
 
@@ -765,14 +777,158 @@ def screen_foundations(t):
 </html>
 """
 
+
+def ai_avatar(t, size=36):
+    return f'<div style="width:{size}px;height:{size}px;border-radius:{size//2}px;background:{t["amber"]};display:flex;align-items:center;justify-content:center;flex-shrink:0;">{ico("sparkle", int(size*0.55), t["navy"], 2.2)}</div>'
+
+def ai_home_header(t, rtl=False, balance="₨84,500", name="Ammi Jaan", greet="Good morning"):
+    return (f'<div class="header" style="padding-top:58px;">'
+            f'<div style="display:flex;align-items:center;gap:12px;"><div class="avatar" style="width:40px;height:40px;border-radius:20px;background:{t["amberTint"]};color:{t["navy"]};font-family:\'Plus Jakarta Sans\';">AJ</div>'
+            f'<div><div class="foot">{greet}</div><div class="hl">{name}</div></div></div>'
+            f'<div class="pill num" style="height:36px;padding:0 14px;background:{t["surface"]};color:{t["ink"]};font-size:14px;box-shadow:0 1px 2px rgba(14,34,51,0.06);gap:8px;">{ico("eye", 16, t["ink3"])}{balance}</div></div>')
+
+def suggestion(t, icon, label, sub, delay_cls):
+    return (f'<div class="card rise {delay_cls}" style="padding:14px 16px;display:flex;align-items:center;gap:14px;min-height:72px;">'
+            f'<div class="icoCircle" style="background:{t["amberTint"]};">{ico(icon, 22, t["navy"], 2.2)}</div>'
+            f'<div style="flex:1;"><div class="hl">{label}</div><div class="foot">{sub}</div></div>{ico("chev", 20, t["ink3"])}</div>')
+
+def composer(t, rtl=False, placeholder="Type in English or Urdu…", listening=False, hint="Tap the mic and just say it"):
+    mic = (f'<div style="position:relative;width:64px;height:64px;flex-shrink:0;">'
+           f'<div class="ringA" style="position:absolute;inset:0;border-radius:32px;background:{t["amber"]};"></div>'
+           f'<div class="ringB" style="position:absolute;inset:0;border-radius:32px;background:{t["amber"]};"></div>'
+           f'<div style="position:absolute;inset:0;border-radius:32px;background:{t["navy"]};display:flex;align-items:center;justify-content:center;">{ico("x", 26, "#fff", 2.6)}</div></div>'
+           if listening else
+           f'<div class="breathe" style="width:64px;height:64px;border-radius:32px;background:{t["amber"]};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 20px rgba(242,169,59,0.45);">{ico("mic", 28, t["navy"], 2.4)}</div>')
+    return (f'<div style="position:absolute;left:0;right:0;bottom:84px;padding:10px 16px 12px;background:{t["bg"]};display:flex;flex-direction:column;gap:8px;">'
+            f'<div style="display:flex;align-items:center;gap:10px;"><div class="input" style="flex:1;height:56px;border-radius:28px;">{ico("keyboard", 20, t["ink3"])}<span>{placeholder}</span></div>{mic}</div>'
+            f'<div class="foot" style="text-align:center;">{hint}</div></div>')
+
+def screen_ai_home(t, state="greet", rtl=False):
+    if rtl:
+        L2 = dict(greet="صبح بخیر", name="امی جان", hello="السلام علیکم امی جان! آج میں آپ کی کیا مدد کر سکتی ہوں؟",
+                  s=[("send","پیسے بھیجیں","کسی رابطے یا بینک اکاؤنٹ کو"),("zap","بل ادا کریں","کے الیکٹرک کا بل ₨4,320 باقی ہے"),("wallet","میرا بیلنس بتائیں","اور حالیہ لین دین"),("phone","موبائل لوڈ","جاز، زونگ، ٹیلی نار، یوفون"),("file","گوشوارہ چاہیے","ماہانہ یا سالانہ PDF")],
+                  ph="اردو یا انگریزی میں لکھیں…", hint="مائیک دبائیں اور بس بول دیں", tabs=("ہوم","بٹوہ","ادائیگی","مزید"))
+    else:
+        L2 = dict(greet="Good morning", name="Ammi Jaan", hello="Assalam o Alaikum, Ammi Jaan. How can I help you today?",
+                  s=[("send","Send money","To a contact or a bank account"),("zap","Pay a bill","K-Electric ₨4,320 is due Sep 10"),("wallet","Check my balance","And recent transactions"),("phone","Top-up a phone","Jazz, Zong, Telenor, Ufone"),("file","Get my statement","Monthly or yearly PDF")],
+                  ph="Type in English or Urdu…", hint="Tap the mic and just say it", tabs=("Home","Wallet","Pay","More"))
+    sug = ''.join(suggestion(t, i, l, sb, f"d{n+2}") for n, (i, l, sb) in enumerate(L2["s"]))
+    if state == "greet":
+        chat = (f'<div class="rise d1" style="display:flex;gap:10px;align-items:flex-end;">{ai_avatar(t)}'
+                f'<div class="bubbleA" style="font-size:19px;line-height:{"38px" if rtl else "27px"};">{L2["hello"]}</div></div>'
+                f'<div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">{sug}</div>')
+        comp = composer(t, rtl, L2["ph"], hint=L2["hint"])
+    elif state == "listening":
+        bars = ''.join(f'<div class="bar" style="height:{h}px;animation-delay:{d}ms;"></div>' for h, d in [(14,0),(26,120),(38,240),(22,360),(30,480),(16,600),(28,720),(20,840),(34,960),(18,1080)])
+        chat = (f'<div style="display:flex;gap:10px;align-items:flex-end;">{ai_avatar(t)}<div class="bubbleA" style="font-size:19px;line-height:27px;">{L2["hello"]}</div></div>'
+                f'<div class="rise" style="margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:16px;padding:24px 0;">'
+                f'<div style="display:flex;align-items:center;gap:5px;height:40px;">{bars}</div>'
+                f'<div class="h2" style="text-align:center;">Listening…</div>'
+                f'<div class="card" style="padding:14px 18px;font-size:19px;line-height:27px;color:{t["ink"]};max-width:320px;text-align:center;">Bilal ko 1500 rupees<span style="color:{t["ink3"]};">|</span></div>'
+                f'<div class="foot">Tap the button when you\'re done — or just pause</div></div>')
+        comp = composer(t, rtl, "Listening…", listening=True, hint="Speak in Urdu, English, or both")
+    else:  # conversation
+        chat = (f'<div style="display:flex;gap:10px;align-items:flex-end;">{ai_avatar(t)}<div class="bubbleA">How can I help you today?</div></div>'
+                f'<div class="bubbleU rise">Pay a bill</div>'
+                f'<div class="rise d2" style="display:flex;gap:10px;align-items:flex-end;">{ai_avatar(t)}<div class="bubbleA">You have one bill due. K-Electric, ₨4,320, due Sep 10. Shall I pay it from your wallet?</div></div>'
+                f'<div class="card rise d4" style="align-self:flex-start;width:300px;padding:16px;display:flex;flex-direction:column;gap:12px;border:1.5px solid {t["amber"]};margin-left:46px;">'
+                f'<div style="display:flex;align-items:center;gap:12px;"><div class="icoCircle" style="background:{t["redTint"]};">{ico("zap", 22, t["red"], 2.2)}</div><div style="flex:1;"><div class="hl">K-Electric</div><div class="foot">Consumer ···5678 · Aug bill</div></div><div class="pill" style="background:{t["redTint"]};color:{t["red"]};">Due Sep 10</div></div>'
+                f'<div style="display:flex;justify-content:space-between;align-items:baseline;"><span class="money num" style="font-size:32px;line-height:38px;">₨4,320</span><span class="foot">Balance after ₨80,180</span></div>'
+                f'<div class="btn" style="height:48px;">Yes, pay ₨4,320</div><div class="btnGhost" style="height:40px;">Not now</div></div>'
+                f'<div class="rise d6" style="display:flex;gap:10px;align-items:center;margin-left:46px;"><div class="bubbleA" style="display:flex;gap:6px;padding:14px 18px;"><div class="dot1" style="width:8px;height:8px;border-radius:4px;background:{t["ink2"]};"></div><div class="dot2" style="width:8px;height:8px;border-radius:4px;background:{t["ink2"]};"></div><div class="dot3" style="width:8px;height:8px;border-radius:4px;background:{t["ink2"]};"></div></div></div>')
+        comp = composer(t, rtl, L2["ph"], hint="You'll confirm with your PIN before anything is paid")
+    body = f"""
+{ai_home_header(t, rtl, greet=L2["greet"], name=L2["name"])}
+<div class="content" style="position:absolute;top:118px;left:0;right:0;bottom:214px;display:flex;flex-direction:column;gap:12px;padding:6px 20px 0;overflow:hidden;">
+{chat}
+</div>
+{comp}
+{tabbar(t, 0, L2["tabs"])}
+"""
+    return wrap(t, body, rtl=rtl)
+
+def screen_wallet(t):
+    body = f"""
+<div class="scroll">
+{header(t, "Wallet", right=icon_btn(t, "bell"))}
+<div class="content" style="display:flex;flex-direction:column;gap:20px;padding-top:4px;">
+  <div class="rise">{balance_card(t)}</div>
+  <div class="rise d2" style="display:flex;gap:8px;">
+    {quick_action(t, "send", "Send money")}{quick_action(t, "zap", "Pay bills")}{quick_action(t, "phone", "Top-up")}{quick_action(t, "piggy", "Savings")}
+  </div>
+  <div class="rise d3">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <div class="hl">Recent activity</div><div class="sub" style="color:{t['amberDeep']};">See all</div>
+    </div>
+    {txn_row(t, "BA", "Bilal Ahmed", "Today, 3:20 PM", "1,500", cat="Transfer")}
+    {txn_row(t, "SK", "Sara Khan", "Today, 3:26 PM", "500", cat="Transfer")}
+    {txn_row(t, "", "Meezan Savings", "Aug 28", "142,928", cat="Transfer", icon="wallet")}
+  </div>
+</div>
+</div>
+<div class="fade"></div>
+{aibar(t, "Ask PAYO — say or type…")}
+{tabbar(t, 1)}
+"""
+    return wrap(t, body)
+
+def screen_motion(t):
+    mrows = [
+        ("Touch feedback", "Any button, tile, chip", "100 ms", "ease-out", "scale 0.98 + shadow drops; restores on release", "Haptic .selection"),
+        ("Home greeting", "Assistant bubble on open", "300 ms", "cubic-bezier(0,0,.2,1)", "opacity 0→1, translateY 12→0", "Plays once per open"),
+        ("Suggestion cards", "5 cards under greeting", "300 ms each, 60 ms stagger", "ease-out", "same rise; total sequence ≈ 600 ms", "Anticipation → action → settle"),
+        ("Mic idle", "Home mic button", "2.4 s loop", "ease-in-out", "scale 1 → 1.04 → 1 (4% — never playful)", "Stops when listening"),
+        ("Listening", "Mic + waveform", "1.8 s ring loop · 0.9 s bars", "ease-out / ease-in-out", "two expanding rings fade out; 10 bars scaleY", "Live transcript types in"),
+        ("Thinking", "Assistant typing dots", "1.2 s loop", "ease-in-out", "3 dots, 150 ms apart, 3 px lift", "Reduced motion: static dots"),
+        ("Reply + card", "Assistant text then card", "text 300 ms · card 350 ms", "ease-out", "card rises 120 ms after text lands", "One focus at a time"),
+        ("Screen transition", "Push / pop", "300 ms", "cubic-bezier(.4,0,.2,1)", "slide 100% ↔ 0 with 30% parallax", "Interruptible by swipe-back"),
+        ("Balance update", "After a payment", "250 ms", "ease-out", "digits count to new value, 1.03 scale settle", "Never bounces"),
+        ("PIN dots", "Each digit", "150 ms", "ease-out", "fill amber, scale 1.1 → 1", "Wrong PIN: 4 px shake, 200 ms, then clear"),
+        ("Confirm sheet", "Confirmation screen", "350 ms", "ease-out", "rises from bottom; scrim 0 → 55%", "Cancel exits in 220 ms"),
+        ("Success", "Payment done", "check 400 ms → text 300 ms", "ease-in-out", "check draws + lands first, then amount and ref rise", "Haptic .success"),
+        ("Voice reply", "Assistant speaking", "while audio plays", "linear", "subtle 2-bar equalizer beside the bubble", "Stops with audio"),
+    ]
+    cell = lambda v, cls="sub", extra="": f'<td class="{cls}" style="padding:10px 12px;border-bottom:1px solid {t["sep"]};{extra}">{v}</td>'
+    trs = ''.join('<tr>' + cell(a, "hl") + cell(b) + cell(c, "num", "font-weight:700;") + cell(d, "num", "font-size:13px;") + cell(e) + cell(f, "foot") + '</tr>' for a, b, c, d, e, f in mrows)
+    body = f"""
+<div style="width:1400px;padding:40px;font-family:'Plus Jakarta Sans', system-ui, sans-serif;color:{t['ink']};background:{t['bg']};display:flex;flex-direction:column;gap:20px;box-sizing:border-box;">
+  <div><div class="h1">Motion spec</div><div class="sub" style="margin-top:6px;">Rules: transitions 250–350 ms · feedback ≤150 ms · entrances ease-out, exits ease-in and ~30% shorter · exaggeration ≤5% · one thing moves at a time · identical actions animate identically · transform/opacity only · reduced-motion → opacity-only, no loops. Built for Reanimated 4 (spring damping 18, stiffness 220 for settles).</div></div>
+  <table style="border-collapse:collapse;width:100%;background:{t['surface']};border-radius:16px;overflow:hidden;">
+    <tr style="background:{t['surface2']};"><th class="cap" style="text-align:left;padding:12px;">Moment</th><th class="cap" style="text-align:left;padding:12px;">Where</th><th class="cap" style="text-align:left;padding:12px;">Duration</th><th class="cap" style="text-align:left;padding:12px;">Easing</th><th class="cap" style="text-align:left;padding:12px;">What moves</th><th class="cap" style="text-align:left;padding:12px;">Notes</th></tr>
+    {trs}
+  </table>
+  <div class="foot">Live on this canvas: the Home artboards play the greeting rise, suggestion stagger, mic breathing, listening rings/bars and thinking dots as real CSS so you can judge the feel.</div>
+</div>
+"""
+    return f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  {FONT_LINK}
+  <style>{css(t)}</style>
+</helmet>
+{body}
+</x-dc>
+</body>
+</html>
+"""
+
+
 # ---------- emit ----------
 files = {
-    "Main.dc.html": screen_home(L),
     "Phone.dc.html": screen_phone(L),
     "Otp.dc.html": screen_otp(L),
     "CreatePin.dc.html": screen_create_pin(L),
     "EnterPin.dc.html": screen_enter_pin(L),
-    "Assistant.dc.html": screen_assistant(L),
+    "Main.dc.html": screen_ai_home(L, "greet"),
+    "HomeListening.dc.html": screen_ai_home(L, "listening"),
+    "HomeConversation.dc.html": screen_ai_home(L, "conversation"),
+    "Wallet.dc.html": screen_wallet(L),
     "Activity.dc.html": screen_activity(L),
     "Receipt.dc.html": screen_receipt(L),
     "PayHub.dc.html": screen_pay(L),
@@ -786,34 +942,36 @@ files = {
     "Card.dc.html": screen_card(L),
     "Statements.dc.html": screen_statements(L),
     "More.dc.html": screen_more(L),
-    "HomeDark.dc.html": screen_home(D),
-    "AssistantDark.dc.html": screen_assistant(D),
-    "HomeUrdu.dc.html": screen_home_urdu(L),
-    "HomeOptionB.dc.html": screen_home_option_b(L),
+    "HomeDark.dc.html": screen_ai_home(D, "greet"),
+    "HomeUrdu.dc.html": screen_ai_home(L, "greet", rtl=True),
+    "Motion.dc.html": screen_motion(L),
     "Foundations.dc.html": screen_foundations(L),
 }
 for name, html in files.items():
     (OUT / name).write_text(html, encoding="utf-8")
 
-rows = [
-    ["Phone.dc.html", "Otp.dc.html", "CreatePin.dc.html", "EnterPin.dc.html", "Main.dc.html", "Assistant.dc.html"],
-    ["Activity.dc.html", "Receipt.dc.html", "PayHub.dc.html", "SendRecipient.dc.html", "SendAmount.dc.html", "Confirm.dc.html"],
-    ["Pin.dc.html", "Success.dc.html", "Bills.dc.html", "Pockets.dc.html", "Card.dc.html", "Statements.dc.html"],
-    ["More.dc.html", "HomeDark.dc.html", "AssistantDark.dc.html", "HomeUrdu.dc.html", "HomeOptionB.dc.html"],
+layout_rows = [
+    ["Phone.dc.html", "Otp.dc.html", "CreatePin.dc.html", "EnterPin.dc.html", "Main.dc.html", "HomeListening.dc.html"],
+    ["HomeConversation.dc.html", "Wallet.dc.html", "Activity.dc.html", "Receipt.dc.html", "PayHub.dc.html", "SendRecipient.dc.html"],
+    ["SendAmount.dc.html", "Confirm.dc.html", "Pin.dc.html", "Success.dc.html", "Bills.dc.html", "Pockets.dc.html"],
+    ["Card.dc.html", "Statements.dc.html", "More.dc.html", "HomeDark.dc.html", "HomeUrdu.dc.html"],
 ]
-titles = {"Phone.dc.html": "Auth 1 — mobile number", "Otp.dc.html": "Auth 2 — OTP", "CreatePin.dc.html": "Auth 3a — new user: create PIN", "EnterPin.dc.html": "Auth 3b — returning: enter PIN", "Pin.dc.html": "Payment PIN gate", "Main.dc.html": "Home (Option A — recommended)", "HomeOptionB.dc.html": "Home (Option B — navy hero)", "HomeDark.dc.html": "Home · dark", "AssistantDark.dc.html": "Assistant · dark", "HomeUrdu.dc.html": "Home · اردو (RTL)", "PayHub.dc.html": "Pay", "SendRecipient.dc.html": "Send — recipient", "SendAmount.dc.html": "Send — amount", "Confirm.dc.html": "Confirm", }
+titles = {"Phone.dc.html": "Auth 1 — mobile number", "Otp.dc.html": "Auth 2 — OTP", "CreatePin.dc.html": "Auth 3a — new user: create PIN", "EnterPin.dc.html": "Auth 3b — returning: enter PIN",
+          "Main.dc.html": "Home — AI greets (animated)", "HomeListening.dc.html": "Home — listening (animated)", "HomeConversation.dc.html": "Home — conversation (animated)",
+          "Wallet.dc.html": "Wallet tab", "PayHub.dc.html": "Pay tab", "SendRecipient.dc.html": "Send — recipient", "SendAmount.dc.html": "Send — amount", "Confirm.dc.html": "Confirm", "Pin.dc.html": "Payment PIN gate",
+          "HomeDark.dc.html": "Home · dark", "HomeUrdu.dc.html": "Home · اردو (RTL)"}
 artboards = []
 y = 0
-for r in rows:
+for r in layout_rows:
     for i, f in enumerate(r):
         ab = {"file": f, "x": i * 480, "y": y, "w": 390, "h": 844}
         if f in titles: ab["title"] = titles[f]
         artboards.append(ab)
     y += 844 + 140
-artboards.append({"file": "Foundations.dc.html", "x": 0, "y": y, "w": 1100, "h": 760, "title": "Design foundations"})
+artboards.append({"file": "Motion.dc.html", "x": 0, "y": y, "w": 1400, "h": 900, "title": "Motion spec"})
+artboards.append({"file": "Foundations.dc.html", "x": 1480, "y": y, "w": 1100, "h": 760, "title": "Design foundations"})
 notes = [
-    {"id": "note-brief", "x": -520, "y": 0, "w": 420, "text": "PAYO revamp — for your approval\n\nRow 1: Auth — phone number → OTP → Create PIN (new user) or Enter PIN (returning) → Home; then Assistant\nRow 2: Activity, Receipt, Pay hub, Send (recipient → amount → confirm)\nRow 3: Payment PIN gate, Success, Bills, Savings, Card, Statements\nRow 4: More, Dark mode, Urdu (RTL), Home Option B\n\nAuth rule: phone only. Unknown number → account created + OTP; known number → OTP. After OTP, new users set a PIN, returning users enter theirs.\n\nEnglish-first. Assistant understands English, Urdu and code-mixed input; replies follow the app language.\nAI bar is docked above the tabs on every tab screen — one tap to speak or type from anywhere.\nMoney safety gate unchanged: confirm → PIN → execute."},
-    {"id": "note-options", "x": 5 * 480, "y": 3 * (844 + 140), "w": 380, "text": "Home: two directions\n\nOption A (recommended): cream background, white balance card — calm, bank-like, best readability for older users.\n\nOption B: navy hero header with the balance on dark — bolder brand presence, closer to Stable's dark bars, slightly lower contrast for body text below.\n\nPick one; everything else stays the same."},
+    {"id": "note-brief", "x": -520, "y": 0, "w": 420, "text": "PAYO revamp v2 — AI-first Home\n\nRow 1: Auth (phone → OTP → create/enter PIN) → Home. The assistant greets by name and offers the five things people come to do; the conversation continues right there. Last frame: listening state.\nRow 2: Home mid-conversation (bill card), Wallet tab (balance, quick actions, activity), Activity, Receipt, Pay, Send\nRow 3: Amount, Confirm, PIN gate, Success, Bills, Savings\nRow 4: Card, Statements, More, Home dark, Home Urdu\nBottom: Motion spec + Design foundations\n\nTabs: Home (assistant) · Wallet · Pay · More. The AI bar stays docked on the other tabs and jumps back to Home.\nThe three Home frames play their motion live — the greeting rises, cards stagger in, the mic breathes, rings pulse while listening, dots while thinking."},
 ]
 canvas = {"artboards": artboards, "annotations": notes, "launch": {"view": "canvas"}}
 (OUT / "canvas.json").write_text(json.dumps(canvas, indent=2, ensure_ascii=False), encoding="utf-8")

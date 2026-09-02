@@ -38,40 +38,57 @@
       "y": 0,
       "w": 390,
       "h": 844,
-      "title": "Home (Option A — recommended)"
+      "title": "Home — AI greets (animated)"
     },
     {
-      "file": "Assistant.dc.html",
+      "file": "HomeListening.dc.html",
       "x": 2400,
       "y": 0,
       "w": 390,
-      "h": 844
+      "h": 844,
+      "title": "Home — listening (animated)"
+    },
+    {
+      "file": "HomeConversation.dc.html",
+      "x": 0,
+      "y": 984,
+      "w": 390,
+      "h": 844,
+      "title": "Home — conversation (animated)"
+    },
+    {
+      "file": "Wallet.dc.html",
+      "x": 480,
+      "y": 984,
+      "w": 390,
+      "h": 844,
+      "title": "Wallet tab"
     },
     {
       "file": "Activity.dc.html",
-      "x": 0,
+      "x": 960,
       "y": 984,
       "w": 390,
       "h": 844
     },
     {
       "file": "Receipt.dc.html",
-      "x": 480,
+      "x": 1440,
       "y": 984,
       "w": 390,
       "h": 844
     },
     {
       "file": "PayHub.dc.html",
-      "x": 960,
+      "x": 1920,
       "y": 984,
       "w": 390,
       "h": 844,
-      "title": "Pay"
+      "title": "Pay tab"
     },
     {
       "file": "SendRecipient.dc.html",
-      "x": 1440,
+      "x": 2400,
       "y": 984,
       "w": 390,
       "h": 844,
@@ -79,23 +96,23 @@
     },
     {
       "file": "SendAmount.dc.html",
-      "x": 1920,
-      "y": 984,
+      "x": 0,
+      "y": 1968,
       "w": 390,
       "h": 844,
       "title": "Send — amount"
     },
     {
       "file": "Confirm.dc.html",
-      "x": 2400,
-      "y": 984,
+      "x": 480,
+      "y": 1968,
       "w": 390,
       "h": 844,
       "title": "Confirm"
     },
     {
       "file": "Pin.dc.html",
-      "x": 0,
+      "x": 960,
       "y": 1968,
       "w": 390,
       "h": 844,
@@ -103,81 +120,73 @@
     },
     {
       "file": "Success.dc.html",
-      "x": 480,
+      "x": 1440,
       "y": 1968,
       "w": 390,
       "h": 844
     },
     {
       "file": "Bills.dc.html",
-      "x": 960,
+      "x": 1920,
       "y": 1968,
       "w": 390,
       "h": 844
     },
     {
       "file": "Pockets.dc.html",
-      "x": 1440,
-      "y": 1968,
-      "w": 390,
-      "h": 844
-    },
-    {
-      "file": "Card.dc.html",
-      "x": 1920,
-      "y": 1968,
-      "w": 390,
-      "h": 844
-    },
-    {
-      "file": "Statements.dc.html",
       "x": 2400,
       "y": 1968,
       "w": 390,
       "h": 844
     },
     {
-      "file": "More.dc.html",
+      "file": "Card.dc.html",
       "x": 0,
       "y": 2952,
       "w": 390,
       "h": 844
     },
     {
-      "file": "HomeDark.dc.html",
+      "file": "Statements.dc.html",
       "x": 480,
+      "y": 2952,
+      "w": 390,
+      "h": 844
+    },
+    {
+      "file": "More.dc.html",
+      "x": 960,
+      "y": 2952,
+      "w": 390,
+      "h": 844
+    },
+    {
+      "file": "HomeDark.dc.html",
+      "x": 1440,
       "y": 2952,
       "w": 390,
       "h": 844,
       "title": "Home · dark"
     },
     {
-      "file": "AssistantDark.dc.html",
-      "x": 960,
-      "y": 2952,
-      "w": 390,
-      "h": 844,
-      "title": "Assistant · dark"
-    },
-    {
       "file": "HomeUrdu.dc.html",
-      "x": 1440,
+      "x": 1920,
       "y": 2952,
       "w": 390,
       "h": 844,
       "title": "Home · اردو (RTL)"
     },
     {
-      "file": "HomeOptionB.dc.html",
-      "x": 1920,
-      "y": 2952,
-      "w": 390,
-      "h": 844,
-      "title": "Home (Option B — navy hero)"
+      "file": "Motion.dc.html",
+      "x": 0,
+      "y": 3936,
+      "w": 1400,
+      "h": 900,
+      "title": "Motion spec"
     },
     {
       "file": "Foundations.dc.html",
-      "x": 0,
+      "x": 1480,
       "y": 3936,
       "w": 1100,
       "h": 760,
@@ -190,14 +199,7 @@
       "x": -520,
       "y": 0,
       "w": 420,
-      "text": "PAYO revamp — for your approval\n\nRow 1: Auth — phone number → OTP → Create PIN (new user) or Enter PIN (returning) → Home; then Assistant\nRow 2: Activity, Receipt, Pay hub, Send (recipient → amount → confirm)\nRow 3: Payment PIN gate, Success, Bills, Savings, Card, Statements\nRow 4: More, Dark mode, Urdu (RTL), Home Option B\n\nAuth rule: phone only. Unknown number → account created + OTP; known number → OTP. After OTP, new users set a PIN, returning users enter theirs.\n\nEnglish-first. Assistant understands English, Urdu and code-mixed input; replies follow the app language.\nAI bar is docked above the tabs on every tab screen — one tap to speak or type from anywhere.\nMoney safety gate unchanged: confirm → PIN → execute."
-    },
-    {
-      "id": "note-options",
-      "x": 2400,
-      "y": 2952,
-      "w": 380,
-      "text": "Home: two directions\n\nOption A (recommended): cream background, white balance card — calm, bank-like, best readability for older users.\n\nOption B: navy hero header with the balance on dark — bolder brand presence, closer to Stable's dark bars, slightly lower contrast for body text below.\n\nPick one; everything else stays the same."
+      "text": "PAYO revamp v2 — AI-first Home\n\nRow 1: Auth (phone → OTP → create/enter PIN) → Home. The assistant greets by name and offers the five things people come to do; the conversation continues right there. Last frame: listening state.\nRow 2: Home mid-conversation (bill card), Wallet tab (balance, quick actions, activity), Activity, Receipt, Pay, Send\nRow 3: Amount, Confirm, PIN gate, Success, Bills, Savings\nRow 4: Card, Statements, More, Home dark, Home Urdu\nBottom: Motion spec + Design foundations\n\nTabs: Home (assistant) · Wallet · Pay · More. The AI bar stays docked on the other tabs and jumps back to Home.\nThe three Home frames play their motion live — the greeting rises, cards stagger in, the mic breathes, rings pulse while listening, dots while thinking."
     }
   ],
   "launch": {
