@@ -8,7 +8,7 @@ import en from './en.json';
 // flexDirection: isRTL() ? 'row-reverse' : 'row', plus writingDirection on text.
 i18n.use(initReactI18next).init({
   resources: { ur: { translation: ur }, en: { translation: en } },
-  lng: 'ur',
+  lng: 'en',
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
 });
