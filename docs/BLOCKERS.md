@@ -21,11 +21,16 @@ grep -E '^GEMINI_API_KEY=' ~/work/stable-workspace/agentic-ai-sia/.env >> ~/work
 
 (`services/ai/.env` is gitignored.)
 
-## 2. Cartesia key absent (expected — spec-sanctioned fallback active)
+## 2. Cartesia key — RESOLVED 2026-09-02
 
-No `CARTESIA_API_KEY` was provided, so TTS uses the silent-stub provider behind the
-`TtsProvider` interface (text + cards fully functional; audio events flow end-to-end
-with ~0.1 s of silence). Add the key to `services/ai/.env` to activate `CartesiaTts`.
+Owner supplied a Cartesia key (in gitignored `services/ai/.env`). While wiring it, two
+bugs in the never-exercised provider were found and fixed: it used `model_id="sonic-2"`
+(no Urdu — Urdu arrived in Sonic 3.6) and iterated `tts.bytes()` without awaiting it.
+Now: `sonic-3.6`, curated Urdu voice (Zara) / English voice (Skylar), 400-char
+per-utterance cap, SDK retries disabled, and any provider failure falls back to the
+silent stub. Verified live with a single 12-character Urdu synthesis (26 KB MP3).
+**The account balance is very low — keep demo turns short; the cap and no-retry
+rules exist to protect it.**
 
 ## 3. Resolved along the way (no action needed)
 

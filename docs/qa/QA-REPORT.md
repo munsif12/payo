@@ -49,7 +49,7 @@ backend (84,500 → … → 70,180 over the QA session, every step arithmeticall
 ## Known limitations (honest list)
 
 1. **Live Gemini agent unverified on-device** — key copy blocked (BLOCKERS.md). Mock-model runs cover the full UI/transport/backend path; agent logic covered by pytest only.
-2. **TTS is a silent stub** — no `CARTESIA_API_KEY` provided. The audio pipeline (SSE `audio` event → fetch → expo-audio playback) runs end-to-end but plays ~0.1 s of silence. With a key, `CartesiaTts` is used automatically.
+2. **TTS now live (2026-09-02)** — Cartesia key added; provider fixed to `sonic-3.6` (Urdu-capable) with a real Urdu voice, verified by one live synthesis. On-device audio playback of real speech has not yet been re-run (QA above predates the key). Account credit is minimal: utterances are capped at 400 chars, no retries, silent-stub fallback on any provider error.
 3. **Voice input on simulator** — recording works (metering silence auto-stop verified), but the simulator microphone carried no intelligible speech; the transcript shown in QA came from the mock. Real-device voice needs the Gemini key + a phone.
 4. **QR camera scan untestable in simulators** — paste-payload fallback works (signed payload verified by backend tests); camera path unexercised.
 5. **Statement PDF is English-only** by design (Nastaliq shaping in pdfkit is unreliable); in-app views are Urdu.
