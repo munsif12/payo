@@ -301,24 +301,78 @@ def screen_home_urdu(t):
 """
     return wrap(t, body, rtl=True)
 
-def screen_login(t):
-    dots = ''.join(f'<div class="dot{" dotOn" if i < 2 else ""}"></div>' for i in range(4))
-    keys = ''.join(f'<div class="key">{k}</div>' for k in ["1","2","3","4","5","6","7","8","9"])
+def brand(t):
+    return (f'<div style="display:flex;align-items:center;gap:10px;"><div style="width:40px;height:40px;border-radius:12px;background:{t["amber"]};display:flex;align-items:center;justify-content:center;">{ico("wallet", 22, t["navy"], 2.4)}</div>'
+            f'<div style="font-size:22px;font-weight:800;letter-spacing:1px;">PAYO</div></div>')
+
+def keypad(t, tall=False, left="", right=None):
+    h = "height:72px;" if tall else ""
+    keys = ''.join(f'<div class="key" style="{h}">{k}</div>' for k in ["1","2","3","4","5","6","7","8","9"])
+    right = right if right is not None else ico("chevL", 24, t["ink2"])
+    return (f'<div class="kpad">{keys}<div class="key" style="background:transparent;box-shadow:none;color:{t["ink2"]};font-size:15px;{h}">{left}</div>'
+            f'<div class="key" style="{h}">0</div><div class="key" style="background:transparent;box-shadow:none;{h}">{right}</div></div>')
+
+def screen_phone(t):
     body = f"""
-<div class="content" style="padding-top:84px;display:flex;flex-direction:column;gap:20px;">
-  <div style="display:flex;align-items:center;gap:10px;">
-    <div style="width:40px;height:40px;border-radius:12px;background:{t['amber']};display:flex;align-items:center;justify-content:center;">{ico("wallet", 22, t['navy'], 2.4)}</div>
-    <div style="font-size:22px;font-weight:800;letter-spacing:1px;">PAYO</div>
+<div class="content" style="padding-top:84px;display:flex;flex-direction:column;gap:22px;">
+  {brand(t)}
+  <div><div class="h1">Enter your mobile number</div><div class="sub" style="margin-top:6px;">We'll send a code to verify it. New to PAYO? Your account is created automatically.</div></div>
+  <div class="input inputOn" style="height:60px;gap:12px;">
+    <div style="display:flex;align-items:center;gap:6px;padding-right:12px;border-right:1px solid {t['sep']};color:{t['ink']};font-weight:600;">PK +92</div>
+    <span class="num" style="color:{t['ink']};font-size:20px;font-weight:600;letter-spacing:1px;">300 111 0001</span>
   </div>
-  <div><div class="h1">Welcome back</div><div class="sub" style="margin-top:6px;">Banking that listens — in English and Urdu.</div></div>
-  <div class="input inputOn">{ico("user", 20, t['ink3'])}<span>ammi@payo.demo</span></div>
-  <div>
-    <div class="sub" style="margin-bottom:12px;">Enter your 4-digit PIN</div>
-    <div style="display:flex;gap:16px;justify-content:center;">{dots}</div>
+  {keypad(t, left="", right=ico("chevL", 24, t['ink2']))}
+  <div class="btn">Send code</div>
+  <div class="foot" style="text-align:center;">By continuing you agree to PAYO's terms. Standard SMS rates may apply.</div>
+</div>
+"""
+    return wrap(t, body)
+
+def screen_otp(t):
+    boxes = ''.join(f'<div style="flex:1;height:60px;border-radius:14px;background:{t["surface"]};border:1.5px solid {t["amber"] if i < 4 else t["sep"]};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;" class="num">{d}</div>' for i, d in enumerate(["4","8","2","9","",""]))
+    body = f"""
+{header(t, "", back=True)}
+<div class="content" style="display:flex;flex-direction:column;gap:22px;padding-top:8px;">
+  <div><div class="h1">Enter the 6-digit code</div><div class="sub" style="margin-top:6px;">Sent by SMS to <span style="color:{t['ink']};font-weight:600;" class="num">+92 300 111 0001</span> · <span style="color:{t['amberDeep']};font-weight:700;">Change</span></div></div>
+  <div style="display:flex;gap:8px;">{boxes}</div>
+  <div class="card" style="padding:12px 14px;display:flex;align-items:center;gap:10px;background:{t['amberTint']};box-shadow:none;">{ico("sparkle", 18, t['navy'], 2.2)}<span class="sub" style="color:{t['navy']};">Demo build: your code is <span class="num" style="font-weight:800;">482913</span></span></div>
+  {keypad(t, left="Resend 0:42")}
+  <div class="btn">Verify</div>
+</div>
+"""
+    return wrap(t, body)
+
+def screen_create_pin(t):
+    dots = ''.join(f'<div class="dot{" dotOn" if i < 4 else ""}" style="width:18px;height:18px;border-radius:9px;"></div>' for i in range(4))
+    dots2 = ''.join(f'<div class="dot{" dotOn" if i < 2 else ""}" style="width:18px;height:18px;border-radius:9px;"></div>' for i in range(4))
+    body = f"""
+{header(t, "", back=True, right=f'<div class="chip" style="height:32px;">Step 3 of 3</div>')}
+<div class="content" style="display:flex;flex-direction:column;gap:22px;padding-top:8px;">
+  <div><div class="h1">Create your PIN</div><div class="sub" style="margin-top:6px;">4 digits. You'll use it to confirm every payment — never share it.</div></div>
+  <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;"><span class="hl">New PIN</span><span class="pill" style="background:{t['greenTint']};color:{t['green']};">{ico("check", 14, t['green'], 3)}Set</span></div>
+    <div style="display:flex;gap:16px;">{dots}</div>
+    <div style="height:1px;background:{t['sep']};"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;"><span class="hl">Confirm PIN</span><span class="foot">2 of 4</span></div>
+    <div style="display:flex;gap:16px;">{dots2}</div>
   </div>
-  <div class="kpad">{keys}<div class="key" style="background:transparent;box-shadow:none;color:{t['ink2']};font-size:15px;">Forgot?</div><div class="key">0</div><div class="key" style="background:transparent;box-shadow:none;">{ico("chevL", 24, t['ink2'])}</div></div>
-  <div class="btn">Log in</div>
-  <div class="sub" style="text-align:center;">New to PAYO? <span style="color:{t['amberDeep']};font-weight:700;">Create account</span></div>
+  <div style="display:flex;align-items:center;gap:10px;padding:0 4px;">{ico("shield", 18, t['ink3'])}<span class="foot">Avoid 1234 or your birth year. PAYO never asks for your PIN by phone.</span></div>
+  {keypad(t, tall=False)}
+  <div class="btn" style="opacity:0.5;">Finish &amp; open wallet</div>
+</div>
+"""
+    return wrap(t, body)
+
+def screen_enter_pin(t):
+    dots = ''.join(f'<div class="dot{" dotOn" if i < 3 else ""}" style="width:18px;height:18px;border-radius:9px;"></div>' for i in range(4))
+    body = f"""
+{header(t, "", right=f'<div class="chip" style="height:32px;gap:6px;">{ico("user", 16, t["ink2"])}Not you?</div>')}
+<div class="content" style="display:flex;flex-direction:column;gap:26px;align-items:center;padding-top:16px;">
+  <div class="avatar" style="width:72px;height:72px;border-radius:36px;background:{t['amberTint']};color:{t['navy']};font-size:22px;">AJ</div>
+  <div style="text-align:center;"><div class="h1">Welcome back, Ammi</div><div class="sub" style="margin-top:6px;">Enter your PIN to open your wallet</div></div>
+  <div style="display:flex;gap:20px;">{dots}</div>
+  <div style="width:100%;">{keypad(t, tall=True, left="Forgot?")}</div>
+  <div class="foot" style="text-align:center;">Number verified · +92 300 111 0001</div>
 </div>
 """
     return wrap(t, body)
@@ -714,7 +768,10 @@ def screen_foundations(t):
 # ---------- emit ----------
 files = {
     "Main.dc.html": screen_home(L),
-    "Login.dc.html": screen_login(L),
+    "Phone.dc.html": screen_phone(L),
+    "Otp.dc.html": screen_otp(L),
+    "CreatePin.dc.html": screen_create_pin(L),
+    "EnterPin.dc.html": screen_enter_pin(L),
     "Assistant.dc.html": screen_assistant(L),
     "Activity.dc.html": screen_activity(L),
     "Receipt.dc.html": screen_receipt(L),
@@ -739,12 +796,12 @@ for name, html in files.items():
     (OUT / name).write_text(html, encoding="utf-8")
 
 rows = [
-    ["Login.dc.html", "Main.dc.html", "Assistant.dc.html", "Activity.dc.html", "Receipt.dc.html"],
-    ["PayHub.dc.html", "SendRecipient.dc.html", "SendAmount.dc.html", "Confirm.dc.html", "Pin.dc.html", "Success.dc.html"],
-    ["Bills.dc.html", "Pockets.dc.html", "Card.dc.html", "Statements.dc.html", "More.dc.html"],
-    ["HomeDark.dc.html", "AssistantDark.dc.html", "HomeUrdu.dc.html", "HomeOptionB.dc.html"],
+    ["Phone.dc.html", "Otp.dc.html", "CreatePin.dc.html", "EnterPin.dc.html", "Main.dc.html", "Assistant.dc.html"],
+    ["Activity.dc.html", "Receipt.dc.html", "PayHub.dc.html", "SendRecipient.dc.html", "SendAmount.dc.html", "Confirm.dc.html"],
+    ["Pin.dc.html", "Success.dc.html", "Bills.dc.html", "Pockets.dc.html", "Card.dc.html", "Statements.dc.html"],
+    ["More.dc.html", "HomeDark.dc.html", "AssistantDark.dc.html", "HomeUrdu.dc.html", "HomeOptionB.dc.html"],
 ]
-titles = {"Main.dc.html": "Home (Option A — recommended)", "HomeOptionB.dc.html": "Home (Option B — navy hero)", "HomeDark.dc.html": "Home · dark", "AssistantDark.dc.html": "Assistant · dark", "HomeUrdu.dc.html": "Home · اردو (RTL)", "PayHub.dc.html": "Pay", "SendRecipient.dc.html": "Send — recipient", "SendAmount.dc.html": "Send — amount", "Confirm.dc.html": "Confirm", "Pin.dc.html": "PIN gate"}
+titles = {"Phone.dc.html": "Auth 1 — mobile number", "Otp.dc.html": "Auth 2 — OTP", "CreatePin.dc.html": "Auth 3a — new user: create PIN", "EnterPin.dc.html": "Auth 3b — returning: enter PIN", "Pin.dc.html": "Payment PIN gate", "Main.dc.html": "Home (Option A — recommended)", "HomeOptionB.dc.html": "Home (Option B — navy hero)", "HomeDark.dc.html": "Home · dark", "AssistantDark.dc.html": "Assistant · dark", "HomeUrdu.dc.html": "Home · اردو (RTL)", "PayHub.dc.html": "Pay", "SendRecipient.dc.html": "Send — recipient", "SendAmount.dc.html": "Send — amount", "Confirm.dc.html": "Confirm", }
 artboards = []
 y = 0
 for r in rows:
@@ -755,8 +812,8 @@ for r in rows:
     y += 844 + 140
 artboards.append({"file": "Foundations.dc.html", "x": 0, "y": y, "w": 1100, "h": 760, "title": "Design foundations"})
 notes = [
-    {"id": "note-brief", "x": -520, "y": 0, "w": 420, "text": "PAYO revamp — for your approval\n\nRow 1: Login, Home, Assistant, Activity, Receipt\nRow 2: Pay hub, Send (recipient → amount → confirm → PIN → success)\nRow 3: Bills, Savings, Card, Statements, More\nRow 4: Dark mode, Urdu (RTL), Home Option B\n\nEnglish-first. Assistant understands English, Urdu and code-mixed input; replies follow the app language.\nAI bar is docked above the tabs on every tab screen — one tap to speak or type from anywhere.\nMoney safety gate unchanged: confirm → PIN → execute."},
-    {"id": "note-options", "x": 1440 + 480, "y": 3 * (844 + 140), "w": 380, "text": "Home: two directions\n\nOption A (recommended): cream background, white balance card — calm, bank-like, best readability for older users.\n\nOption B: navy hero header with the balance on dark — bolder brand presence, closer to Stable's dark bars, slightly lower contrast for body text below.\n\nPick one; everything else stays the same."},
+    {"id": "note-brief", "x": -520, "y": 0, "w": 420, "text": "PAYO revamp — for your approval\n\nRow 1: Auth — phone number → OTP → Create PIN (new user) or Enter PIN (returning) → Home; then Assistant\nRow 2: Activity, Receipt, Pay hub, Send (recipient → amount → confirm)\nRow 3: Payment PIN gate, Success, Bills, Savings, Card, Statements\nRow 4: More, Dark mode, Urdu (RTL), Home Option B\n\nAuth rule: phone only. Unknown number → account created + OTP; known number → OTP. After OTP, new users set a PIN, returning users enter theirs.\n\nEnglish-first. Assistant understands English, Urdu and code-mixed input; replies follow the app language.\nAI bar is docked above the tabs on every tab screen — one tap to speak or type from anywhere.\nMoney safety gate unchanged: confirm → PIN → execute."},
+    {"id": "note-options", "x": 5 * 480, "y": 3 * (844 + 140), "w": 380, "text": "Home: two directions\n\nOption A (recommended): cream background, white balance card — calm, bank-like, best readability for older users.\n\nOption B: navy hero header with the balance on dark — bolder brand presence, closer to Stable's dark bars, slightly lower contrast for body text below.\n\nPick one; everything else stays the same."},
 ]
 canvas = {"artboards": artboards, "annotations": notes, "launch": {"view": "canvas"}}
 (OUT / "canvas.json").write_text(json.dumps(canvas, indent=2, ensure_ascii=False), encoding="utf-8")

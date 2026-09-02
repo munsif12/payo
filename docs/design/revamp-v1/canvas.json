@@ -1,15 +1,40 @@
 {
   "artboards": [
     {
-      "file": "Login.dc.html",
+      "file": "Phone.dc.html",
       "x": 0,
       "y": 0,
       "w": 390,
-      "h": 844
+      "h": 844,
+      "title": "Auth 1 — mobile number"
+    },
+    {
+      "file": "Otp.dc.html",
+      "x": 480,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Auth 2 — OTP"
+    },
+    {
+      "file": "CreatePin.dc.html",
+      "x": 960,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Auth 3a — new user: create PIN"
+    },
+    {
+      "file": "EnterPin.dc.html",
+      "x": 1440,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Auth 3b — returning: enter PIN"
     },
     {
       "file": "Main.dc.html",
-      "x": 480,
+      "x": 1920,
       "y": 0,
       "w": 390,
       "h": 844,
@@ -17,28 +42,28 @@
     },
     {
       "file": "Assistant.dc.html",
-      "x": 960,
+      "x": 2400,
       "y": 0,
       "w": 390,
       "h": 844
     },
     {
       "file": "Activity.dc.html",
-      "x": 1440,
-      "y": 0,
+      "x": 0,
+      "y": 984,
       "w": 390,
       "h": 844
     },
     {
       "file": "Receipt.dc.html",
-      "x": 1920,
-      "y": 0,
+      "x": 480,
+      "y": 984,
       "w": 390,
       "h": 844
     },
     {
       "file": "PayHub.dc.html",
-      "x": 0,
+      "x": 960,
       "y": 984,
       "w": 390,
       "h": 844,
@@ -46,7 +71,7 @@
     },
     {
       "file": "SendRecipient.dc.html",
-      "x": 480,
+      "x": 1440,
       "y": 984,
       "w": 390,
       "h": 844,
@@ -54,7 +79,7 @@
     },
     {
       "file": "SendAmount.dc.html",
-      "x": 960,
+      "x": 1920,
       "y": 984,
       "w": 390,
       "h": 844,
@@ -62,7 +87,7 @@
     },
     {
       "file": "Confirm.dc.html",
-      "x": 1440,
+      "x": 2400,
       "y": 984,
       "w": 390,
       "h": 844,
@@ -70,57 +95,57 @@
     },
     {
       "file": "Pin.dc.html",
-      "x": 1920,
-      "y": 984,
-      "w": 390,
-      "h": 844,
-      "title": "PIN gate"
-    },
-    {
-      "file": "Success.dc.html",
-      "x": 2400,
-      "y": 984,
-      "w": 390,
-      "h": 844
-    },
-    {
-      "file": "Bills.dc.html",
       "x": 0,
       "y": 1968,
       "w": 390,
-      "h": 844
+      "h": 844,
+      "title": "Payment PIN gate"
     },
     {
-      "file": "Pockets.dc.html",
+      "file": "Success.dc.html",
       "x": 480,
       "y": 1968,
       "w": 390,
       "h": 844
     },
     {
-      "file": "Card.dc.html",
+      "file": "Bills.dc.html",
       "x": 960,
       "y": 1968,
       "w": 390,
       "h": 844
     },
     {
-      "file": "Statements.dc.html",
+      "file": "Pockets.dc.html",
       "x": 1440,
       "y": 1968,
       "w": 390,
       "h": 844
     },
     {
-      "file": "More.dc.html",
+      "file": "Card.dc.html",
       "x": 1920,
       "y": 1968,
       "w": 390,
       "h": 844
     },
     {
-      "file": "HomeDark.dc.html",
+      "file": "Statements.dc.html",
+      "x": 2400,
+      "y": 1968,
+      "w": 390,
+      "h": 844
+    },
+    {
+      "file": "More.dc.html",
       "x": 0,
+      "y": 2952,
+      "w": 390,
+      "h": 844
+    },
+    {
+      "file": "HomeDark.dc.html",
+      "x": 480,
       "y": 2952,
       "w": 390,
       "h": 844,
@@ -128,7 +153,7 @@
     },
     {
       "file": "AssistantDark.dc.html",
-      "x": 480,
+      "x": 960,
       "y": 2952,
       "w": 390,
       "h": 844,
@@ -136,7 +161,7 @@
     },
     {
       "file": "HomeUrdu.dc.html",
-      "x": 960,
+      "x": 1440,
       "y": 2952,
       "w": 390,
       "h": 844,
@@ -144,7 +169,7 @@
     },
     {
       "file": "HomeOptionB.dc.html",
-      "x": 1440,
+      "x": 1920,
       "y": 2952,
       "w": 390,
       "h": 844,
@@ -165,11 +190,11 @@
       "x": -520,
       "y": 0,
       "w": 420,
-      "text": "PAYO revamp — for your approval\n\nRow 1: Login, Home, Assistant, Activity, Receipt\nRow 2: Pay hub, Send (recipient → amount → confirm → PIN → success)\nRow 3: Bills, Savings, Card, Statements, More\nRow 4: Dark mode, Urdu (RTL), Home Option B\n\nEnglish-first. Assistant understands English, Urdu and code-mixed input; replies follow the app language.\nAI bar is docked above the tabs on every tab screen — one tap to speak or type from anywhere.\nMoney safety gate unchanged: confirm → PIN → execute."
+      "text": "PAYO revamp — for your approval\n\nRow 1: Auth — phone number → OTP → Create PIN (new user) or Enter PIN (returning) → Home; then Assistant\nRow 2: Activity, Receipt, Pay hub, Send (recipient → amount → confirm)\nRow 3: Payment PIN gate, Success, Bills, Savings, Card, Statements\nRow 4: More, Dark mode, Urdu (RTL), Home Option B\n\nAuth rule: phone only. Unknown number → account created + OTP; known number → OTP. After OTP, new users set a PIN, returning users enter theirs.\n\nEnglish-first. Assistant understands English, Urdu and code-mixed input; replies follow the app language.\nAI bar is docked above the tabs on every tab screen — one tap to speak or type from anywhere.\nMoney safety gate unchanged: confirm → PIN → execute."
     },
     {
       "id": "note-options",
-      "x": 1920,
+      "x": 2400,
       "y": 2952,
       "w": 380,
       "text": "Home: two directions\n\nOption A (recommended): cream background, white balance card — calm, bank-like, best readability for older users.\n\nOption B: navy hero header with the balance on dark — bolder brand presence, closer to Stable's dark bars, slightly lower contrast for body text below.\n\nPick one; everything else stays the same."
