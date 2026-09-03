@@ -14,10 +14,11 @@ test('InstitutionChip parses a sample with the expected keys', () => {
 
 test('RecipientChip parses a sample with the expected keys', () => {
   const sample: RecipientChip = {
-    recipientId: 'r1', nickname: 'Munsif', title: 'Munsif Ali', institutionName: 'Easypaisa', identifier: '03135468810',
+    recipientId: 'r1', nickname: 'Munsif', title: 'Munsif Ali', institutionId: 'inst-1',
+    institutionName: 'Easypaisa', identifier: '03135468810',
   };
   expect(Object.keys(sample).sort()).toEqual(
-    ['recipientId', 'nickname', 'title', 'institutionName', 'identifier'].sort(),
+    ['recipientId', 'nickname', 'title', 'institutionId', 'institutionName', 'identifier'].sort(),
   );
 });
 

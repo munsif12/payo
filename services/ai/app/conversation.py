@@ -49,8 +49,14 @@ def _card_facts(card: dict[str, Any]) -> str | None:
         )
     if kind == "recipient_chips":
         items = card.get("recipients") or []
+        # institution_id+identifier ride along so a later turn that picks one specific
+        # option (e.g. "the JazzCash one") can resolve it directly — several chips can
+        # share the same nickname (that's exactly why they needed disambiguating), so
+        # recipient_id/nickname alone is not enough to tell them apart.
         return "recipient_chips: " + ", ".join(
-            f"{r.get('recipientId')}:{r.get('nickname')}" for r in items
+            f"{r.get('recipientId')}:{r.get('nickname')}@{r.get('institutionName')}"
+            f"(institution_id={r.get('institutionId')} identifier={r.get('identifier')})"
+            for r in items
         )
     if kind == "biller_chips":
         items = card.get("billers") or []

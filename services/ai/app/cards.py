@@ -98,6 +98,7 @@ class RecipientChip(BaseModel):
     recipientId: str
     nickname: str
     title: str
+    institutionId: str
     institutionName: str
     identifier: str
 

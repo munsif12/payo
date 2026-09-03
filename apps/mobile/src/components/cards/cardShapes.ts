@@ -41,6 +41,7 @@ export interface RecipientChip {
   recipientId: string;
   nickname: string;
   title: string;
+  institutionId: string;
   institutionName: string;
   identifier: string;
 }

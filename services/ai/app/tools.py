@@ -187,7 +187,8 @@ async def search_recipients(client: BackendClient, query: str) -> Result:
     chips = [
         RecipientChip(
             recipientId=r["id"], nickname=r["nickname"], title=r["title"],
-            institutionName=r["institution"]["name"], identifier=r["identifier"],
+            institutionId=r["institution"]["id"], institutionName=r["institution"]["name"],
+            identifier=r["identifier"],
         )
         for r in items
     ]

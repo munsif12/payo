@@ -202,6 +202,10 @@ function RecipientChipsCardView({ card, onChipTap }: Props) {
   const urdu = useIsUrdu();
   const prompt = card.prompt as { en: string; ur: string };
   const recipients = (card.recipients ?? []) as RecipientChip[];
+  // Several options can share the same nickname — that's exactly why they needed
+  // disambiguating — so tapping one must send back more than the bare nickname, or the
+  // model just re-runs the same ambiguous name search and re-shows this card forever.
+  // The institution name is always unambiguous between options with the same nickname.
   return (
     <View style={{ marginTop: space.s }}>
       <Text variant="foot">{urdu ? prompt.ur : prompt.en}</Text>
@@ -212,7 +216,7 @@ function RecipientChipsCardView({ card, onChipTap }: Props) {
             testID={`chip-recipient-${r.recipientId}`}
             label={r.nickname}
             detail={`${r.title} · ${r.institutionName} · ${maskIdentifier(r.identifier)}`}
-            onPress={() => onChipTap?.(r.nickname)}
+            onPress={() => onChipTap?.(`${r.nickname} at ${r.institutionName}`)}
           />
         ))}
       </View>
