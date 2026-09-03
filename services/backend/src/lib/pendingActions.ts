@@ -5,7 +5,7 @@ import { assertPinOk } from './pinAuth';
 
 type PADoc = InstanceType<typeof PendingAction>;
 type TxnDoc = InstanceType<typeof Transaction>;
-type Executor = (session: ClientSession, action: PADoc) => Promise<TxnDoc>;
+export type Executor = (session: ClientSession, action: PADoc) => Promise<TxnDoc>;
 const executors = new Map<string, Executor>();
 export const registerExecutor = (kind: string, fn: Executor) => executors.set(kind, fn);
 

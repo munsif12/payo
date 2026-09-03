@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { createApp } from '../app';
 import { runSeed } from '../seed/seed';
-import { Biller } from '../models';
+import { Biller, Institution } from '../models';
 
 const app = createApp();
 
@@ -51,8 +51,9 @@ test('demo-world end-to-end smoke through the public API', async () => {
   expect(dueAfter.body.data.items).toHaveLength(0);
 
   // send ₨1,500 to Bilal
+  const payo = (await Institution.findOne({ code: 'PAYO' }))!;
   const transfer = await auth(request(app).post('/api/v1/transfers'))
-    .send({ to: { kind: 'payo', phone: '+923001110002' }, amountPaisa: 150_000 });
+    .send({ to: { institutionId: String(payo._id), identifier: '+923001110002' }, amountPaisa: 150_000 });
   const tExec = await auth(request(app).post(`/api/v1/actions/${transfer.body.data.id}/execute`)).send({ pin: '1234' });
   expect(tExec.status).toBe(200);
 

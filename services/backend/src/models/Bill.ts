@@ -11,6 +11,13 @@ const billSchema = new Schema({
   status: { type: String, required: true, default: 'due', enum: ['due', 'paid'] },
 }, { timestamps: true });
 
-billSchema.index({ userId: 1, billerId: 1, consumerNo: 1 });
+// Partial unique index: only ONE due bill per (user, biller, consumerNo) at a time —
+// a paid bill doesn't block a later re-lookup creating a fresh due one. Also the
+// concurrency guard: two racing ensureDueBill() calls both try to insert; one wins,
+// the other gets a duplicate-key error and re-reads the winner's document.
+billSchema.index(
+  { userId: 1, billerId: 1, consumerNo: 1 },
+  { unique: true, partialFilterExpression: { status: 'due' } },
+);
 
 export const Bill = model('Bill', billSchema);

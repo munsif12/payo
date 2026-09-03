@@ -86,14 +86,15 @@ with 401 `OTP_SCOPE`.
 | 🔒 `PATCH /me` | `{ name?, urduName?, language? }` → updated `user` (partial update). |
 | 🔒 `GET /transactions?type&category&from&to&limit&cursor` | → `{ items: Txn[], nextCursor }` |
 | 🔒 `GET /transactions/spending-summary?from&to` | → `{ totalOutPaisa, totalInPaisa, byCategory: [{ category, totalPaisa, count }] }` |
-| 🔒 `GET /contacts` / `POST /contacts` | create: `{ name, urduName?, kind: 'payo'\|'bank', phone?, bankId?, iban? }` → `Contact` |
-| 🔒 `GET /banks` | → `{ items: [{ id, name, urduName }] }` |
-| 🔒 `POST /banks/resolve-title` | `{ bankId, iban }` → `{ accountTitle }` (deterministic fake) |
-| 🔒 `POST /transfers` | `{ to: { kind: 'payo', phone } \| { kind: 'bank', bankId, iban } \| { kind: 'contact', contactId }, amountPaisa, note? }` → `PendingAction` |
-| 🔒 `GET /billers` | → `{ items: [{ id, name, urduName, category }] }` (categories: electricity, gas, internet, water) |
-| 🔒 `GET /bills/due` | → `{ items: [{ billId, biller: {id,name,urduName,category}, consumerNo, amountPaisa, dueDate, month }] }` — the caller's own due bills (`Bill.userId`, stamped on lookup and by seed). |
+| 🔒 `GET /institutions?q=` | → `{ items: [{ id, name, urduName, kind: 'wallet'\|'bank', code, popular }] }` — ~35 entries (5 wallets: PAYO, Easypaisa, JazzCash, SadaPay, NayaPay; ~30 banks); `q` matches name/urduName/code; popular first, then alphabetical. |
+| 🔒 `POST /transfers/resolve` | `{ institutionId, identifier }` → `{ title, institution: {id,name,urduName,kind}, identifier, linkedUserId? }`. PAYO + phone → real user (404 `RECIPIENT_NOT_FOUND`, 400 `SELF_TRANSFER`); other wallets → phone normalised to `+92…`, deterministic title; banks → IBAN or 10–16 digit account no, deterministic title; else 400 `INVALID_IDENTIFIER`. |
+| 🔒 `GET /recipients?q=` / `POST /recipients` / `DELETE /recipients/:id` | create: `{ nickname, institutionId, identifier }` → resolves + stores `{ id, nickname, title, institution: {id,name,urduName,kind}, identifier, linkedUserId?, lastUsedAt }`; `q` matches nickname/title/identifier; list is most-recently-used first; duplicate `(userId, institutionId, identifier)` → 409 `ALREADY_SAVED`. Replaces `Contact`/`/contacts`. |
+| 🔒 `POST /transfers` | `{ to: { recipientId } \| { institutionId, identifier }, amountPaisa, note? }` → `PendingAction` (resolves again server-side; fee: banks 2500, wallets 0). Legacy `phone`/`bank`/`contact` shapes and `/banks*` are removed. |
+| 🔒 `GET /billers` | → `{ items: [{ id, name, urduName, category }] }` (categories: electricity, gas, internet, water, mobile) |
+| 🔒 `GET /bills/due` | → `{ items: [{ billId, biller: {id,name,urduName,category}, consumerNo, amountPaisa, dueDate, month }] }` — the caller's own due bills (`Bill.userId`, stamped on lookup and by seed), refreshed to also include each saved biller's current due bill. |
 | 🔒 `POST /bills/lookup` | `{ billerId, consumerNo }` → `{ billId, consumerName, amountPaisa, dueDate, month }` (deterministic fake; stamps `bill.userId` to the caller) |
 | 🔒 `POST /bills/pay` | `{ billId }` → `PendingAction` |
+| 🔒 `GET /saved-billers` / `POST /saved-billers` / `DELETE /saved-billers/:id` | create: `{ nickname, billerId, consumerNo }` → does the lookup and stores `{ id, nickname, biller: {id,name,urduName,category}, consumerNo, consumerName }`; duplicate `(userId, billerId, consumerNo)` → 409 `ALREADY_SAVED`. |
 | 🔒 `GET /telcos` | → `{ items: [{ id, name, urduName }] }` (Jazz, Zong, Telenor, Ufone) |
 | 🔒 `POST /recharges` | `{ telcoId, phone, amountPaisa }` → `PendingAction` |
 | 🔒 `GET /requests` / `POST /requests` | create: `{ fromPhone, amountPaisa, note? }`; incoming request approve: `POST /requests/:id/approve` → `PendingAction` (payer side); `POST /requests/:id/decline` |
@@ -106,7 +107,7 @@ with 401 `OTP_SCOPE`.
 | 🔒 `GET /statements/:id/pdf` | → `application/pdf` bytes |
 | 🔒 `GET /qr/mine` | → `{ payload }` (signed string encoding userId+phone) |
 | 🔒 `POST /qr/resolve` | `{ payload }` → `{ user: { name, urduName, phone, avatar } }` |
-| 🔒 `POST /actions/:id/execute` | `{ pin }` → `{ transaction: Txn }` (atomic; idempotent; 410 if expired/consumed) |
+| 🔒 `POST /actions/:id/execute` | `{ pin }` → `{ transaction: Txn, recipientSuggestion?: { institutionId, identifier, title, alreadySaved }, billerSuggestion?: { billerId, consumerNo, consumerName, alreadySaved } }` (atomic; idempotent; 410 if expired/consumed; `recipientSuggestion` on `send_money*` kinds, `billerSuggestion` on `pay_bill`) |
 | 🔒 `POST /actions/:id/cancel` | → `{ cancelled: true }` |
 | 🔒 `GET /chat/sessions` / `POST /chat/sessions` → `Session`; `GET /chat/sessions/:id/messages`; `POST /chat/sessions/:id/messages` `{ role, text, cards? }` → `Message` (written by AI service) |
 

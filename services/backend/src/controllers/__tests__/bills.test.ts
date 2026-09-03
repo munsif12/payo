@@ -127,3 +127,18 @@ test('lookup stamps bill.userId; GET /bills/due is scoped per user', async () =>
   expect(dueAAfter.body.data.items).toHaveLength(1);
   expect(dueAAfter.body.data.items[0].billId).toBe(lookup.body.data.billId);
 });
+
+test('two concurrent lookups for the same biller+consumer create exactly one due bill', async () => {
+  const { token } = await createVerifiedUser(app);
+  const biller = await makeBiller();
+  const [r1, r2] = await Promise.all([
+    request(app).post('/api/v1/bills/lookup')
+      .set('Authorization', `Bearer ${token}`).send({ billerId: String(biller._id), consumerNo: CONSUMER_NO }),
+    request(app).post('/api/v1/bills/lookup')
+      .set('Authorization', `Bearer ${token}`).send({ billerId: String(biller._id), consumerNo: CONSUMER_NO }),
+  ]);
+  expect(r1.status).toBe(200);
+  expect(r2.status).toBe(200);
+  expect(r1.body.data.billId).toBe(r2.body.data.billId);
+  expect(await Bill.countDocuments({ consumerNo: CONSUMER_NO })).toBe(1);
+});

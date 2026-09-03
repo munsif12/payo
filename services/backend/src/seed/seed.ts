@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import {
-  User, Account, Card, Bank, Biller, Telco, Bill, Pocket, Contact, Transaction,
+  User, Account, Card, Institution, Biller, Telco, Bill, Pocket, Transaction,
 } from '../models';
 import { config } from '../config';
-import { SEED_USERS, SEED_BANKS, SEED_BILLERS, SEED_TELCOS, SPEND_TEMPLATES, SALARY_RS, AMMI } from './data';
+import { SEED_USERS, SEED_INSTITUTIONS, SEED_BILLERS, SEED_TELCOS, SPEND_TEMPLATES, SALARY_RS, AMMI } from './data';
 
 // Deterministic PRNG so the demo world is identical on every run.
 function mulberry32(seed: number) {
@@ -35,7 +35,7 @@ export async function runSeed() {
   const pinHash = await bcrypt.hash('1234', 10);
   const now = new Date();
 
-  const banks = await Bank.create([...SEED_BANKS]);
+  await Institution.create([...SEED_INSTITUTIONS]);
   const billers = await Biller.create([...SEED_BILLERS]);
   await Telco.create([...SEED_TELCOS]);
 
@@ -112,11 +112,8 @@ export async function runSeed() {
     users.push(user);
   }
 
-  const [ammi, bilal, saraKhan, saraMalik] = users as [
-    (typeof users)[number], (typeof users)[number], (typeof users)[number], (typeof users)[number],
-  ];
+  const [ammi] = users as [(typeof users)[number]];
   const kElectric = billers.find(b => b.name === 'K-Electric')!;
-  const meezan = banks.find(b => b.name === 'Meezan Bank')!;
 
   await Bill.create({
     billerId: kElectric._id, consumerNo: AMMI.dueBillConsumerNo,
@@ -129,12 +126,8 @@ export async function runSeed() {
 
   await Pocket.create({ userId: ammi._id, ...AMMI.pocket });
 
-  await Contact.create([
-    { userId: ammi._id, name: bilal.name, urduName: bilal.urduName, kind: 'payo', phone: bilal.phone, linkedUserId: bilal._id },
-    { userId: ammi._id, name: saraKhan.name, urduName: saraKhan.urduName, kind: 'payo', phone: saraKhan.phone, linkedUserId: saraKhan._id },
-    { userId: ammi._id, name: saraMalik.name, urduName: saraMalik.urduName, kind: 'payo', phone: saraMalik.phone, linkedUserId: saraMalik._id },
-    { userId: ammi._id, name: 'Bhai Jan', urduName: 'بھائی جان', kind: 'bank', bankId: meezan._id, iban: AMMI.bhaiJanIban },
-  ]);
+  // No recipients and no saved billers are pre-seeded — the point of v3 is that the
+  // user builds these up themselves (send/pay → "save?").
 }
 
 // npm run seed — connect to local Mongo, seed, exit.

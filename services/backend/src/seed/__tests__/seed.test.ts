@@ -2,7 +2,8 @@ import request from 'supertest';
 import mongoose from 'mongoose';
 import { createApp } from '../../app';
 import { runSeed } from '../seed';
-import { User, Account, Transaction, Bill, Pocket, Bank, Biller, Telco, Contact } from '../../models';
+import { User, Account, Transaction, Bill, Pocket, Institution, Biller, Telco, Recipient, SavedBiller } from '../../models';
+import { SEED_INSTITUTIONS, SEED_BILLERS } from '../data';
 
 const app = createApp();
 
@@ -31,10 +32,12 @@ test('seed builds the Contract 4 demo world', async () => {
   expect(pocket.balancePaisa).toBe(12_000_000);
   expect(pocket.urduName).toBe('عمرہ فنڈ');
 
-  expect(await Bank.countDocuments()).toBe(5);
-  expect(await Biller.countDocuments()).toBe(4);
+  expect(await Institution.countDocuments()).toBe(SEED_INSTITUTIONS.length);
+  expect(await Biller.countDocuments()).toBe(SEED_BILLERS.length);
   expect(await Telco.countDocuments()).toBe(4);
-  expect(await Contact.countDocuments({ userId: ammi._id })).toBe(4);
+  // v3: no recipients or saved billers are pre-seeded.
+  expect(await Recipient.countDocuments()).toBe(0);
+  expect(await SavedBiller.countDocuments()).toBe(0);
 
   // seeded users are already onboarded — phone + OTP + PIN, no signup step
   const r = await request(app).post('/api/v1/auth/request-otp').send({ phone: ammi.phone });

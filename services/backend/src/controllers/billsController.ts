@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import mongoose from 'mongoose';
-import { Bill, Biller } from '../models';
+import { Bill, Biller, SavedBiller } from '../models';
 import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { createPendingAction, toActionDto } from '../lib/pendingActions';
@@ -13,8 +13,49 @@ export async function listBillers(_req: Request, res: Response) {
   return ok(res, { items: items.map(b => ({ id: String(b._id), name: b.name, urduName: b.urduName, category: b.category })) });
 }
 
-/** GET /bills/due — the caller's own due bills (bill.userId, stamped on lookup and by seed). */
+/**
+ * Finds the caller's current due bill for a biller+consumer number, creating one
+ * deterministically (on consumerNo alone, so every caller sees the same amount/name)
+ * if none exists yet. Shared by lookupBill, POST /saved-billers, and GET /bills/due
+ * (which refreshes each saved biller's due bill on demand).
+ */
+export async function ensureDueBill(userId: string, billerId: string, consumerNo: string) {
+  const biller = await Biller.findById(billerId).catch(() => null);
+  if (!biller) throw new ApiError(404, 'NOT_FOUND', 'Biller not found');
+
+  const existing = await Bill.findOne({ userId, billerId: biller._id, consumerNo, status: 'due' });
+  if (existing) return existing;
+
+  const now = new Date();
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const month = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+  const amountPaisa = Math.round((150000 + (djb2(consumerNo) % 700000)) / 1000) * 1000;
+  try {
+    return await Bill.create({
+      billerId: biller._id, consumerNo,
+      consumerName: resolveFakeTitle(consumerNo),
+      amountPaisa, month,
+      dueDate: new Date(now.getFullYear(), now.getMonth(), 10),
+      userId,
+    });
+  } catch (e) {
+    // Lost the race on the partial-unique (userId, billerId, consumerNo, status:'due')
+    // index — a concurrent call created it first; re-read theirs instead of failing.
+    if (e instanceof Error && 'code' in e && (e as { code?: number }).code === 11000) {
+      const winner = await Bill.findOne({ userId, billerId: biller._id, consumerNo, status: 'due' });
+      if (winner) return winner;
+    }
+    throw e;
+  }
+}
+
+/** GET /bills/due — the caller's own due bills, refreshing each saved biller's due bill first. */
 export async function listDueBills(req: Request, res: Response) {
+  const savedBillers = await SavedBiller.find({ userId: req.userId });
+  for (const sb of savedBillers) {
+    await ensureDueBill(req.userId, String(sb.billerId), sb.consumerNo);
+  }
+
   const bills = await Bill.find({ userId: req.userId, status: 'due' }).sort({ dueDate: 1 });
   const billers = await Biller.find({ _id: { $in: bills.map(b => b.billerId) } });
   const billerMap = new Map(billers.map(b => [String(b._id), b]));
@@ -37,26 +78,7 @@ export async function lookupBill(req: Request, res: Response) {
     billerId: z.string(),
     consumerNo: z.string().regex(/^\d{10,14}$/, 'Consumer number must be 10-14 digits'),
   }).parse(req.body);
-  const biller = await Biller.findById(billerId).catch(() => null);
-  if (!biller) throw new ApiError(404, 'NOT_FOUND', 'Biller not found');
-
-  let bill = await Bill.findOne({ userId: req.userId, billerId: biller._id, consumerNo, status: 'due' });
-  if (!bill) {
-    const now = new Date();
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const month = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
-    // Deterministic on consumerNo alone so every user looking up the same consumer number
-    // sees the same amount/name — but each user gets their OWN bill document (never
-    // shares or re-stamps another user's bill).
-    const amountPaisa = Math.round((150000 + (djb2(consumerNo) % 700000)) / 1000) * 1000;
-    bill = await Bill.create({
-      billerId: biller._id, consumerNo,
-      consumerName: resolveFakeTitle(consumerNo),
-      amountPaisa, month,
-      dueDate: new Date(now.getFullYear(), now.getMonth(), 10),
-      userId: req.userId,
-    });
-  }
+  const bill = await ensureDueBill(req.userId, billerId, consumerNo);
   return ok(res, {
     billId: String(bill._id), consumerName: bill.consumerName,
     amountPaisa: bill.amountPaisa, dueDate: bill.dueDate.toISOString(), month: bill.month,
