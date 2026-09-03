@@ -4,9 +4,10 @@ import type { RootState } from '../store';
 import { signedOut } from '../store/authSlice';
 import { shouldSignOut } from './authGuard';
 import type {
-  Me, Txn, PendingAction, ContactDto, PocketDto, RequestDto, CardDto,
+  Me, Txn, PendingAction, PocketDto, RequestDto, CardDto,
   StatementMeta, BillLookup, NamedItem, PublicUser, DueBill,
   RecipientSuggestion, BillerSuggestion, RecipientDto, SavedBillerDto,
+  InstitutionDto, ResolvedRecipient,
 } from './types';
 
 interface Ok<T> { success: true; data: T }
@@ -37,7 +38,7 @@ export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBa
 export const payoApi = createApi({
   reducerPath: 'payoApi',
   baseQuery: baseQueryWithAuth,
-  tagTypes: ['Me', 'Txns', 'Contacts', 'Pockets', 'Requests', 'Card', 'Statements', 'DueBills'],
+  tagTypes: ['Me', 'Txns', 'Pockets', 'Requests', 'Card', 'Statements', 'DueBills', 'Recipients', 'SavedBillers'],
   endpoints: (b) => ({
     me: b.query<Me, void>({
       query: () => '/me',
@@ -89,20 +90,28 @@ export const payoApi = createApi({
       forceRefetch: ({ currentArg, previousArg }) => currentArg?.cursor !== previousArg?.cursor,
       providesTags: ['Txns'],
     }),
-    contacts: b.query<{ items: ContactDto[] }, void>({
-      query: () => '/contacts',
-      transformResponse: (r: Ok<{ items: ContactDto[] }>) => r.data,
-      providesTags: ['Contacts'],
+    institutions: b.query<{ items: InstitutionDto[] }, string | void>({
+      query: (q) => `/institutions${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+      transformResponse: (r: Ok<{ items: InstitutionDto[] }>) => r.data,
     }),
-    banks: b.query<{ items: NamedItem[] }, void>({
-      query: () => '/banks',
-      transformResponse: (r: Ok<{ items: NamedItem[] }>) => r.data,
+    resolveRecipient: b.mutation<ResolvedRecipient, { institutionId: string; identifier: string }>({
+      query: (body) => ({ url: '/transfers/resolve', method: 'POST', body }),
+      transformResponse: (r: Ok<ResolvedRecipient>) => r.data,
     }),
-    resolveTitle: b.mutation<{ accountTitle: string }, { bankId: string; iban: string }>({
-      query: (body) => ({ url: '/banks/resolve-title', method: 'POST', body }),
-      transformResponse: (r: Ok<{ accountTitle: string }>) => r.data,
+    recipients: b.query<{ items: RecipientDto[] }, string | void>({
+      query: (q) => `/recipients${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+      transformResponse: (r: Ok<{ items: RecipientDto[] }>) => r.data,
+      providesTags: ['Recipients'],
     }),
-    createTransfer: b.mutation<PendingAction, { to: Record<string, unknown>; amountPaisa: number; note?: string }>({
+    deleteRecipient: b.mutation<{ deleted: true }, string>({
+      query: (id) => ({ url: `/recipients/${id}`, method: 'DELETE' }),
+      transformResponse: (r: Ok<{ deleted: true }>) => r.data,
+      invalidatesTags: ['Recipients'],
+    }),
+    createTransfer: b.mutation<
+      PendingAction,
+      { to: { recipientId: string } | { institutionId: string; identifier: string }; amountPaisa: number; note?: string }
+    >({
       query: (body) => ({ url: '/transfers', method: 'POST', body }),
       transformResponse: (r: Ok<PendingAction>) => r.data,
     }),
@@ -211,18 +220,31 @@ export const payoApi = createApi({
     createRecipient: b.mutation<RecipientDto, { nickname: string; institutionId: string; identifier: string }>({
       query: (body) => ({ url: '/recipients', method: 'POST', body }),
       transformResponse: (r: Ok<RecipientDto>) => r.data,
+      invalidatesTags: ['Recipients'],
+    }),
+    savedBillers: b.query<{ items: SavedBillerDto[] }, void>({
+      query: () => '/saved-billers',
+      transformResponse: (r: Ok<{ items: SavedBillerDto[] }>) => r.data,
+      providesTags: ['SavedBillers'],
     }),
     createSavedBiller: b.mutation<SavedBillerDto, { nickname: string; billerId: string; consumerNo: string }>({
       query: (body) => ({ url: '/saved-billers', method: 'POST', body }),
       transformResponse: (r: Ok<SavedBillerDto>) => r.data,
+      invalidatesTags: ['SavedBillers'],
+    }),
+    deleteSavedBiller: b.mutation<{ deleted: true }, string>({
+      query: (id) => ({ url: `/saved-billers/${id}`, method: 'DELETE' }),
+      transformResponse: (r: Ok<{ deleted: true }>) => r.data,
+      invalidatesTags: ['SavedBillers'],
     }),
   }),
 });
 
 export const {
   useMeQuery, useRequestOtpMutation, useVerifyOtpMutation, useSetPinMutation, useVerifyPinWithOtpMutation,
-  useTransactionsQuery, useContactsQuery,
-  useBanksQuery, useResolveTitleMutation, useCreateTransferMutation,
+  useTransactionsQuery,
+  useInstitutionsQuery, useResolveRecipientMutation, useCreateTransferMutation,
+  useRecipientsQuery, useDeleteRecipientMutation,
   useBillersQuery, useDueBillsQuery, useLookupBillMutation, usePayBillMutation,
   useTelcosQuery, useCreateRechargeMutation,
   useRequestsQuery, useCreateRequestMutation, useApproveRequestMutation, useDeclineRequestMutation,
@@ -232,7 +254,17 @@ export const {
   useStatementsQuery, useGenerateStatementMutation,
   useExecuteActionMutation, useCancelActionMutation,
   useCreateRecipientMutation, useCreateSavedBillerMutation,
+  useSavedBillersQuery, useDeleteSavedBillerMutation,
 } = payoApi;
+
+// Resolves the PAYO wallet institution (id + record) so callers that already know a
+// user's phone (QR resolve, deep links) can skip the institution picker and go straight
+// to /transfers/resolve. Institution.code is the authoritative match; name is a fallback
+// for older seeds without a code field.
+export function usePayoInstitution(): InstitutionDto | undefined {
+  const { data } = useInstitutionsQuery('PAYO');
+  return data?.items.find((i) => i.code === 'PAYO' || i.name === 'PAYO');
+}
 
 export function apiErr(e: unknown): { code: string; message: string } {
   const data = (e as { data?: { code?: string; message?: string } })?.data;

@@ -25,11 +25,6 @@ export interface Me {
   card: { id: string; last4: string; frozen: boolean };
 }
 
-export interface ContactDto {
-  id: string; name: string; urduName?: string; kind: 'payo' | 'bank';
-  phone?: string; bankId?: string; bankName?: string; iban?: string; linkedUserId?: string;
-}
-
 export interface PocketDto {
   id: string; name: string; urduName?: string; emoji: string;
   goalPaisa?: number; balancePaisa: number;
@@ -58,6 +53,13 @@ export interface InstitutionDto {
   id: string; name: string; urduName: string; kind: 'wallet' | 'bank'; code?: string; popular: boolean;
 }
 
+export interface ResolvedRecipient {
+  title: string;
+  institution: { id: string; name: string; urduName?: string; kind: 'wallet' | 'bank' };
+  identifier: string;
+  linkedUserId?: string;
+}
+
 export interface RecipientSuggestion {
   institutionId: string; identifier: string; title: string; alreadySaved: boolean;
 }
@@ -73,7 +75,9 @@ export interface RecipientDto {
 }
 
 export interface SavedBillerDto {
-  id: string; nickname: string; billerId: string; consumerNo: string; consumerName: string;
+  id: string; nickname: string;
+  biller: { id: string; name: string; urduName?: string; category?: string };
+  consumerNo: string; consumerName: string;
 }
 
 export interface DueBill {

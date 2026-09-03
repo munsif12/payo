@@ -1,41 +1,38 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, StickyNote } from 'lucide-react-native';
-import { Screen, Text, Card, Avatar, Chip, Input, Keypad, Button } from '../../src/ui';
+import { Screen, Text, Card, Avatar, Chip, Input, Keypad, Button, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
-import { useCreateTransferMutation, useContactsQuery, useMeQuery, apiErr } from '../../src/api/client';
+import { useCreateTransferMutation, useMeQuery, apiErr } from '../../src/api/client';
 import { holdAction } from '../../src/store/pendingActionHolder';
 import { formatPaisa } from '../../src/lib/money';
+import { maskIdentifier } from '../../src/lib/mask';
+import { ltrIsolate } from '../../src/lib/bidi';
 
 const QUICK_RS = [500, 1000, 2000, 5000];
 
 export default function SendAmount() {
   const { t } = useTranslation();
   const { c } = useTheme();
+  const urdu = useIsUrdu();
   const router = useRouter();
-  const { to, label } = useLocalSearchParams<{ to: string; label: string }>();
+  const {
+    recipientId, institutionId, identifier, title, institutionName, institutionUrduName,
+  } = useLocalSearchParams<{
+    recipientId?: string; institutionId?: string; identifier: string; title: string;
+    institutionName: string; institutionUrduName?: string;
+  }>();
   const [rupees, setRupees] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [createTransfer, { isLoading }] = useCreateTransferMutation();
-  const { data: contacts } = useContactsQuery();
   const { data: me } = useMeQuery();
 
-  const parsedTo = useMemo(() => {
-    try { return JSON.parse(to ?? '{}') as Record<string, unknown>; } catch { return {}; }
-  }, [to]);
-
-  const subtitle = useMemo(() => {
-    if (parsedTo.kind === 'payo') return `PAYO · ${String(parsedTo.phone ?? '')}`;
-    if (parsedTo.kind === 'contact') {
-      const match = contacts?.items.find((ctc) => ctc.id === parsedTo.contactId);
-      return match?.phone ? `PAYO · ${match.phone}` : t('send.title');
-    }
-    return t('send.chips.bank');
-  }, [parsedTo, contacts, t]);
+  const institutionLabel = urdu && institutionUrduName ? institutionUrduName : institutionName;
+  const subtitle = ltrIsolate(`${institutionLabel} · ${maskIdentifier(identifier ?? '')}`);
 
   const amountPaisa = Number(rupees || '0') * 100;
   const availablePaisa = me?.account.balancePaisa ?? 0;
@@ -43,12 +40,13 @@ export default function SendAmount() {
   const submit = async () => {
     setError(null);
     try {
-      const action = await createTransfer({ to: parsedTo, amountPaisa, note: note.trim() || undefined }).unwrap();
+      const to = recipientId ? { recipientId } : { institutionId: institutionId ?? '', identifier: identifier ?? '' };
+      const action = await createTransfer({ to, amountPaisa, note: note.trim() || undefined }).unwrap();
       holdAction(action);
       router.push({ pathname: '/confirm/[actionId]', params: { actionId: action.id } });
     } catch (e) {
       const { code, message } = apiErr(e);
-      setError(code === 'RECIPIENT_NOT_FOUND' ? t('send.recipientNotFound') : message);
+      setError(code === 'RECIPIENT_NOT_FOUND' ? t('send.errors.recipientNotFound') : message);
     }
   };
 
@@ -66,9 +64,9 @@ export default function SendAmount() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
         <Card padding={space.m} style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingHorizontal: space.l }}>
-          <Avatar name={label ?? ''} />
+          <Avatar name={title ?? ''} />
           <View style={{ flex: 1 }}>
-            <Text variant="hl" numberOfLines={1}>{label}</Text>
+            <Text variant="hl" numberOfLines={1}>{title}</Text>
             <Text variant="foot" numberOfLines={1}>{subtitle}</Text>
           </View>
           <Pressable testID="amount-change" onPress={() => router.back()} hitSlop={8}>

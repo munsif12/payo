@@ -7,7 +7,7 @@ import { QrCode, ScanLine } from 'lucide-react-native';
 import { Screen, Text, Input, Card, Chip, Button } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
-import { useMyQrQuery, useResolveQrMutation, apiErr } from '../../src/api/client';
+import { useMyQrQuery, useResolveQrMutation, useResolveRecipientMutation, usePayoInstitution, apiErr } from '../../src/api/client';
 
 export default function Qr() {
   const { t } = useTranslation();
@@ -18,13 +18,33 @@ export default function Qr() {
   const [pasted, setPasted] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { data: mine } = useMyQrQuery();
-  const [resolve, { isLoading }] = useResolveQrMutation();
+  const [resolve, { isLoading: resolvingQr }] = useResolveQrMutation();
+  const [resolveRecipient, { isLoading: resolvingRecipient }] = useResolveRecipientMutation();
+  const payoInstitution = usePayoInstitution();
 
   const onResolve = async () => {
     setError(null);
     try {
       const { user } = await resolve({ payload: pasted.trim() }).unwrap();
-      router.push({ pathname: '/send', params: { phone: user.phone } });
+      // A scanned QR is always a PAYO wallet user — resolve straight through
+      // /transfers/resolve with the PAYO institution and skip the bank/wallet picker.
+      if (payoInstitution) {
+        const resolved = await resolveRecipient({ institutionId: payoInstitution.id, identifier: user.phone }).unwrap();
+        router.push({
+          pathname: '/send/recipient',
+          params: {
+            title: resolved.title,
+            institutionId: resolved.institution.id,
+            institutionName: resolved.institution.name,
+            institutionUrduName: resolved.institution.urduName ?? '',
+            institutionKind: resolved.institution.kind,
+            identifier: resolved.identifier,
+            linkedUserId: resolved.linkedUserId ?? '',
+          },
+        });
+      } else {
+        router.push({ pathname: '/send', params: { phone: user.phone } });
+      }
     } catch (e) {
       setError(apiErr(e).code === 'INVALID_QR' ? t('qr.invalid') : apiErr(e).message);
     }
@@ -63,7 +83,7 @@ export default function Qr() {
           </View>
           <Input testID="qr-paste" placeholder="payo:v1:…" autoCapitalize="none" value={pasted} onChangeText={setPasted} />
           {error ? <Text variant="sub" color={c.red} center>{error}</Text> : null}
-          <Button testID="qr-resolve" label={t('common.next')} onPress={onResolve} disabled={!pasted.trim()} loading={isLoading} />
+          <Button testID="qr-resolve" label={t('common.next')} onPress={onResolve} disabled={!pasted.trim()} loading={resolvingQr || resolvingRecipient} />
         </View>
       )}
     </Screen>

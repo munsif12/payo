@@ -3,22 +3,22 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, StickyNote } from 'lucide-react-native';
-import { Screen, Text, Input, ListRow, Avatar, Button, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Input, ListRow, Avatar, Button } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
-import { useContactsQuery, useCreateRequestMutation, apiErr } from '../../src/api/client';
+import { useRecipientsQuery, useCreateRequestMutation, apiErr } from '../../src/api/client';
 
 export default function NewRequest() {
   const { t } = useTranslation();
   const { c } = useTheme();
-  const urdu = useIsUrdu();
   const router = useRouter();
   const [phone, setPhone] = useState('+92');
   const [rupees, setRupees] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { data: contacts } = useContactsQuery();
+  const { data: recipients } = useRecipientsQuery();
   const [createRequest, { isLoading }] = useCreateRequestMutation();
+  const payoRecipients = (recipients?.items ?? []).filter((r) => r.linkedUserId);
 
   const submit = async () => {
     setError(null);
@@ -41,17 +41,17 @@ export default function NewRequest() {
 
       <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
         <Text variant="sub">{t('requests.fromWhom')}</Text>
-        {(contacts?.items ?? []).filter((ctc) => ctc.kind === 'payo').map((ctc) => (
+        {payoRecipients.map((r) => (
           <ListRow
-            key={ctc.id}
-            testID={`request-contact-${ctc.id}`}
-            onPress={() => setPhone(ctc.phone!)}
-            left={<Avatar name={ctc.name} bg={phone === ctc.phone ? c.amberTint : c.surface2} color={phone === ctc.phone ? c.onAmber : c.ink2} />}
-            title={urdu && ctc.urduName ? ctc.urduName : ctc.name}
-            subtitle={ctc.phone}
+            key={r.id}
+            testID={`request-recipient-${r.id}`}
+            onPress={() => setPhone(r.identifier)}
+            left={<Avatar name={r.nickname} bg={phone === r.identifier ? c.amberTint : c.surface2} color={phone === r.identifier ? c.onAmber : c.ink2} />}
+            title={r.nickname}
+            subtitle={r.identifier}
           />
         ))}
-        <Input testID="request-phone" placeholder={t('send.phonePlaceholder')} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+        <Input testID="request-phone" placeholder={t('requests.phonePlaceholder')} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
         <Input testID="request-amount" placeholder={t('common.amount')} keyboardType="number-pad" value={rupees} onChangeText={setRupees} />
         <Input
           testID="request-note"

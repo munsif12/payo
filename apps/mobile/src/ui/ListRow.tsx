@@ -14,6 +14,7 @@ export interface ListRowProps {
   subtitle?: React.ReactNode;
   right?: React.ReactNode;
   onPress?: () => void;
+  onLongPress?: () => void;
   showChevron?: boolean;
   separator?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -22,7 +23,7 @@ export interface ListRowProps {
 
 // ListRow — Foundations.dc.html .row: 14px gap, 14px vertical padding,
 // separator border-bottom. Used for txn rows, biller rows, settings rows.
-export function ListRow({ left, title, subtitle, right, onPress, showChevron, separator = true, style, testID }: ListRowProps) {
+export function ListRow({ left, title, subtitle, right, onPress, onLongPress, showChevron, separator = true, style, testID }: ListRowProps) {
   const { c } = useTheme();
   const urdu = useIsUrdu();
   const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
@@ -48,7 +49,7 @@ export function ListRow({ left, title, subtitle, right, onPress, showChevron, se
     borderBottomColor: c.separator,
   };
 
-  if (!onPress) {
+  if (!onPress && !onLongPress) {
     return <View testID={testID} style={[rowStyle, style]}>{content}</View>;
   }
 
@@ -57,6 +58,7 @@ export function ListRow({ left, title, subtitle, right, onPress, showChevron, se
       testID={testID}
       accessibilityRole="button"
       onPress={onPress}
+      onLongPress={onLongPress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       style={[rowStyle, pressStyle, style]}

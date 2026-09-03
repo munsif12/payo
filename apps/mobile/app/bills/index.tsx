@@ -1,21 +1,26 @@
-import React, { useMemo } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Zap, Flame, Wifi, Droplet, Smartphone, Receipt } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { Screen, Text, Card, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, ListRow, Avatar, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
-import { useBillersQuery, useDueBillsQuery } from '../../src/api/client';
+import {
+  useBillersQuery, useDueBillsQuery, useSavedBillersQuery, useDeleteSavedBillerMutation,
+  useLookupBillMutation, usePayBillMutation, apiErr,
+} from '../../src/api/client';
+import { holdAction } from '../../src/store/pendingActionHolder';
 import { formatPaisa } from '../../src/lib/money';
 import { formatShortDate } from '../../src/lib/dates';
 import { ltrIsolate } from '../../src/lib/bidi';
-import type { NamedItem } from '../../src/api/types';
+import type { NamedItem, SavedBillerDto } from '../../src/api/types';
 
 const CAT_ICON: Record<string, LucideIcon> = {
   electricity: Zap, gas: Flame, internet: Wifi, water: Droplet, mobile: Smartphone,
 };
+const CATEGORY_ORDER = ['electricity', 'gas', 'internet', 'water', 'mobile'];
 
 function categoryVisual(category: string | undefined, c: ReturnType<typeof useTheme>['c']) {
   const Icon = CAT_ICON[category ?? ''] ?? Receipt;
@@ -36,12 +41,52 @@ export default function Billers() {
   const router = useRouter();
   const { data } = useBillersQuery();
   const { data: due } = useDueBillsQuery();
+  const { data: saved } = useSavedBillersQuery();
+  const [deleteSavedBiller] = useDeleteSavedBillerMutation();
+  const [lookupBill] = useLookupBillMutation();
+  const [payBill] = usePayBillMutation();
+  const [error, setError] = useState<string | null>(null);
 
   const dueBill = due?.items?.[0];
   const allBillers = useMemo(() => data?.items ?? [], [data]);
+  const savedItems = saved?.items ?? [];
+
+  const grouped = useMemo(() => {
+    const byCat = new Map<string, NamedItem[]>();
+    for (const b of allBillers) {
+      const cat = b.category ?? 'other';
+      if (!byCat.has(cat)) byCat.set(cat, []);
+      byCat.get(cat)!.push(b);
+    }
+    const cats = [...CATEGORY_ORDER.filter((cat) => byCat.has(cat)), ...[...byCat.keys()].filter((cat) => !CATEGORY_ORDER.includes(cat))];
+    return cats.map((cat) => ({ category: cat, items: byCat.get(cat) ?? [] }));
+  }, [allBillers]);
 
   const openBiller = (b: NamedItem, consumerNo?: string) =>
     router.push({ pathname: '/bills/[billerId]', params: { billerId: b.id, name: b.name, urduName: b.urduName, ...(consumerNo ? { consumerNo } : {}) } });
+
+  const onTapSaved = async (sb: SavedBillerDto) => {
+    setError(null);
+    try {
+      const bill = await lookupBill({ billerId: sb.biller.id, consumerNo: sb.consumerNo }).unwrap();
+      const action = await payBill({ billId: bill.billId }).unwrap();
+      holdAction(action);
+      router.push({ pathname: '/confirm/[actionId]', params: { actionId: action.id } });
+    } catch (e) {
+      setError(apiErr(e).message);
+    }
+  };
+
+  const onDeleteSaved = (sb: SavedBillerDto) => {
+    Alert.alert(
+      t('bills.saved.deleteTitle'),
+      t('bills.saved.deleteMessage', { name: sb.nickname }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.delete'), style: 'destructive', onPress: () => deleteSavedBiller(sb.id) },
+      ],
+    );
+  };
 
   return (
     <Screen>
@@ -85,10 +130,30 @@ export default function Billers() {
           </Card>
         ) : null}
 
-        {allBillers.length > 0 ? (
+        {error ? <Text variant="sub" color={c.red} center>{error}</Text> : null}
+
+        {savedItems.length > 0 ? (
           <View>
-            <Text variant="cap" style={{ marginBottom: 4 }}>{t('bills.category.utilities')}</Text>
-            {allBillers.map((b) => {
+            <Text variant="cap" style={{ marginBottom: 4 }}>{t('bills.saved.title')}</Text>
+            {savedItems.map((sb) => (
+              <ListRow
+                key={sb.id}
+                testID={`saved-biller-${sb.id}`}
+                onPress={() => onTapSaved(sb)}
+                onLongPress={() => onDeleteSaved(sb)}
+                left={<Avatar name={sb.nickname} />}
+                title={sb.nickname}
+                subtitle={ltrIsolate(`${urdu ? sb.biller.urduName ?? sb.biller.name : sb.biller.name} · ${sb.consumerNo}`)}
+                showChevron
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {grouped.map(({ category, items }) => (
+          <View key={category}>
+            <Text variant="cap" style={{ marginBottom: 4 }}>{t(`bills.category.${category}`, { defaultValue: category })}</Text>
+            {items.map((b) => {
               const { Icon, bg, color } = categoryVisual(b.category, c);
               return (
                 <Pressable
@@ -112,10 +177,10 @@ export default function Billers() {
               );
             })}
           </View>
-        ) : null}
+        ))}
 
         <View>
-          <Text variant="cap" style={{ marginBottom: 4 }}>{t('bills.category.mobile')}</Text>
+          <Text variant="cap" style={{ marginBottom: 4 }}>{t('bills.mobileTopup.title')}</Text>
           <Pressable
             testID="bills-mobile-topup"
             onPress={() => router.push('/recharge')}
