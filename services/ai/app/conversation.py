@@ -32,6 +32,22 @@ def _history_from_messages(items: list[dict[str, Any]]) -> list[BaseMessage]:
     return history
 
 
+def _resolved_pairs_from_messages(items: list[dict[str, Any]]) -> set[tuple[str, str]]:
+    """(institution_id, identifier) pairs the user already saw resolved via a `recipient`
+    card earlier in this conversation — full history, not just the trimmed window kept
+    for the model's text context, since the recipient card itself may have scrolled out
+    of that window by the time the user confirms."""
+    pairs: set[tuple[str, str]] = set()
+    for m in items:
+        for card in m.get("cards") or []:
+            if card.get("kind") == "recipient":
+                institution_id = (card.get("institution") or {}).get("id")
+                identifier = card.get("identifier")
+                if institution_id and identifier:
+                    pairs.add((institution_id, identifier.strip().lower()))
+    return pairs
+
+
 async def converse_turn(
     client: BackendClient,
     *,
@@ -59,17 +75,21 @@ async def converse_turn(
         if session_id:
             existing = await client.messages(session_id)
             history = _history_from_messages(existing["items"])
+            resolved_pairs = _resolved_pairs_from_messages(existing["items"])
         else:
             session = await client.create_session()
             session_id = session["id"]
             history = []
+            resolved_pairs = set()
 
         await client.add_message(session_id, "user", text)
 
         # The reply language follows the input's own script when it's Urdu, even if the
         # UI language is English — e.g. a Roman-Urdu UI user who types/speaks Urdu script.
         turn_language = reply_language(text, language)
-        reply, cards = await run_agent(client, history, text, turn_language, model=model)
+        reply, cards = await run_agent(
+            client, history, text, turn_language, model=model, resolved_pairs=resolved_pairs
+        )
 
         for token in reply.split(" "):
             yield sse("token", {"text": token + " "})

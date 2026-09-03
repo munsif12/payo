@@ -29,6 +29,20 @@ def _fail(e: BackendError) -> Result:
     return {"text": f"ERROR {e.code}: {e.message}", "card": None}
 
 
+async def _institution_id_by_name(client: BackendClient, name: str) -> str | None:
+    """Look up an institution's real id by its display name (English or Urdu, case-insensitive
+    on the English name). Used only as a fallback — see `_retry_with_institution_name`."""
+    try:
+        data = await client.institutions(name)
+    except BackendError:
+        return None
+    needle = name.strip().lower()
+    for item in data.get("items", []):
+        if item.get("name", "").strip().lower() == needle or item.get("urduName", "") == name.strip():
+            return item["id"]
+    return None
+
+
 async def get_balance(client: BackendClient) -> Result:
     try:
         me = await client.me()
@@ -114,6 +128,13 @@ async def resolve_recipient(client: BackendClient, institution_id: str, identifi
     try:
         data = await client.resolve_recipient(institution_id, identifier)
     except BackendError as e:
+        # A later turn's history carries the institution's display name, not the opaque id
+        # the tool returned same-turn — the model may pass that name back as institution_id.
+        # Retry once, by name, before failing the whole action on that slip.
+        if e.code == "NOT_FOUND":
+            by_name = await _institution_id_by_name(client, institution_id)
+            if by_name and by_name != institution_id:
+                return await resolve_recipient(client, by_name, identifier)
         return _fail(e)
     inst = data["institution"]
     card = RecipientCard(
@@ -334,6 +355,12 @@ async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str
     try:
         action = await client.create_transfer(to, amount_paisa)
     except BackendError as e:
+        # Same fallback as resolve_recipient: a later turn may only have the institution's
+        # display name to offer as institution_id, not its id — retry once by name.
+        if e.code == "NOT_FOUND" and institution_id and identifier:
+            by_name = await _institution_id_by_name(client, institution_id)
+            if by_name and by_name != institution_id:
+                return await send_money(client, amount_paisa, institution_id=by_name, identifier=identifier)
         return _fail(e)
     return _ok(
         f"Prepared transfer of {_rs(amount_paisa)} — a confirmation card is shown; "

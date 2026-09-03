@@ -328,3 +328,65 @@ async def test_agent_send_money_allowed_after_resolve_recipient(fake_backend):
     assert [c["kind"] for c in cards] == ["recipient", "confirmation"]
     assert cards[-1]["actionId"] == "act13"
     await client.aclose()
+
+
+async def test_agent_send_money_allowed_when_resolve_recipient_ran_in_a_prior_turn(fake_backend):
+    """Regression: resolve_recipient's confirmation may land in an earlier HTTP turn than
+    the user's "yes, continue" — the guard's bookkeeping must not reset between turns, or
+    the model gets rejected and loops back to re-showing the same recipient card forever.
+    The caller (conversation.py) derives `resolved_pairs` from the recipient cards already
+    in chat history and passes it in; here we simulate that directly."""
+    pending = {
+        "id": "act14", "kind": "send_money", "amountPaisa": 150000, "feePaisa": 0,
+        "summary": {"en": "Send ₨1,500 to Bilal Ahmed", "ur": "بلال احمد کو ₨1,500 بھیجیں"},
+        "lines": [], "requiresPin": True, "expiresAt": "2026-09-02T12:00:00.000Z", "status": "pending",
+    }
+    fake_backend.route("POST", "/api/v1/transfers", pending)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{
+            "name": "send_money",
+            "args": {"amount_paisa": 150000, "institution_id": "easypaisa", "identifier": "+923001110002"},
+            "id": "t1",
+        }]),
+        AIMessage(content="Please confirm on the card and enter your PIN."),
+    ])
+    reply, cards = await run_agent(
+        client, [], "Yes, continue", "en", model=model,
+        resolved_pairs={("easypaisa", "+923001110002")},
+    )
+    assert [c["kind"] for c in cards] == ["confirmation"]
+    assert cards[-1]["actionId"] == "act14"
+    await client.aclose()
+
+
+async def test_agent_send_money_allowed_when_model_passes_institution_name_instead_of_id(fake_backend):
+    """Regression: on a later turn the model may only have the institution's display name in
+    its own history (a prior reply reads "...at Easypaisa...", not the opaque id) and pass
+    that as institution_id to send_money. The guard should recognize it refers to the same
+    already-confirmed pair (via a name lookup) rather than reject it."""
+    fake_backend.route("GET", "/api/v1/institutions", {
+        "items": [{"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet"}],
+    })
+    pending = {
+        "id": "act15", "kind": "send_money", "amountPaisa": 150000, "feePaisa": 0,
+        "summary": {"en": "Send ₨1,500 to Bilal Ahmed", "ur": "بلال احمد کو ₨1,500 بھیجیں"},
+        "lines": [], "requiresPin": True, "expiresAt": "2026-09-02T12:00:00.000Z", "status": "pending",
+    }
+    fake_backend.route("POST", "/api/v1/transfers", pending)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{
+            "name": "send_money",
+            "args": {"amount_paisa": 150000, "institution_id": "Easypaisa", "identifier": "+923001110002"},
+            "id": "t1",
+        }]),
+        AIMessage(content="Please confirm on the card and enter your PIN."),
+    ])
+    reply, cards = await run_agent(
+        client, [], "Yes, continue", "en", model=model,
+        resolved_pairs={("easypaisa", "+923001110002")},
+    )
+    assert [c["kind"] for c in cards] == ["confirmation"]
+    assert cards[-1]["actionId"] == "act15"
+    await client.aclose()

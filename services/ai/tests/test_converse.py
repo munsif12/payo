@@ -172,3 +172,38 @@ async def test_urdu_script_text_input_with_english_ui_language_uses_urdu_system_
     assert len(system_msgs) == 1
     assert "ہمیشہ اردو میں ہی دیں" in system_msgs[0].content
     assert "ALWAYS reply in English" not in system_msgs[0].content
+
+
+def test_resolved_pairs_from_messages_extracts_recipient_cards_across_full_history():
+    """Regression for the cross-turn send_money guard: a `recipient` card confirmed several
+    turns ago (older than the 12-message window kept for the model's text context) must
+    still be picked up, since the user may confirm well after it scrolled out of view."""
+    from app.conversation import _resolved_pairs_from_messages
+
+    items = [
+        {"role": "user", "text": "pay 100 rupees to 03135468810", "cards": []},
+        {
+            "role": "assistant",
+            "text": "You want to send 100 rupees to Sara Khan at Easypaisa.",
+            "cards": [
+                {
+                    "kind": "recipient",
+                    "title": "Sara Khan",
+                    "institution": {"id": "easypaisa", "name": "Easypaisa"},
+                    "identifier": "+923135468810",
+                },
+            ],
+        },
+        {"role": "user", "text": "Yes, continue", "cards": []},
+    ]
+    assert _resolved_pairs_from_messages(items) == {("easypaisa", "+923135468810")}
+
+
+def test_resolved_pairs_from_messages_ignores_non_recipient_cards():
+    from app.conversation import _resolved_pairs_from_messages
+
+    items = [
+        {"role": "assistant", "text": "Your balance is ₨84,500.",
+         "cards": [{"kind": "balance", "balancePaisa": 8_450_000}]},
+    ]
+    assert _resolved_pairs_from_messages(items) == set()

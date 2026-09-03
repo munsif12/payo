@@ -9,13 +9,22 @@ karna hai"). Every money-moving request is understood by the agent but only ever
 classic wallet UI (tabs: Home / Wallet / Pay / More) covers every capability by hand, in
 either language. Demo only: no real money movement, no payment gateways.
 
+**Send money works like a Pakistani wallet** (Easypaisa/JazzCash model): a recipient is
+*identifier + institution* — a phone number for PAYO/Easypaisa/JazzCash/SadaPay/NayaPay,
+or an IBAN/account number for a bank. The app (or the assistant, via chips) resolves the
+account title before anything moves, then the user can **save the recipient** under a
+nickname for next time. Bills work the same way — pick or type a biller + reference,
+confirm, then optionally **save the biller** for a one-line repeat next time. **PIN entry
+is a bottom sheet everywhere** — chat, classic Send, Bills, pockets, requests — never a
+separate page.
+
 ## What's inside
 
 | Piece | Stack | Highlights |
 |---|---|---|
 | `apps/mobile` | Expo SDK 57 · TypeScript · expo-router · RTK Query · i18next | Phone → OTP → PIN auth; AI-first animated Home (greeting + stagger, listening state, wrong-PIN shake); English default with an instant Urdu (RTL, Nastaliq) toggle; new design-system tokens/UI kit/motion primitives across every screen; shared confirm → PIN → execute flow |
-| `services/backend` | Node 20 · Express 4 · Mongoose 8 · TS · zod · pdfkit | All money movement; pending-action engine (PIN-gated, idempotent, 2-min expiry, atomic Mongo transactions); phone-only OTP auth, profile, due bills, transfers, bills, recharges, requests, pockets, cards, statements (PDF, English-only), QR, chat persistence; deterministic seed world; **81 jest tests** |
-| `services/ai` | Python 3.12 · FastAPI · LangGraph · Gemini · Cartesia | The agent is *just another client*: tools calling the backend with the user's JWT — write tools only ever create pending actions. Understands English, Urdu script, and Roman Urdu; always replies in the user's selected language. Gemini native-audio in, Cartesia TTS out (silent stub without a key), SSE per contract; **40 pytest tests** |
+| `services/backend` | Node 20 · Express 4 · Mongoose 8 · TS · zod · pdfkit | All money movement; pending-action engine (PIN-gated, idempotent, 2-min expiry, atomic Mongo transactions); phone-only OTP auth, profile, institutions directory + recipient resolve/save, due bills, transfers, bills, saved billers, recharges, requests, pockets, cards, statements (PDF, English-only), QR, chat persistence; deterministic seed world; **91 jest tests** |
+| `services/ai` | Python 3.12 · FastAPI · LangGraph · Gemini · Cartesia | The agent is *just another client*: tools calling the backend with the user's JWT — write tools only ever create pending actions. Bank-aware send flow (institution chips, resolve gate, saved recipients), saved billers, in-chat save prompts. Understands English, Urdu script, and Roman Urdu; always replies in the user's selected language, Urdu transcription in Perso-Arabic script only. Gemini native-audio in, Cartesia TTS out (silent stub without a key), SSE per contract; **69 pytest tests** |
 | `scripts/mock-ai` | FastAPI | Offline/no-key demo fallback: same SSE contract, real backend actions, canned reasoning for the demo utterances |
 
 Docs: `docs/` — product spec (`2026-09-01-payo-mvp-design.md`), revamp spec
@@ -54,9 +63,9 @@ CARTESIA_API_KEY=...   # optional; without it TTS is a silent stub (text+cards s
 ### Tests
 
 ```bash
-cd services/backend && npm test           # 81 tests (money invariants, pending-action engine, auth, e2e)
-cd services/ai && uv run pytest           # 40 tests (tools, agent w/ fake model, SSE, bilingual prompt)
-cd apps/mobile && npx jest                # 35 tests (money format, SSE parser, urls, hooks)
+cd services/backend && npm test           # 91 tests (money invariants, pending-action engine, auth, e2e)
+cd services/ai && uv run pytest           # 69 tests (tools, agent w/ fake model, SSE, bilingual prompt)
+cd apps/mobile && npx jest                # 54 tests (money format, SSE parser, urls, hooks)
 cd apps/mobile && npx tsc --noEmit -p .   # typecheck (no package.json script yet — run tsc directly)
 ```
 

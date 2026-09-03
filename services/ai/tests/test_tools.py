@@ -123,6 +123,42 @@ async def test_resolve_recipient_returns_recipient_card(fake_backend):
     assert sent == {"institutionId": "easypaisa", "identifier": "+923001110002"}
 
 
+async def test_resolve_recipient_retries_by_name_when_institution_id_is_not_found(fake_backend):
+    """Regression: a later conversation turn may only have the institution's display name
+    (from a prior reply's text) rather than the opaque id resolve_recipient returned in that
+    earlier turn's own tool-call context. resolve_recipient should recover by looking the name
+    up via GET /institutions and retrying, instead of failing the whole action."""
+    import httpx
+
+    from tests.conftest import err, ok
+
+    def resolve_responder(request):
+        body = body_of(request)
+        if body["institutionId"] == "easypaisa":
+            return ok({
+                "title": "Bilal Ahmed", "institution": EASYPAISA, "identifier": "+923001110002",
+            })
+        return err(404, "NOT_FOUND", "Institution not found")
+
+    fake_backend.route("GET", "/api/v1/institutions", {"items": [EASYPAISA]})
+    fake_backend.route("POST", "/api/v1/transfers/resolve", responder=resolve_responder)
+    r = await tools.resolve_recipient(await client_for(fake_backend), "Easypaisa", "+923001110002")
+    assert r["card"]["kind"] == "recipient"
+    assert r["card"]["institution"]["id"] == "easypaisa"
+    # institutions lookup, then the failed resolve by name, then the retry by real id
+    assert len(fake_backend.requests) == 3
+
+
+async def test_resolve_recipient_fails_when_name_lookup_finds_no_match(fake_backend):
+    from tests.conftest import err
+
+    fake_backend.route("GET", "/api/v1/institutions", {"items": []})
+    fake_backend.route("POST", "/api/v1/transfers/resolve", responder=lambda req: err(404, "NOT_FOUND", "Institution not found"))
+    r = await tools.resolve_recipient(await client_for(fake_backend), "NotARealBank", "+923001110002")
+    assert r["card"] is None
+    assert "ERROR NOT_FOUND" in r["text"]
+
+
 async def test_search_recipients_multiple_returns_recipient_chips(fake_backend):
     fake_backend.route("GET", "/api/v1/recipients", {"items": [
         {"id": "r1", "nickname": "Munsif", "title": "Munsif Ali", "institution": EASYPAISA, "identifier": "+923001110003"},

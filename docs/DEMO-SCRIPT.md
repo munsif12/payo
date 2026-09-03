@@ -29,42 +29,51 @@ by name and hands you the five things you actually came to do."
 **Audience sees:** Home screen — animated greeting ("Good morning, Ammi Jaan"), balance
 pill, five suggestion cards staggering in.
 
-## Flow A — Pay a bill, AI-first (2 min) ⭐ the hero
+## Flow A — Send money like a wallet: bank choice, PIN in chat, save (2 min) ⭐ the hero
 
-**Say (en):** *tap "Pay a bill"* — or type/speak "Pay my electricity bill."
+**Say (en):** *type or say:* "Pay 100 rupees to 03135468810."
 **Audience sees:**
-1. PAYO finds the due K-Electric bill and answers with a **bill card** — amount, due
-   date, "Pay now."
-2. Tap **Pay now** → a **confirmation card** slides in: *Pay K-Electric ₨4,320*.
+1. No bank/wallet was named, so PAYO asks — **"Which bank or wallet?"** — with tappable
+   chips for the popular ones (PAYO, Easypaisa, JazzCash, SadaPay, NayaPay, HBL, Meezan,
+   UBL, MCB, Allied). Tap **Easypaisa**.
+2. PAYO resolves the account and answers with a **recipient card**: name, institution,
+   masked number, "Send to Sara Khan?" Tap **Yes, continue**.
+3. A **confirmation card** slides in. The **PIN pad opens right inside the chat** — no
+   separate screen — for `1234`. Wrong PIN shakes the pad in place and asks again.
 
-**Say (en):** "Note what did NOT happen: the AI didn't move any money — only a human
-confirmation + PIN can."
-3. Tap **Confirm** → PIN pad → enter `1234`.
-4. Green **Success** with a reference number; the balance pill drops by ₨4,320.
-5. Open **Activity**: the payment is at the top, timestamped, and looking the bill up
-   again shows nothing due — the backend refuses double payment.
+**Say (en):** "Note what did NOT happen: the AI never moved money on its own — it only
+ever prepares a card. A human tap and a PIN execute it, and only once."
+4. Green **success card**, then PAYO asks **"Save this recipient?"** — type a nickname
+   inline (e.g. "Munsif") and it's saved for next time, no separate screen.
+5. Open **Wallet**: the transfer is at the top of Recent activity, timestamped.
 
 **Punchline (en):** "Every write goes through a pending action that expires in two
 minutes and executes exactly once. The model prepares; the human and the PIN execute."
 
-## Flow B — Roman Urdu, typed (1 min) — "it actually understands"
+## Flow B — Saved-recipient send + bill by reference (1 min) — "it remembers"
 
-**Say (en):** *tap the AI bar and type:* "bilal ko 1500 bhejo"
-**Audience sees:** PAYO understands the Roman-Urdu request as "send ₨1,500 to Bilal,"
-resolves Bilal from contacts, and answers **in English** (the app's current language)
-with the same confirmation → PIN → success flow as Flow A.
+**Say (en):** *type or say:* "Send 250 to Munsif."
+**Audience sees:** PAYO searches saved recipients by name, finds the one match, and goes
+straight to the recipient card — no bank/wallet question this time, because it already
+knows. Confirm → PIN in chat → success, same as Flow A. If two recipients share a name,
+PAYO shows chips to ask which one instead of guessing.
+**Say (en):** *type or say:* "Pay my electricity bill."
+**Audience sees:** first time, PAYO asks for the biller and the consumer/reference
+number; supply "K-Electric" and the account number, confirm the bill card, PIN, paid —
+then PAYO asks to save the biller. Ask again later and PAYO pays straight from the saved
+biller, no re-asking.
 **Say (en):** "Type it in Urdu script, Roman Urdu, or English — PAYO understands all
 three and always replies in whichever language you're using."
 
-## Flow C — The Urdu switch + two Saras (1 min) — for the room
+## Flow C — The Urdu switch + two Munsifs (1 min) — for the room
 
 **Do:** More → Profile → tap **اردو**.
 **Audience sees:** the entire app — including cards already in the conversation — flips
 to right-to-left Urdu (Nastaliq) instantly.
-**Say (اردو):** «سارہ کو پیسے بھیجنے ہیں»
-**Audience sees:** PAYO asks back — «کون سی سارہ؟» — with two tappable chips, **سارہ
-خان** and **سارہ ملک**, each with its phone number. Tap one; the choice returns as your
-reply and PAYO replies in Urdu, RTL, throughout.
+**Say (اردو):** «منصف کو پیسے بھیجنے ہیں»
+**Audience sees:** if two saved recipients share the name "Munsif," PAYO asks back —
+«کون سا منصف؟» — with tappable chips, each showing its institution and masked number.
+Tap one; the choice returns as your reply and PAYO replies in Urdu, RTL, throughout.
 **Say (en):** "It doesn't guess with your money — ambiguity becomes a question. Same
 brain, either language."
 
@@ -92,4 +101,6 @@ to every screen, and a grandmother who never has to see a form. That's PAYO."
   is no real microphone in a simulator, so lean on typed/Roman-Urdu input for Flow B.
 - Wrong PIN on purpose is a nice extra beat: the pad shakes back with an inline error
   ("Wrong PIN, try again" / «پن غلط ہے، دوبارہ کوشش کریں») and nothing moves — the
-  session stays signed in either way.
+  session stays signed in either way. This works identically whether the PIN sheet
+  opened from a chat card or from the classic Send/Bills screens — it's the same
+  bottom-sheet component everywhere, no separate PIN page.

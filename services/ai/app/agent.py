@@ -24,7 +24,7 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — بزرگ اور غ�
 - ہمیشہ سادہ، مختصر اردو جملوں میں جواب دیں (بولا جائے گا، اس لیے مختصر رکھیں)۔
 - اکاؤنٹ کی کوئی بھی حقیقت (بیلنس، لین دین، بل) بتانے سے پہلے متعلقہ ٹول ضرور استعمال کریں — کبھی اندازہ نہ لگائیں۔
 - آپ خود کوئی کارڈ نہیں دکھا سکتیں — کارڈ صرف ٹول کال سے بنتا ہے۔ «تصدیق کے لیے کارڈ دیکھیں» صرف تب کہیں جب اسی باری میں send_money / pay_bill / recharge / pocket_deposit ٹول کال ہو چکا ہو۔
-- پیسے بھیجنے کا طریقہ: اگر صارف نام بتائے تو پہلے search_recipients(نام) کال کریں — ایک محفوظ رابطہ ملے تو اسی کا recipient_id استعمال کریں؛ کئی ملیں تو chips کارڈ دکھا کر پوچھیں (خود انتخاب نہ کریں)۔ اگر صارف فون نمبر یا IBAN بتائے مگر بینک/والٹ نہ بتائے تو list_institutions کال کر کے پوچھیں کون سا۔ بینک/والٹ معلوم ہونے پر resolve_recipient(institution_id, identifier) کال کریں — یہ recipient کارڈ دکھاتا ہے۔ send_money تب تک کبھی کال نہ کریں جب تک resolve_recipient کا کارڈ دکھایا جا چکا ہو اور صارف نے واضح الفاظ میں تصدیق نہ کر دی ہو («ہاں»، «جی»، «ٹھیک ہے» وغیرہ)۔ کامیابی کے بعد ایپ خود "رابطہ محفوظ کریں؟" پوچھتی ہے — save_recipient صرف تب کال کریں جب صارف خود مانگے یا قبول کرے۔
+- پیسے بھیجنے کا طریقہ: اگر صارف نام بتائے تو پہلے search_recipients(نام) کال کریں — ایک محفوظ رابطہ ملے تو اسی کا recipient_id استعمال کریں؛ کئی ملیں تو chips کارڈ دکھا کر پوچھیں (خود انتخاب نہ کریں)۔ اگر صارف فون نمبر یا IBAN بتائے مگر بینک/والٹ نہ بتائے تو list_institutions کال کر کے پوچھیں کون سا۔ بینک/والٹ معلوم ہونے پر resolve_recipient(institution_id, identifier) کال کریں — یہ recipient کارڈ دکھاتا ہے۔ send_money تب تک کبھی کال نہ کریں جب تک resolve_recipient کا کارڈ دکھایا جا چکا ہو اور صارف نے واضح الفاظ میں تصدیق نہ کر دی ہو («ہاں»، «جی»، «ٹھیک ہے» وغیرہ)۔ تصدیق کے بعد فوراً send_money کال کریں (وہی institution_id+identifier) — پہلے سے حل شدہ جوڑے کے لیے resolve_recipient کو دوبارہ کال نہ کریں، چاہے وہ پچھلے پیغام میں ہوا ہو؛ دوبارہ resolve کرنے سے صارف کو ہمیشہ وہی کارڈ دکھتا رہے گا۔ کامیابی کے بعد ایپ خود "رابطہ محفوظ کریں؟" پوچھتی ہے — save_recipient صرف تب کال کریں جب صارف خود مانگے یا قبول کرے۔
 - رقم صارف کی تصدیق اور PIN کے بعد ہی منتقل ہوتی ہے۔ کبھی نہ کہیں کہ رقم بھیج دی گئی۔
 - کارڈ نمبر کبھی پورا نہ پڑھیں۔
 - رقم ہمیشہ روپے میں کہیں (مثلاً «پندرہ سو روپے»)۔
@@ -43,8 +43,12 @@ Rules:
   user gives a phone number or IBAN with no bank/wallet named, call list_institutions and ask which
   one (chips). Once the institution is known, call resolve_recipient(institution_id, identifier) —
   this shows a recipient card. NEVER call send_money until that recipient card has been shown AND
-  the user has clearly confirmed ("yes", "ok", "go ahead", etc.). After a successful send the app
-  itself asks "save this recipient?" — only call save_recipient if the user asks for it or accepts.
+  the user has clearly confirmed ("yes", "ok", "go ahead", etc.). Once they confirm, call
+  send_money immediately with the SAME institution_id+identifier — do NOT call resolve_recipient
+  again for a pair you already resolved earlier in this conversation, even if that happened in a
+  previous message; re-resolving instead of proceeding just shows the user the same card forever.
+  After a successful send the app itself asks "save this recipient?" — only call save_recipient if
+  the user asks for it or accepts.
 - Money moves only after the user taps confirm and enters their PIN. Never claim money was sent.
 - Never read a full card number aloud.
 - Say amounts in rupees.
@@ -173,7 +177,11 @@ class FreezeCardArgs(BaseModel):
     frozen: bool = True
 
 
-def build_tools(client: BackendClient, cards_sink: list[dict[str, Any]]) -> list[StructuredTool]:
+def build_tools(
+    client: BackendClient,
+    cards_sink: list[dict[str, Any]],
+    resolved_pairs: set[tuple[str, str]] | None = None,
+) -> list[StructuredTool]:
     """Wrap app.tools as LangChain tools; text goes to the model, cards to the sink."""
 
     def wrap(fn, name: str, description: str, schema: type[BaseModel]) -> StructuredTool:
@@ -190,11 +198,12 @@ def build_tools(client: BackendClient, cards_sink: list[dict[str, Any]]) -> list
             coroutine=runner, name=name, description=description, args_schema=schema,
         )
 
-    # Per-run guard: send_money must not run on institution_id+identifier unless
-    # resolve_recipient was called successfully for that exact pair earlier in this
-    # same run_agent turn (recipient_id sends are already-resolved saved recipients,
-    # so they're exempt).
-    resolved_pairs: set[tuple[str, str]] = set()
+    # Guard: send_money must not run on institution_id+identifier unless resolve_recipient
+    # was called for that exact pair — either earlier this same run_agent turn, or in a
+    # prior turn of the same conversation (seeded by the caller from chat history; the
+    # user already saw and confirmed that recipient card). recipient_id sends are
+    # already-resolved saved recipients, so they're exempt.
+    resolved_pairs: set[tuple[str, str]] = set(resolved_pairs or ())
 
     def _norm_identifier(identifier: str) -> str:
         return identifier.strip().lower()
@@ -204,7 +213,10 @@ def build_tools(client: BackendClient, cards_sink: list[dict[str, Any]]) -> list
         card = result.get("card")
         if card:
             cards_sink.append(card)
-            resolved_pairs.add((institution_id, _norm_identifier(identifier)))
+            # Key by the id the card itself carries — t.resolve_recipient may have retried
+            # institution_id as a display name and resolved to a different real id.
+            real_institution_id = card.get("institution", {}).get("id", institution_id)
+            resolved_pairs.add((real_institution_id, _norm_identifier(identifier)))
         return result["text"]
 
     async def send_money_runner(
@@ -212,12 +224,21 @@ def build_tools(client: BackendClient, cards_sink: list[dict[str, Any]]) -> list
         institution_id: str | None = None, identifier: str | None = None,
     ) -> str:
         if not recipient_id and institution_id and identifier:
-            if (institution_id, _norm_identifier(identifier)) not in resolved_pairs:
-                return (
-                    "ERROR: send_money cannot run on this institution_id+identifier yet — call "
-                    "resolve_recipient(institution_id, identifier) first, show the recipient card, "
-                    "and get the user's confirmation before trying send_money again."
-                )
+            key = (institution_id, _norm_identifier(identifier))
+            if key not in resolved_pairs:
+                # A later turn may only have the institution's display name in its own
+                # history (not the opaque id resolve_recipient returned same-turn) — see if
+                # that name maps to an id we already confirmed before rejecting outright.
+                # Only worth the lookup if something was resolved at all this conversation.
+                by_name = await t._institution_id_by_name(client, institution_id) if resolved_pairs else None
+                if by_name and (by_name, key[1]) in resolved_pairs:
+                    institution_id = by_name
+                else:
+                    return (
+                        "ERROR: send_money cannot run on this institution_id+identifier yet — call "
+                        "resolve_recipient(institution_id, identifier) first, show the recipient card, "
+                        "and get the user's confirmation before trying send_money again."
+                    )
         result = await t.send_money(
             client, amount_paisa=amount_paisa, recipient_id=recipient_id,
             institution_id=institution_id, identifier=identifier,
@@ -231,8 +252,10 @@ def build_tools(client: BackendClient, cards_sink: list[dict[str, Any]]) -> list
         coroutine=resolve_recipient_runner, name="resolve_recipient",
         description=(
             "Resolve the account title for an institution_id + identifier (phone for wallets, "
-            "IBAN/account number for banks) and show a recipient card. ALWAYS call this and get the "
-            "user's confirmation before calling send_money with institution_id+identifier."
+            "IBAN/account number for banks) and show a recipient card. Call this ONCE per pair and "
+            "get the user's confirmation before calling send_money with institution_id+identifier. "
+            "Do NOT call this again for a pair already resolved earlier in the conversation — once "
+            "the user confirms, call send_money directly."
         ),
         args_schema=ResolveRecipientArgs,
     )
@@ -241,9 +264,11 @@ def build_tools(client: BackendClient, cards_sink: list[dict[str, Any]]) -> list
         description=(
             "Prepare sending money (creates a confirmation card; the user confirms with PIN). "
             "Provide amount_paisa and EITHER recipient_id (from search_recipients) OR "
-            "institution_id+identifier — the latter REQUIRES that resolve_recipient was already "
-            "called for that exact pair and the user confirmed the recipient card; calling this "
-            "without that will be rejected."
+            "institution_id+identifier. Call this the moment the user confirms a recipient card "
+            "you (or an earlier turn of this same conversation) already showed for that "
+            "institution_id+identifier — do NOT call resolve_recipient again first just because "
+            "its own tool call isn't visible in this turn; the confirmation itself is the signal "
+            "to proceed straight to send_money."
         ),
         args_schema=SendMoneyArgs,
     )
@@ -300,11 +325,18 @@ async def run_agent(
     user_text: str,
     language: str = "ur",
     model: BaseChatModel | None = None,
+    resolved_pairs: set[tuple[str, str]] | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
-    """Run one conversational turn. Returns (reply_text, cards)."""
+    """Run one conversational turn. Returns (reply_text, cards).
+
+    `resolved_pairs` carries (institution_id, identifier) pairs the user already saw
+    resolved and confirmed in an earlier turn of this conversation (derived from prior
+    `recipient` cards in chat history) — without it, the send_money guard below would
+    reject a same-turn confirmation because its own bookkeeping is per-call.
+    """
     cards: list[dict[str, Any]] = []
     model = model or build_model()
-    agent = create_react_agent(model, build_tools(client, cards))
+    agent = create_react_agent(model, build_tools(client, cards, resolved_pairs))
     messages: list[BaseMessage] = [SystemMessage(content=system_prompt(language)), *history, HumanMessage(content=user_text)]
     state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
     reply = _last_reply(state)
