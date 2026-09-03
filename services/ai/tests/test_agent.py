@@ -474,3 +474,29 @@ async def test_reply_never_leaks_the_cards_context_marker(fake_backend):
     await client.aclose()
     assert "[cards]" not in reply
     assert reply == "Your balance is one rupee."
+
+
+async def test_urdu_language_nudge_reply_is_also_stripped_of_the_marker(fake_backend):
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="Hello there."),  # English under language="ur" -> Urdu nudge
+        AIMessage(content='سلام، میں حاضر ہوں۔\n[cards] recipient: institution_id=easypaisa'),
+    ])
+    reply, _ = await run_agent(client, [], "سلام", "ur", model=model)
+    await client.aclose()
+    assert "[cards]" not in reply
+    assert reply == "سلام، میں حاضر ہوں۔"
+
+
+async def test_all_guards_share_one_budget_of_at_most_three_invocations(fake_backend):
+    """card guard + prose ask + Urdu language would each want a re-prompt; the shared
+    budget caps the turn at the initial call plus MAX_NUDGES."""
+    from app.agent import MAX_NUDGES
+
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    prose = "Please confirm on the card. Which bank or wallet is this?"
+    model = RecordingFakeToolModel(messages=iter([AIMessage(content=prose)] * 3))
+    reply, cards = await run_agent(client, [], "send 100 to 03135468810", "ur", model=model)
+    await client.aclose()
+    assert cards == []
+    assert len(model.received) == 1 + MAX_NUDGES == 3

@@ -394,14 +394,17 @@ async def run_agent(
         extra_invocations += 1
 
     # Guard: the reply-language rule is a hard requirement. If the UI language is Urdu
-    # and the final reply carries no Arabic-script characters, re-prompt exactly once.
-    if language == "ur" and not has_arabic_script(reply):
+    # and the final reply carries no Arabic-script characters, re-prompt — budget allowing.
+    if language == "ur" and not has_arabic_script(reply) and extra_invocations < MAX_NUDGES:
         lang_nudged = [*state["messages"], HumanMessage(content=URDU_LANGUAGE_NUDGE)]
         state = await agent.ainvoke({"messages": lang_nudged}, config={"recursion_limit": 12})
-        reply = _last_reply(state)
+        reply = strip_cards_marker(_last_reply(state))
+        extra_invocations += 1
     return str(reply), cards
 
 
+# At most this many nudge re-invocations per turn, across ALL guards (card, prose,
+# marker-echo, language) — so a turn never costs more than 1 + MAX_NUDGES model calls.
 MAX_NUDGES = 2
 
 NUDGE = (
@@ -483,7 +486,7 @@ def _content_text(content: Any) -> str:
 def _last_reply(state: dict[str, Any]) -> str:
     for m in reversed(state["messages"]):
         if isinstance(m, AIMessage):
-            text = _content_text(m.content)
+            text = strip_cards_marker(_content_text(m.content))
             if text:
                 return text
     return ""
