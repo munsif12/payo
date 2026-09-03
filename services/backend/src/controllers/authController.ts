@@ -46,8 +46,13 @@ export async function requestOtp(req: Request, res: Response) {
       // Lost the create race to a concurrent request-otp for the same (until-now unknown)
       // phone — the unique index on User.phone rejects the loser. The winner already
       // created the user + account + card, so just fall through instead of 500ing.
+      // Any OTHER duplicate-key error (e.g. a stale/unrelated unique index) is a real
+      // failure and must not be swallowed as fake success — confirm the phone race by
+      // re-reading the user; if it's still missing, rethrow.
       const isDupKey = typeof e === 'object' && e !== null && (e as { code?: number }).code === 11000;
       if (!isDupKey) throw e;
+      const winner = await User.findOne({ phone });
+      if (!winner) throw e;
     } finally {
       await session.endSession();
     }

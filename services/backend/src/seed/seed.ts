@@ -24,10 +24,12 @@ export async function runSeed() {
   if (config.mongoUri.includes('mongodb+srv'))
     throw new Error('Refusing to seed a remote cluster — local Mongo only');
 
-  await Promise.all(
-    [User, Account, Card, Bank, Biller, Telco, Bill, Pocket, Contact, Transaction]
-      .map(m => m.deleteMany({})),
-  );
+  // Drop the whole database (not just documents) so stale indexes from an old schema
+  // version never survive a reseed, then rebuild EVERY registered model's indexes to
+  // match the current schema (dropDatabase wipes all of them, not just User/Bill's —
+  // e.g. Transaction.refNo and OtpCode.phone are unique too).
+  await mongoose.connection.dropDatabase();
+  await Promise.all(mongoose.modelNames().map((n) => mongoose.model(n).syncIndexes()));
   refCounter = 0;
 
   const pinHash = await bcrypt.hash('1234', 10);

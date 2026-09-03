@@ -3,7 +3,7 @@ import { Schema, model } from 'mongoose';
 const userSchema = new Schema({
   name: { type: String, required: true },
   urduName: String,
-  email: { type: String, lowercase: true, trim: true },
+  email: { type: String, lowercase: true, trim: true, index: { unique: true, sparse: true } },
   phone: { type: String, required: true, unique: true },
   pinHash: String,
   pinSet: { type: Boolean, required: true, default: false },

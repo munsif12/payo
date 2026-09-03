@@ -1,9 +1,16 @@
 import request from 'supertest';
+import mongoose from 'mongoose';
 import { createApp } from '../../app';
 import { runSeed } from '../seed';
 import { User, Account, Transaction, Bill, Pocket, Bank, Biller, Telco, Contact } from '../../models';
 
 const app = createApp();
+
+async function hasUniqueIndex(collection: string, key: Record<string, 1 | -1>) {
+  const indexes = await mongoose.connection.collection(collection).indexes();
+  return indexes.some((idx) =>
+    idx.unique === true && JSON.stringify(idx.key) === JSON.stringify(key));
+}
 
 test('seed builds the Contract 4 demo world', async () => {
   await runSeed();
@@ -37,6 +44,11 @@ test('seed builds the Contract 4 demo world', async () => {
     .set('Authorization', `Bearer ${v.body.data.otpToken}`).send({ pin: '1234' });
   expect(login.status).toBe(200);
   expect(login.body.data.token).toBeTruthy();
+
+  // dropDatabase() during runSeed() wipes every collection's indexes — confirm the
+  // reseed step rebuilds them for models beyond just User/Bill.
+  expect(await hasUniqueIndex('transactions', { refNo: 1 })).toBe(true);
+  expect(await hasUniqueIndex('otpcodes', { phone: 1 })).toBe(true);
 }, 60_000);
 
 test('seed is idempotent — re-run lands on the same world', async () => {

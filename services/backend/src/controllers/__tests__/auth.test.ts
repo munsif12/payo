@@ -1,5 +1,7 @@
 import request from 'supertest';
+import mongoose from 'mongoose';
 import { createApp } from '../../app';
+import { User, Account, Card } from '../../models';
 
 const app = createApp();
 const PHONE = '+923001110001';
@@ -162,6 +164,46 @@ test('a correct PIN resets the wrong-attempt counter', async () => {
   }
   expect(last!.status).toBe(401);
   expect(last!.body.code).toBe('INVALID_PIN');
+});
+
+test('request-otp for a new phone creates User + Account + Card, and verify-otp succeeds', async () => {
+  const phone = '+923001113331';
+  const r = await request(app).post('/api/v1/auth/request-otp').send({ phone });
+  expect(r.status).toBe(201);
+  expect(r.body.data.isNewUser).toBe(true);
+
+  const user = await User.findOne({ phone });
+  expect(user).toBeTruthy();
+  expect(await Account.countDocuments({ userId: user!._id })).toBe(1);
+  expect(await Card.countDocuments({ userId: user!._id })).toBe(1);
+
+  const v = await request(app).post('/api/v1/auth/verify-otp').send({ phone, otp: r.body.data.demoOtp });
+  expect(v.status).toBe(200);
+  expect(v.body.data.otpToken).toBeTruthy();
+});
+
+test('a stale non-sparse unique index on email no longer blocks emailless signups after syncIndexes (regression)', async () => {
+  // Simulate a legacy deployment where `email` still carries a plain unique index from
+  // an old schema version — every emailless user has email:undefined, so a non-sparse
+  // unique index treats them as duplicates of each other. (The test harness's own
+  // beforeAll already built the current sparse index, so drop it first to get a clean
+  // "before migration" state.)
+  await mongoose.connection.collection('users').dropIndex('email_1');
+  await mongoose.connection.collection('users').createIndex({ email: 1 }, { unique: true, name: 'email_1' });
+
+  // This is the startup/seed migration step under test: syncIndexes drops the stale
+  // index and rebuilds it per the current (sparse) schema. Without the model's
+  // `sparse: true`, this line would just recreate the same blocking index and the
+  // assertions below would fail.
+  await User.syncIndexes();
+
+  const phoneA = '+923001112221';
+  const phoneB = '+923001112222';
+  const a = await request(app).post('/api/v1/auth/request-otp').send({ phone: phoneA });
+  const b = await request(app).post('/api/v1/auth/request-otp').send({ phone: phoneB });
+  expect(a.status).toBe(201);
+  expect(b.status).toBe(201);
+  expect(await User.countDocuments({ phone: { $in: [phoneA, phoneB] } })).toBe(2);
 });
 
 test('concurrent request-otp for the same new phone does not 500 (create-race safe)', async () => {
