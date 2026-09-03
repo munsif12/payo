@@ -28,6 +28,7 @@ export default function Otp() {
   const [demoOtp, setDemoOtp] = useState(initialDemoOtp ?? '');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
   const [requestOtp, { isLoading: isResending }] = useRequestOtpMutation();
   const [verifyOtp, { isLoading: isVerifying }] = useVerifyOtpMutation();
@@ -39,17 +40,18 @@ export default function Otp() {
   }, []);
 
   const onDigit = (d: string) => {
-    if (code.length >= CODE_LENGTH) return;
+    if (code.length >= CODE_LENGTH || locked) return;
     setError(null);
     setCode((p) => p + d);
   };
   const onBackspace = () => {
+    if (locked) return;
     setError(null);
     setCode((p) => p.slice(0, -1));
   };
 
   const resend = async () => {
-    if (seconds > 0 || isResending || !pendingPhone) return;
+    if (seconds > 0 || isResending || !pendingPhone || locked) return;
     setError(null);
     setCode('');
     try {
@@ -71,8 +73,10 @@ export default function Otp() {
       dispatch(pendingNameLoaded(cachedName));
       router.replace(data.isNewUser ? '/(auth)/create-pin' : '/(auth)/enter-pin');
     } catch (e) {
+      const err = apiErr(e);
       setCode('');
-      setError(apiErr(e).message);
+      setError(err.message);
+      if (err.code === 'OTP_LOCKED') setLocked(true);
     }
   };
 
@@ -126,9 +130,9 @@ export default function Otp() {
         <Keypad
           onDigit={onDigit}
           onBackspace={onBackspace}
-          disabled={isVerifying}
+          disabled={isVerifying || locked}
           leftSlot={
-            seconds > 0 ? (
+            seconds > 0 || locked ? (
               <Text variant="foot" color={c.ink2}>{t('auth.otp.resend', { time: ltrIsolate(formatCountdown(seconds)) })}</Text>
             ) : (
               <Pressable testID="otp-resend" onPress={resend} hitSlop={8} disabled={isResending}>
@@ -142,7 +146,7 @@ export default function Otp() {
           testID="otp-submit"
           label={t('auth.otp.verify')}
           onPress={submit}
-          disabled={code.length !== CODE_LENGTH}
+          disabled={code.length !== CODE_LENGTH || locked}
           loading={isVerifying}
         />
       </View>

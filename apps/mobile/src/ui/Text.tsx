@@ -17,6 +17,16 @@ export function useIsUrdu() {
   return i18n.language === 'ur';
 }
 
+/** Money/numeric text must always read left-to-right, even in an Urdu (RTL)
+ * screen — mixing an RTL paragraph direction with digit groups and currency
+ * symbols causes the bidi algorithm to reorder them (e.g. "₨84,500" can come
+ * out mirrored). Every other variant follows the language direction. Kept
+ * pure/exported so it's unit-testable without rendering. */
+export function textDirectionFor(variant: TextVariant, urdu: boolean): 'ltr' | 'rtl' {
+  if (variant === 'money') return 'ltr';
+  return urdu ? 'rtl' : 'ltr';
+}
+
 type FontWeightKey = 400 | 500 | 600 | 700 | 800;
 
 export interface TextProps {
@@ -54,7 +64,7 @@ export function Text({ variant = 'body', color, weight, children, style, center,
     fontFamily: urdu ? type.urduFontFamily : type.fontFamily[weightKey],
     color: resolvedColor,
     textAlign: center ? 'center' : urdu ? 'right' : 'left',
-    writingDirection: urdu ? 'rtl' : 'ltr',
+    writingDirection: textDirectionFor(variant, urdu),
     textTransform: variant === 'cap' ? 'uppercase' : undefined,
     fontVariant: variant === 'money' ? ['tabular-nums'] : undefined,
   };

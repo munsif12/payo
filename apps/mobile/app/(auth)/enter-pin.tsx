@@ -78,6 +78,7 @@ export default function EnterPin() {
             testID="enter-pin-not-you"
             accessibilityRole="button"
             onPress={notYou}
+            hitSlop={8}
             style={{
               height: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: c.surface2,
               flexDirection: 'row', alignItems: 'center', gap: 6,

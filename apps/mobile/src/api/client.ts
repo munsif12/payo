@@ -5,7 +5,7 @@ import { signedOut } from '../store/authSlice';
 import { shouldSignOut } from './authGuard';
 import type {
   Me, Txn, PendingAction, ContactDto, PocketDto, RequestDto, CardDto,
-  StatementMeta, BillLookup, NamedItem, PublicUser,
+  StatementMeta, BillLookup, NamedItem, PublicUser, DueBill,
 } from './types';
 
 interface Ok<T> { success: true; data: T }
@@ -35,7 +35,7 @@ export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBa
 export const payoApi = createApi({
   reducerPath: 'payoApi',
   baseQuery: baseQueryWithAuth,
-  tagTypes: ['Me', 'Txns', 'Contacts', 'Pockets', 'Requests', 'Card', 'Statements'],
+  tagTypes: ['Me', 'Txns', 'Contacts', 'Pockets', 'Requests', 'Card', 'Statements', 'DueBills'],
   endpoints: (b) => ({
     me: b.query<Me, void>({
       query: () => '/me',
@@ -113,6 +113,11 @@ export const payoApi = createApi({
       query: () => '/billers',
       transformResponse: (r: Ok<{ items: NamedItem[] }>) => r.data,
     }),
+    dueBills: b.query<{ items: DueBill[] }, void>({
+      query: () => '/bills/due',
+      transformResponse: (r: Ok<{ items: DueBill[] }>) => r.data,
+      providesTags: ['DueBills'],
+    }),
     lookupBill: b.mutation<BillLookup, { billerId: string; consumerNo: string }>({
       query: (body) => ({ url: '/bills/lookup', method: 'POST', body }),
       transformResponse: (r: Ok<BillLookup>) => r.data,
@@ -120,6 +125,7 @@ export const payoApi = createApi({
     payBill: b.mutation<PendingAction, { billId: string }>({
       query: (body) => ({ url: '/bills/pay', method: 'POST', body }),
       transformResponse: (r: Ok<PendingAction>) => r.data,
+      invalidatesTags: ['DueBills'],
     }),
     telcos: b.query<{ items: NamedItem[] }, void>({
       query: () => '/telcos',
@@ -194,7 +200,7 @@ export const payoApi = createApi({
     executeAction: b.mutation<{ transaction: Txn }, { id: string; pin?: string }>({
       query: ({ id, pin }) => ({ url: `/actions/${id}/execute`, method: 'POST', body: pin ? { pin } : {} }),
       transformResponse: (r: Ok<{ transaction: Txn }>) => r.data,
-      invalidatesTags: ['Me', 'Txns', 'Pockets', 'Requests'],
+      invalidatesTags: ['Me', 'Txns', 'Pockets', 'Requests', 'DueBills'],
     }),
     cancelAction: b.mutation<{ cancelled: true }, string>({
       query: (id) => ({ url: `/actions/${id}/cancel`, method: 'POST' }),
@@ -207,7 +213,7 @@ export const {
   useMeQuery, useRequestOtpMutation, useVerifyOtpMutation, useSetPinMutation, useVerifyPinWithOtpMutation,
   useTransactionsQuery, useContactsQuery, useCreateContactMutation,
   useBanksQuery, useResolveTitleMutation, useCreateTransferMutation,
-  useBillersQuery, useLookupBillMutation, usePayBillMutation,
+  useBillersQuery, useDueBillsQuery, useLookupBillMutation, usePayBillMutation,
   useTelcosQuery, useCreateRechargeMutation,
   useRequestsQuery, useCreateRequestMutation, useApproveRequestMutation, useDeclineRequestMutation,
   usePocketsQuery, useCreatePocketMutation, usePocketMoveMutation,

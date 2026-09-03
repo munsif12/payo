@@ -53,3 +53,9 @@ export interface BillLookup {
 }
 
 export interface NamedItem { id: string; name: string; urduName: string; category?: string }
+
+export interface DueBill {
+  billId: string;
+  biller: { id: string; name: string; urduName: string; category?: string };
+  consumerNo: string; amountPaisa: number; dueDate: string; month: string;
+}
