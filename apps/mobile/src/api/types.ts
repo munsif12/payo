@@ -54,6 +54,28 @@ export interface BillLookup {
 
 export interface NamedItem { id: string; name: string; urduName: string; category?: string }
 
+export interface InstitutionDto {
+  id: string; name: string; urduName: string; kind: 'wallet' | 'bank'; code?: string; popular: boolean;
+}
+
+export interface RecipientSuggestion {
+  institutionId: string; identifier: string; title: string; alreadySaved: boolean;
+}
+
+export interface BillerSuggestion {
+  billerId: string; consumerNo: string; consumerName: string; alreadySaved: boolean;
+}
+
+export interface RecipientDto {
+  id: string; nickname: string; title: string;
+  institution: { id: string; name: string; urduName?: string; kind: 'wallet' | 'bank' };
+  identifier: string; linkedUserId?: string; lastUsedAt?: string;
+}
+
+export interface SavedBillerDto {
+  id: string; nickname: string; billerId: string; consumerNo: string; consumerName: string;
+}
+
 export interface DueBill {
   billId: string;
   biller: { id: string; name: string; urduName: string; category?: string };

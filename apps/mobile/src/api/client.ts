@@ -6,6 +6,7 @@ import { shouldSignOut } from './authGuard';
 import type {
   Me, Txn, PendingAction, ContactDto, PocketDto, RequestDto, CardDto,
   StatementMeta, BillLookup, NamedItem, PublicUser, DueBill,
+  RecipientSuggestion, BillerSuggestion, RecipientDto, SavedBillerDto,
 } from './types';
 
 interface Ok<T> { success: true; data: T }
@@ -193,14 +194,27 @@ export const payoApi = createApi({
       transformResponse: (r: Ok<{ statementId: string; summary: Record<string, unknown> }>) => r.data,
       invalidatesTags: ['Statements'],
     }),
-    executeAction: b.mutation<{ transaction: Txn }, { id: string; pin?: string }>({
+    executeAction: b.mutation<
+      { transaction: Txn; recipientSuggestion?: RecipientSuggestion; billerSuggestion?: BillerSuggestion },
+      { id: string; pin?: string }
+    >({
       query: ({ id, pin }) => ({ url: `/actions/${id}/execute`, method: 'POST', body: pin ? { pin } : {} }),
-      transformResponse: (r: Ok<{ transaction: Txn }>) => r.data,
+      transformResponse: (r: Ok<{ transaction: Txn; recipientSuggestion?: RecipientSuggestion; billerSuggestion?: BillerSuggestion }>) => r.data,
       invalidatesTags: ['Me', 'Txns', 'Pockets', 'Requests', 'DueBills'],
     }),
     cancelAction: b.mutation<{ cancelled: true }, string>({
       query: (id) => ({ url: `/actions/${id}/cancel`, method: 'POST' }),
       transformResponse: (r: Ok<{ cancelled: true }>) => r.data,
+    }),
+    // Save-prompt flow (V3.2): fired after a successful send/pay when the response
+    // carries a recipientSuggestion/billerSuggestion the user chose to save.
+    createRecipient: b.mutation<RecipientDto, { nickname: string; institutionId: string; identifier: string }>({
+      query: (body) => ({ url: '/recipients', method: 'POST', body }),
+      transformResponse: (r: Ok<RecipientDto>) => r.data,
+    }),
+    createSavedBiller: b.mutation<SavedBillerDto, { nickname: string; billerId: string; consumerNo: string }>({
+      query: (body) => ({ url: '/saved-billers', method: 'POST', body }),
+      transformResponse: (r: Ok<SavedBillerDto>) => r.data,
     }),
   }),
 });
@@ -217,6 +231,7 @@ export const {
   useCardQuery, useFreezeCardMutation,
   useStatementsQuery, useGenerateStatementMutation,
   useExecuteActionMutation, useCancelActionMutation,
+  useCreateRecipientMutation, useCreateSavedBillerMutation,
 } = payoApi;
 
 export function apiErr(e: unknown): { code: string; message: string } {

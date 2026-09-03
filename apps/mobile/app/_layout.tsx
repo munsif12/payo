@@ -17,6 +17,7 @@ import i18n from '../src/i18n';
 import { useTheme } from '../src/theme/useTheme';
 import { store, RootState } from '../src/store';
 import { hydrated, loadStoredAuth } from '../src/store/authSlice';
+import { PinSheetProvider } from '../src/pin/usePinSheet';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -82,7 +83,9 @@ export default function RootLayout() {
 
   return (
     <Provider store={store}>
-      <RootShell />
+      <PinSheetProvider>
+        <RootShell />
+      </PinSheetProvider>
     </Provider>
   );
 }

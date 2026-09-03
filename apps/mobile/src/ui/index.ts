@@ -14,6 +14,8 @@ export { Keypad } from './Keypad';
 export type { KeypadProps } from './Keypad';
 export { PinDots } from './PinDots';
 export type { PinDotsHandle, PinDotsProps } from './PinDots';
+export { PinSheet } from './PinSheet';
+export type { PinSheetProps } from './PinSheet';
 export { TabBar } from './TabBar';
 export type { TabKey } from './TabBar';
 export { AIBar } from './AIBar';

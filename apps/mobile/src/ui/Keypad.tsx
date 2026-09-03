@@ -11,11 +11,12 @@ import { Text } from './Text';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
-function Key({ children, onPress, size, testID }: {
+function Key({ children, onPress, size, testID, accessibilityLabel }: {
   children: React.ReactNode;
   onPress?: () => void;
   size: number;
   testID?: string;
+  accessibilityLabel?: string;
 }) {
   const { c, dark } = useTheme();
   const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
@@ -26,6 +27,7 @@ function Key({ children, onPress, size, testID }: {
     <AnimatedPressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});
         onPress();
@@ -72,7 +74,7 @@ export function Keypad({ onDigit, onBackspace, size = 64, leftSlot, disabled, st
       {rows.map((row, ri) => (
         <View key={ri} style={{ flexDirection: 'row', gap: 12 }}>
           {row.map((d) => (
-            <Key key={d} size={size} onPress={disabled ? undefined : () => onDigit(d)} testID={`keypad-${d}`}>
+            <Key key={d} size={size} onPress={disabled ? undefined : () => onDigit(d)} testID={`keypad-${d}`} accessibilityLabel={d}>
               <Text variant="h2" weight={600}>{d}</Text>
             </Key>
           ))}
@@ -80,10 +82,10 @@ export function Keypad({ onDigit, onBackspace, size = 64, leftSlot, disabled, st
       ))}
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <Key size={size}>{leftSlot}</Key>
-        <Key size={size} onPress={disabled ? undefined : () => onDigit('0')} testID="keypad-0">
+        <Key size={size} onPress={disabled ? undefined : () => onDigit('0')} testID="keypad-0" accessibilityLabel="0">
           <Text variant="h2" weight={600}>0</Text>
         </Key>
-        <Key size={size} onPress={disabled ? undefined : onBackspace} testID="keypad-backspace">
+        <Key size={size} onPress={disabled ? undefined : onBackspace} testID="keypad-backspace" accessibilityLabel="Backspace">
           <Delete size={26} color={c.ink2} strokeWidth={2} />
         </Key>
       </View>

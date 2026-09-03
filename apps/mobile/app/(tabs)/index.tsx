@@ -24,7 +24,7 @@ export default function Home() {
   const { greetingFoot, name, greetingMessage, suggestions, balancePaisa } = useHomeGreeting();
   const [balanceRevealed, setBalanceRevealed] = useState(false);
   const [draft, setDraft] = useState('');
-  const { messages, status, sendText, sendAudio } = useConverse();
+  const { messages, status, sendText, sendAudio, appendLocal } = useConverse();
   const { recording, start, stop } = useRecorder(({ uri }) => sendAudio(uri));
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -82,7 +82,7 @@ export default function Home() {
             keyExtractor={(m) => m.id}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
             contentContainerStyle={{ paddingHorizontal: space.gutter, paddingVertical: space.m, gap: space.s }}
-            renderItem={({ item }) => <Bubble message={item} onChipTap={sendText} />}
+            renderItem={({ item }) => <Bubble message={item} onChipTap={sendText} onAppendLocal={appendLocal} />}
             ListFooterComponent={status === 'thinking' ? <ThinkingBubble /> : null}
           />
         ) : (
@@ -176,7 +176,11 @@ function SuggestionCard({ suggestion, delay, onPress }: { suggestion: Suggestion
   );
 }
 
-function Bubble({ message, onChipTap }: { message: ChatMessage; onChipTap: (t: string) => void }) {
+function Bubble({ message, onChipTap, onAppendLocal }: {
+  message: ChatMessage;
+  onChipTap: (t: string) => void;
+  onAppendLocal: (m: Omit<ChatMessage, 'id'> & { id?: string }) => void;
+}) {
   const { t } = useTranslation();
   const urdu = useIsUrdu();
   const { c } = useTheme();
@@ -203,7 +207,9 @@ function Bubble({ message, onChipTap }: { message: ChatMessage; onChipTap: (t: s
             {message.text}
           </Text>
         ) : null}
-        {message.cards.map((card, i) => <CardView key={i} card={card} onChipTap={onChipTap} />)}
+        {message.cards.map((card, i) => (
+          <CardView key={i} card={card} onChipTap={onChipTap} onAppendLocal={onAppendLocal} />
+        ))}
       </View>
     </View>
   );

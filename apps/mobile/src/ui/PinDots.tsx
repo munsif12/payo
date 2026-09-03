@@ -79,7 +79,11 @@ export const PinDots = forwardRef<PinDotsHandle, PinDotsProps>(function PinDots(
   }));
 
   return (
-    <Animated.View style={[{ flexDirection: 'row', gap }, containerStyle]}>
+    <Animated.View
+      accessible
+      accessibilityLabel={`${filled} of ${length} digits entered`}
+      style={[{ flexDirection: 'row', gap }, containerStyle]}
+    >
       {Array.from({ length }).map((_, i) => (
         <Dot key={i} filled={i < filled} size={size} reducedMotion={reducedMotion} />
       ))}

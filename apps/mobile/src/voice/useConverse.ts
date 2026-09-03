@@ -157,5 +157,12 @@ export function useConverse() {
   const sendText = (text: string) => run({ text, userBubble: text });
   const sendAudio = (audioUri: string) => run({ audioUri, userBubble: null });
 
-  return { messages, status, sendText, sendAudio };
+  // Appends a fully-formed assistant message that never went through the
+  // /converse stream (e.g. a success + save_prompt card pair rendered
+  // locally right after a PinSheet execute). Not gated by inFlightGate —
+  // it isn't a request/response turn.
+  const appendLocal = (message: Omit<ChatMessage, 'id'> & { id?: string }) =>
+    append({ id: message.id ?? mid(), role: message.role, text: message.text, cards: message.cards });
+
+  return { messages, status, sendText, sendAudio, appendLocal };
 }
