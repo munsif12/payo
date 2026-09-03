@@ -43,6 +43,21 @@ async def _institution_id_by_name(client: BackendClient, name: str) -> str | Non
     return None
 
 
+async def _biller_id_by_name(client: BackendClient, name: str) -> str | None:
+    """Look up a biller's real id by its display name (English or Urdu, case-insensitive)."""
+    try:
+        data = await client.billers()
+    except BackendError:
+        return None
+    needle = name.strip().lower()
+    for item in data.get("items", []):
+        if item.get("name", "").strip().lower() == needle or item.get("urduName", "") == name.strip():
+            return item["id"]
+    # Fall back to a unique substring match ("K Electric" vs "K-Electric").
+    loose = [i for i in data.get("items", []) if needle in i.get("name", "").strip().lower()]
+    return loose[0]["id"] if len(loose) == 1 else None
+
+
 async def get_balance(client: BackendClient) -> Result:
     try:
         me = await client.me()
@@ -204,9 +219,26 @@ async def list_billers(client: BackendClient) -> Result:
     return _ok("Billers: " + "; ".join(f"{b['name']} ({b['category']}, id {b['id']})" for b in data["items"]))
 
 
-async def lookup_bill(client: BackendClient, biller_id: str, consumer_no: str) -> Result:
+async def lookup_bill(client: BackendClient, biller_id: str | None = None, consumer_no: str | None = None,
+                      biller_name: str | None = None) -> Result:
+    if not consumer_no:
+        return _ok("ERROR: lookup_bill needs a consumer_no.")
+    if not biller_id and biller_name:
+        biller_id = await _biller_id_by_name(client, biller_name)
+        if not biller_id:
+            return _ok(f"No biller matches '{biller_name}'. Call list_billers and pick the id.")
+    if not biller_id:
+        return _ok("ERROR: lookup_bill needs a biller_id or biller_name.")
     try:
         bill = await client.lookup_bill(biller_id, consumer_no)
+    except BackendError as e:
+        # The model may pass the biller's display name as biller_id — map it once and retry.
+        if e.code == "NOT_FOUND":
+            by_name = await _biller_id_by_name(client, biller_id)
+            if by_name and by_name != biller_id:
+                return await lookup_bill(client, biller_id=by_name, consumer_no=consumer_no)
+        return _fail(e)
+    try:
         billers = await client.billers()
     except BackendError as e:
         return _fail(e)
@@ -344,8 +376,11 @@ async def list_requests(client: BackendClient) -> Result:
 # ---- write tools: each creates a PendingAction and returns a confirmation card ----
 
 async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str | None = None,
-                     institution_id: str | None = None, identifier: str | None = None) -> Result:
+                     institution_id: str | None = None, identifier: str | None = None,
+                     institution_name: str | None = None) -> Result:
     to: dict[str, Any]
+    if not recipient_id and not institution_id and institution_name:
+        institution_id = await _institution_id_by_name(client, institution_name) or institution_name
     if recipient_id:
         to = {"recipientId": recipient_id}
     elif institution_id and identifier:

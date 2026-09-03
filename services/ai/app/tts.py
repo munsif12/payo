@@ -102,6 +102,6 @@ class CartesiaTts:
 
 
 def build_tts() -> TtsProvider:
-    if settings.cartesia_api_key:
+    if settings.tts_enabled and settings.cartesia_api_key:
         return CartesiaTts()
     return StubTts()

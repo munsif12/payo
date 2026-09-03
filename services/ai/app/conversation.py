@@ -22,13 +22,78 @@ def sse(event: str, data: dict[str, Any]) -> dict[str, str]:
     return {"event": event, "data": json.dumps(data, ensure_ascii=False)}
 
 
+def _card_facts(card: dict[str, Any]) -> str | None:
+    """One card rendered as a compact `kind: k=v k=v` fact string for the model.
+
+    The persisted message text stays clean (the app renders cards natively); only the
+    model-facing history gets these lines, so a later turn can read back the ids it needs
+    (institution_id, identifier, bill_id, action_id) instead of re-asking or re-resolving.
+    """
+    kind = card.get("kind")
+    def kv(pairs: list[tuple[str, Any]]) -> str:
+        return " ".join(f"{k}={v}" for k, v in pairs if v not in (None, ""))
+
+    if kind == "recipient":
+        inst = card.get("institution") or {}
+        return "recipient: " + kv([
+            ("institution_id", inst.get("id")),
+            ("institution", inst.get("name")),
+            ("identifier", card.get("identifier")),
+            ("title", card.get("title")),
+            ("linked_user_id", card.get("linkedUserId")),
+        ])
+    if kind == "institution_chips":
+        items = card.get("institutions") or []
+        return "institution_chips: " + ", ".join(
+            f"{i.get('institutionId')}:{i.get('name')}" for i in items
+        )
+    if kind == "recipient_chips":
+        items = card.get("recipients") or []
+        return "recipient_chips: " + ", ".join(
+            f"{r.get('recipientId')}:{r.get('nickname')}" for r in items
+        )
+    if kind == "biller_chips":
+        items = card.get("billers") or []
+        return "biller_chips: " + ", ".join(
+            f"{b.get('billerId')}:{b.get('name')}"
+            + (f"/{b.get('consumerNo')}" if b.get("consumerNo") else "")
+            for b in items
+        )
+    if kind == "bill":
+        return "bill: " + kv([
+            ("bill_id", card.get("billId")),
+            ("biller", card.get("biller")),
+            ("consumer_no", card.get("consumerNo") or card.get("consumerName")),
+            ("amount_paisa", card.get("amountPaisa")),
+            ("due", (card.get("dueDate") or "")[:10] or None),
+        ])
+    if kind == "confirmation":
+        return "confirmation: " + kv([
+            ("action_id", card.get("actionId")),
+            ("amount_paisa", card.get("amountPaisa")),
+        ])
+    if kind == "pocket":
+        return "pocket: " + kv([("pocket_id", card.get("pocketId")), ("name", card.get("name"))])
+    if kind == "balance":
+        return "balance: " + kv([("balance_paisa", card.get("balancePaisa"))])
+    return None
+
+
+def cards_context_line(cards: list[dict[str, Any]] | None) -> str:
+    """`[cards] ...` line appended to an assistant message in the model-facing history."""
+    facts = [f for f in (_card_facts(c) for c in cards or []) if f]
+    return "[cards] " + " | ".join(facts) if facts else ""
+
+
 def _history_from_messages(items: list[dict[str, Any]]) -> list[BaseMessage]:
     history: list[BaseMessage] = []
     for m in items[-12:]:  # last few turns are enough context
         if m["role"] == "user":
             history.append(HumanMessage(content=m["text"]))
         else:
-            history.append(AIMessage(content=m["text"]))
+            line = cards_context_line(m.get("cards"))
+            text = f"{m['text']}\n{line}" if line else m["text"]
+            history.append(AIMessage(content=text))
     return history
 
 

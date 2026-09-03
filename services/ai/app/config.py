@@ -3,6 +3,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     gemini_api_key: str = ""
     cartesia_api_key: str = ""
+    # Master switch: TTS_ENABLED=false forces the silent stub even with a Cartesia key set
+    # (cheap local runs / live probes must never spend Cartesia credits).
+    tts_enabled: bool = True
     backend_base_url: str = "http://localhost:4000/api/v1"
     gemini_model: str = "gemini-2.5-flash"
     # Curated Cartesia Voice Library voices (Sonic 3.6). Override per env if desired.

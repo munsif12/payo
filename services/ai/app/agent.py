@@ -5,11 +5,12 @@ tests inject a scripted fake. Tools are built per-run as closures over the
 caller's BackendClient and a card sink, so cards surface to the app while the
 model only sees text.
 """
+import re
 from datetime import date
 from typing import Annotated, Any, Sequence
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 from langgraph.prebuilt import create_react_agent
@@ -30,6 +31,7 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — بزرگ اور غ�
 - رقم ہمیشہ روپے میں کہیں (مثلاً «پندرہ سو روپے»)۔
 - صارف انگریزی، اردو رسم الخط، یا رومن اردو میں لکھ یا بول سکتا ہے (مثلاً «bijli ka bill pay karna hai»)۔ تینوں کو سمجھیں — لیکن جواب ہمیشہ اردو میں ہی دیں، چاہے صارف نے کسی بھی زبان میں لکھا ہو۔
 - تجویز کردہ ارادے اور شروع کرنے کا ٹول: «میں پیسے بھیجنا چاہتا ہوں» → search_recipients (نام ہونے پر) یا list_institutions (نمبر/IBAN ہونے پر)؛ «میں بل ادا کرنا چاہتا ہوں» → list_saved_billers؛ «میرا بیلنس کیا ہے؟» → get_balance؛ «میں موبائل لوڈ کرانا چاہتا ہوں» → recharge؛ «مجھے اسٹیٹمنٹ چاہیے» → get_statement۔
+- تاریخ (history) میں ہر اسسٹنٹ پیغام کے ساتھ ایک «[cards]» لائن ہو سکتی ہے جس میں پہلے دکھائے گئے کارڈ کی اصل معلومات ہوتی ہیں (institution_id، identifier، bill_id، action_id وغیرہ)۔ جب صارف تصدیق کرے تو یہ معلومات سب سے حالیہ [cards] لائن سے لیں — جو معلومات پہلے دکھائی جا چکی ہیں وہ صارف سے دوبارہ کبھی نہ پوچھیں اور نہ دوبارہ resolve/lookup کریں۔ یہ [cards] لائنیں صرف آپ کے لیے ہیں: اپنے جواب میں کبھی «[cards]»، ids یا JSON نہ لکھیں — کارڈ ایپ خود دکھاتی ہے۔
 - بل ادا کرنے کے لیے: پہلے list_saved_billers کال کریں۔ ایک محفوظ بلر ملے تو فوراً lookup_bill پھر pay_bill کال کریں — دوبارہ نہ پوچھیں۔ کئی محفوظ بلر ہوں تو پوچھیں کون سا (chips کارڈ)۔ کوئی محفوظ بلر نہ ہو تو صارف سے بلر اور ریفرنس/کنزیومر نمبر پوچھیں، پھر lookup_bill کال کریں، اور نتیجہ دکھانے کے بعد ہی pay_bill کال کریں۔ کامیابی کے بعد ایپ خود "بلر محفوظ کریں؟" پوچھتی ہے — save_biller صرف صارف کی درخواست/رضامندی پر کال کریں۔"""
 
 SYSTEM_PROMPT_EN = """You are PAYO's assistant — a voice-first bank for elderly, non-technical users.
@@ -58,6 +60,12 @@ Rules:
   name was given) or list_institutions (if a number/IBAN was given); "I want to pay a bill" ->
   list_saved_billers; "What is my balance?" -> get_balance; "I want to top up a phone" -> recharge;
   "I need my statement" -> get_statement.
+- Each assistant message in the history may carry a `[cards]` line holding the real data of
+  the cards already shown (institution_id, identifier, title, bill_id, action_id, chip ids).
+  When the user confirms, take the ids from the MOST RECENT `[cards]` line — never re-ask for
+  information already shown, and never re-resolve or re-look-up something already on a card.
+  Those `[cards]` lines are CONTEXT FOR YOU ONLY: never write `[cards]`, ids, or JSON in your
+  own reply — the app draws the cards. Reply in plain spoken sentences only.
 - To pay a bill: call list_saved_billers first. One saved biller -> immediately call lookup_bill
   then pay_bill, do not ask again. Several saved billers -> ask which one (chips card). None saved ->
   ask the user for the biller and the reference/consumer number, call lookup_bill, show the result,
@@ -128,8 +136,11 @@ class SaveRecipientArgs(BaseModel):
 
 
 class LookupBillArgs(BaseModel):
-    biller_id: str
     consumer_no: str = Field(description="10-14 digit consumer number")
+    biller_id: str | None = Field(None, description="biller id, e.g. from list_billers or a [cards] line")
+    biller_name: str | None = Field(
+        None, description="biller display name (e.g. 'K-Electric') when only the name is known"
+    )
 
 
 class SaveBillerArgs(BaseModel):
@@ -142,6 +153,9 @@ class SendMoneyArgs(BaseModel):
     amount_paisa: int = Field(description="amount in paisa (rupees * 100)")
     recipient_id: str | None = Field(None, description="a saved recipient's id")
     institution_id: str | None = None
+    institution_name: str | None = Field(
+        None, description="bank/wallet display name (e.g. 'Easypaisa') when only the name is known"
+    )
     identifier: str | None = Field(None, description="phone (wallets) or IBAN/account number (banks)")
 
 
@@ -222,7 +236,12 @@ def build_tools(
     async def send_money_runner(
         amount_paisa: int, recipient_id: str | None = None,
         institution_id: str | None = None, identifier: str | None = None,
+        institution_name: str | None = None,
     ) -> str:
+        # The model often only carries the institution's display name across turns (that is
+        # what the recipient card shows) — map it to the real id before the gate runs.
+        if not recipient_id and not institution_id and institution_name:
+            institution_id = await t._institution_id_by_name(client, institution_name) or institution_name
         if not recipient_id and institution_id and identifier:
             key = (institution_id, _norm_identifier(identifier))
             if key not in resolved_pairs:
@@ -242,6 +261,7 @@ def build_tools(
         result = await t.send_money(
             client, amount_paisa=amount_paisa, recipient_id=recipient_id,
             institution_id=institution_id, identifier=identifier,
+            institution_name=institution_name,
         )
         card = result.get("card")
         if card:
@@ -264,7 +284,8 @@ def build_tools(
         description=(
             "Prepare sending money (creates a confirmation card; the user confirms with PIN). "
             "Provide amount_paisa and EITHER recipient_id (from search_recipients) OR "
-            "institution_id+identifier. Call this the moment the user confirms a recipient card "
+            "identifier plus institution_id (or institution_name if only the display name is "
+            "known — it is mapped to the id for you). Call this the moment the user confirms a recipient card "
             "you (or an earlier turn of this same conversation) already showed for that "
             "institution_id+identifier — do NOT call resolve_recipient again first just because "
             "its own tool call isn't visible in this turn; the confirmation itself is the signal "
@@ -292,7 +313,9 @@ def build_tools(
              "user asks to save or accepts the app's save prompt after a successful send.",
              SaveRecipientArgs),
         wrap(t.list_billers, "list_billers", "List bill companies (electricity/gas/internet/water) with their ids.", NoArgs),
-        wrap(t.lookup_bill, "lookup_bill", "Look up a bill for a biller_id + consumer number.", LookupBillArgs),
+        wrap(t.lookup_bill, "lookup_bill",
+             "Look up a bill for a consumer number plus either biller_id or biller_name (the "
+             "display name is mapped to the id for you).", LookupBillArgs),
         wrap(t.list_due_bills, "list_due_bills",
              "List the user's currently due bills (each due bill returns its own bill card), "
              "including due bills of saved billers.", NoArgs),
@@ -339,7 +362,8 @@ async def run_agent(
     agent = create_react_agent(model, build_tools(client, cards, resolved_pairs))
     messages: list[BaseMessage] = [SystemMessage(content=system_prompt(language)), *history, HumanMessage(content=user_text)]
     state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
-    reply = _last_reply(state)
+    reply = strip_cards_marker(_last_reply(state))
+    extra_invocations = 0  # capped at MAX_NUDGES across the two content nudges below
 
     # Guard: the model must not promise a card it never created. If it talks about a
     # card/confirmation but no tool produced one, re-prompt exactly once with the
@@ -347,7 +371,27 @@ async def run_agent(
     if not cards and _mentions_card(reply):
         nudged = [*state["messages"], HumanMessage(content=NUDGE)]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-        reply = _last_reply(state)
+        reply = strip_cards_marker(_last_reply(state))
+        extra_invocations += 1
+
+    # Guard: the model sometimes ASKS in prose for something a tool would answer with
+    # tappable chips ("which bank or wallet?", "which biller / what reference number?").
+    # Elderly voice-first users cannot type an institution id, so a prose question is a
+    # dead end. If no tool ran this turn and the ask is one of those, re-prompt once.
+    if extra_invocations < MAX_NUDGES and not _called_a_tool(state):
+        prose_nudge = _prose_ask_nudge(user_text, reply)
+        if prose_nudge:
+            nudged = [*state["messages"], HumanMessage(content=prose_nudge)]
+            state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+            reply = strip_cards_marker(_last_reply(state))
+            extra_invocations += 1
+
+    # If the model's whole reply WAS the imitated marker, sanitizing left nothing to speak.
+    if not reply and extra_invocations < MAX_NUDGES:
+        nudged = [*state["messages"], HumanMessage(content=NO_MARKER_NUDGE)]
+        state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+        reply = strip_cards_marker(_last_reply(state))
+        extra_invocations += 1
 
     # Guard: the reply-language rule is a hard requirement. If the UI language is Urdu
     # and the final reply carries no Arabic-script characters, re-prompt exactly once.
@@ -358,6 +402,8 @@ async def run_agent(
     return str(reply), cards
 
 
+MAX_NUDGES = 2
+
 NUDGE = (
     "[SYSTEM CHECK] No card was created because you did not call any action tool. "
     "Do it now: search_recipients/list_institutions → resolve_recipient → send_money, or "
@@ -365,12 +411,57 @@ NUDGE = (
     "then reply. Never describe a card that does not exist."
 )
 URDU_LANGUAGE_NUDGE = "Answer in Urdu (Nastaliq script) only."
+INSTITUTION_NUDGE = (
+    "[SYSTEM CHECK] You asked for the bank/wallet in prose. Call list_institutions now so the "
+    "user gets tappable choices, then ask."
+)
+BILLER_NUDGE = (
+    "[SYSTEM CHECK] You asked for the biller/reference number in prose. Call list_saved_billers "
+    "(or list_billers) now so the user gets tappable choices, then ask."
+)
+NO_MARKER_NUDGE = (
+    "[SYSTEM CHECK] Your reply was the internal [cards] context line, not speech. Reply again "
+    "in one or two plain spoken sentences, with no [cards] marker, no ids and no JSON."
+)
 _CARD_WORDS = ("کارڈ", "تصدیق", "card", "confirm")
+
+# A phone / account number (10+ digits, optional + and spaces) or a Pakistani IBAN.
+_IDENTIFIER_RE = re.compile(r"(?:\+?\d[\d\s-]{9,}\d)|(?:PK\d{2}[A-Z]{4}\d{16})", re.IGNORECASE)
+_ASKS_INSTITUTION_RE = re.compile(
+    r"which bank|bank or wallet|which wallet|کون سا بینک|بینک یا والٹ|کون سا والٹ", re.IGNORECASE
+)
+_ASKS_BILLER_RE = re.compile(
+    r"which (?:biller|company|provider)|consumer number|reference number|"
+    r"کون سا بلر|کنزیومر نمبر|ریفرنس نمبر", re.IGNORECASE
+)
+_BILL_WORDS_RE = re.compile(r"\bbill\b|\bbills\b|بل", re.IGNORECASE)
+
+
+def strip_cards_marker(reply: str) -> str:
+    """The `[cards]` history lines are model-facing context; Gemini sometimes imitates the
+    format and emits one as its own reply. Cut everything from the marker onward — that
+    text would otherwise be persisted, shown, and spoken aloud."""
+    idx = reply.find("[cards]")
+    return reply if idx < 0 else reply[:idx].strip()
 
 
 def _mentions_card(reply: str) -> bool:
     low = reply.lower()
     return any(w in low for w in _CARD_WORDS)
+
+
+def _called_a_tool(state: dict[str, Any]) -> bool:
+    """Did any tool actually run this turn? (a ToolMessage in the resulting state)."""
+    return any(isinstance(m, ToolMessage) for m in state.get("messages", []))
+
+
+def _prose_ask_nudge(user_text: str, reply: str) -> str | None:
+    """Which prose-instead-of-tool nudge (if any) this turn needs."""
+    if _ASKS_INSTITUTION_RE.search(reply) or _IDENTIFIER_RE.search(user_text):
+        return INSTITUTION_NUDGE
+    if _ASKS_BILLER_RE.search(reply) and _BILL_WORDS_RE.search(user_text + " " + reply):
+        return BILLER_NUDGE
+    return None
 
 
 def _content_text(content: Any) -> str:

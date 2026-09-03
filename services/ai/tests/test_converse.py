@@ -207,3 +207,176 @@ def test_resolved_pairs_from_messages_ignores_non_recipient_cards():
          "cards": [{"kind": "balance", "balancePaisa": 8_450_000}]},
     ]
     assert _resolved_pairs_from_messages(items) == set()
+
+
+# --- multi-turn state: each POST /converse rebuilds history from persisted messages ---
+
+def chat_store(fake_backend):
+    """Stateful fake of the backend chat API: sessions + messages (with cards)."""
+    items: list[dict] = []
+
+    def create_session(req):
+        return httpx.Response(201, json={"success": True, "data": {
+            "id": "sessM", "title": None, "createdAt": "2026-09-02T00:00:00Z"}})
+
+    def add_message(req):
+        body = body_of(req)
+        item = {"id": f"m{len(items) + 1}", "role": body["role"], "text": body["text"],
+                "cards": body.get("cards") or [], "createdAt": "2026-09-02T00:00:00Z"}
+        items.append(item)
+        return httpx.Response(201, json={"success": True, "data": item})
+
+    fake_backend.route("POST", "/api/v1/chat/sessions", responder=create_session)
+    fake_backend.route("POST", "/api/v1/chat/sessions/sessM/messages", responder=add_message)
+    fake_backend.route("GET", "/api/v1/chat/sessions/sessM/messages", responder=lambda req: httpx.Response(
+        200, json={"success": True, "data": {"items": items}}))
+    return items
+
+
+async def run_turn(fake_backend, text, model, session_id=None):
+    """One converse_turn against the fake backend; returns (cards, session_id)."""
+    from app.conversation import converse_turn
+    from app.backend_client import BackendClient
+
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    cards, sid = [], session_id
+    try:
+        async for ev in converse_turn(
+            client, text=text, audio=None, audio_mime=None, session_id=session_id,
+            language="en", tts=StubTts(), transcriber=FakeTranscriber(), model=model,
+        ):
+            data = json.loads(ev["data"])
+            if ev["event"] == "card":
+                cards.append(data["card"])
+            elif ev["event"] == "done":
+                sid = data["sessionId"]
+            elif ev["event"] == "error":
+                raise AssertionError(f"turn errored: {data}")
+    finally:
+        await client.aclose()
+    return cards, sid
+
+
+PENDING_SEND = {
+    "id": "actM", "kind": "send_money", "amountPaisa": 10000, "feePaisa": 0,
+    "summary": {"en": "Send ₨100 to Sara Khan", "ur": "ثارہ خان کو ₨100 بھیجیں"},
+    "lines": [], "requiresPin": True, "expiresAt": "2026-09-02T12:00:00.000Z", "status": "pending",
+}
+INSTITUTIONS = {"items": [
+    {"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet", "popular": True},
+    {"id": "jazzcash", "name": "JazzCash", "urduName": "جاز کیش", "kind": "wallet", "popular": True},
+]}
+
+
+async def test_three_turn_send_keeps_recipient_across_turns(fake_backend):
+    """turn1 chips -> turn2 recipient card -> turn3 'Yes, continue' must produce a
+    confirmation using the ids from the [cards] history line, with NO second resolve call."""
+    from tests.test_agent import RecordingFakeToolModel
+
+    chat_store(fake_backend)
+    fake_backend.route("GET", "/api/v1/institutions", INSTITUTIONS)
+    fake_backend.route("POST", "/api/v1/transfers/resolve", {
+        "title": "Sara Khan",
+        "institution": {"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet"},
+        "identifier": "+923135468810", "linkedUserId": "u9",
+    })
+    fake_backend.route("POST", "/api/v1/transfers", PENDING_SEND)
+
+    cards1, sid = await run_turn(fake_backend, "pay 100 rupees to 03135468810", scripted([
+        AIMessage(content="", tool_calls=[{"name": "list_institutions", "args": {}, "id": "t1"}]),
+        AIMessage(content="Which wallet is that number with?"),
+    ]))
+    assert [c["kind"] for c in cards1] == ["institution_chips"]
+
+    cards2, sid = await run_turn(fake_backend, "Easypaisa", scripted([
+        AIMessage(content="", tool_calls=[{"name": "resolve_recipient", "args": {
+            "institution_id": "easypaisa", "identifier": "+923135468810"}, "id": "t2"}]),
+        AIMessage(content="Send ₨100 to Sara Khan at Easypaisa?"),
+    ]), session_id=sid)
+    assert [c["kind"] for c in cards2] == ["recipient"]
+
+    # Turn 3: the model only carries the institution's NAME, as its history shows.
+    model3 = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {
+            "amount_paisa": 10000, "institution_name": "Easypaisa",
+            "identifier": "+923135468810"}, "id": "t3"}]),
+        AIMessage(content="Please confirm on the card and enter your PIN."),
+    ]))
+    before = len([r for r in fake_backend.requests if r.url.path == "/api/v1/transfers/resolve"])
+    cards3, sid = await run_turn(fake_backend, "Yes, continue", model3, session_id=sid)
+
+    assert [c["kind"] for c in cards3] == ["confirmation"]
+    assert cards3[0]["actionId"] == "actM"
+    # no re-resolve on the confirmation turn
+    after = len([r for r in fake_backend.requests if r.url.path == "/api/v1/transfers/resolve"])
+    assert after == before
+    # the transfer carried the right institution + identifier
+    transfer = body_of([r for r in fake_backend.requests if r.url.path == "/api/v1/transfers"][-1])
+    assert transfer["to"] == {"institutionId": "easypaisa", "identifier": "+923135468810"}
+    # and the model actually saw the machine-readable card facts in its history
+    history_text = "\n".join(str(m.content) for m in model3.received[0])
+    assert "[cards] recipient: institution_id=easypaisa" in history_text
+    assert "identifier=+923135468810" in history_text
+    assert "title=Sara Khan" in history_text
+    assert "[cards] institution_chips: easypaisa:Easypaisa" in history_text
+
+
+async def test_two_turn_bill_pays_from_bill_card_in_history(fake_backend):
+    """A `bill` card shown in turn 1 must let turn 2's 'yes' call pay_bill(bill_id)
+    straight from the history line — no second lookup."""
+    from tests.test_agent import RecordingFakeToolModel
+
+    chat_store(fake_backend)
+    fake_backend.route("GET", "/api/v1/billers", {"items": [
+        {"id": "kel", "name": "K-Electric", "urduName": "کے الیکٹرک", "category": "electricity"}]})
+    fake_backend.route("POST", "/api/v1/bills/lookup", {
+        "billId": "bill7", "consumerName": "Ammi Jaan", "amountPaisa": 432000,
+        "dueDate": "2026-09-10T00:00:00.000Z", "month": "2026-08"})
+    fake_backend.route("POST", "/api/v1/bills/pay", {
+        "id": "actB", "kind": "pay_bill", "amountPaisa": 432000, "feePaisa": 0,
+        "summary": {"en": "Pay K-Electric ₨4,320", "ur": "کے الیکٹرک ₨4,320"},
+        "lines": [], "requiresPin": True, "expiresAt": "2026-09-02T12:00:00.000Z", "status": "pending"})
+
+    # Turn 1 uses biller_name only — it must be mapped to the biller id.
+    cards1, sid = await run_turn(fake_backend, "pay my K-Electric bill 0400012345678", scripted([
+        AIMessage(content="", tool_calls=[{"name": "lookup_bill", "args": {
+            "biller_name": "K-Electric", "consumer_no": "0400012345678"}, "id": "t1"}]),
+        AIMessage(content="Your K-Electric bill is ₨4,320. Pay it?"),
+    ]))
+    assert [c["kind"] for c in cards1] == ["bill"]
+    assert cards1[0]["billId"] == "bill7"
+
+    model2 = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="", tool_calls=[{"name": "pay_bill", "args": {"bill_id": "bill7"}, "id": "t2"}]),
+        AIMessage(content="Please confirm on the card and enter your PIN."),
+    ]))
+    lookups_before = len([r for r in fake_backend.requests if r.url.path == "/api/v1/bills/lookup"])
+    cards2, sid = await run_turn(fake_backend, "yes", model2, session_id=sid)
+
+    assert [c["kind"] for c in cards2] == ["confirmation"]
+    assert cards2[0]["actionId"] == "actB"
+    assert len([r for r in fake_backend.requests if r.url.path == "/api/v1/bills/lookup"]) == lookups_before
+    history_text = "\n".join(str(m.content) for m in model2.received[0])
+    assert "[cards] bill: bill_id=bill7 biller=K-Electric" in history_text
+    assert "amount_paisa=432000" in history_text
+
+
+async def test_send_money_accepts_institution_name_and_maps_it_to_an_id(fake_backend):
+    """Name-only send (no prior resolve in this run): institution_name -> real id."""
+    from app.agent import run_agent
+    from app.backend_client import BackendClient
+
+    fake_backend.route("GET", "/api/v1/institutions", INSTITUTIONS)
+    fake_backend.route("POST", "/api/v1/transfers", PENDING_SEND)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    resolved = {("easypaisa", "+923135468810")}  # confirmed in an earlier turn
+    _, cards = await run_agent(client, [], "Yes, continue", "en", model=scripted([
+        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {
+            "amount_paisa": 10000, "institution_name": "Easypaisa",
+            "identifier": "+923135468810"}, "id": "t1"}]),
+        AIMessage(content="Please confirm on the card."),
+    ]), resolved_pairs=resolved)
+    await client.aclose()
+    assert cards[-1]["kind"] == "confirmation"
+    transfer = body_of([r for r in fake_backend.requests if r.url.path == "/api/v1/transfers"][-1])
+    assert transfer["to"]["institutionId"] == "easypaisa"

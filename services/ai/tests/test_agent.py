@@ -390,3 +390,87 @@ async def test_agent_send_money_allowed_when_model_passes_institution_name_inste
     assert [c["kind"] for c in cards] == ["confirmation"]
     assert cards[-1]["actionId"] == "act15"
     await client.aclose()
+
+
+# --- prose-instead-of-tool nudge ---
+
+INSTITUTIONS_DATA = {"items": [
+    {"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet", "popular": True},
+    {"id": "jazzcash", "name": "JazzCash", "urduName": "جاز کیش", "kind": "wallet", "popular": True},
+]}
+
+
+async def test_prose_bank_question_is_nudged_into_list_institutions(fake_backend):
+    """Turn 1 of a send: the model asks 'which bank or wallet?' in prose with no tool call.
+    One nudge must turn that into a real institution_chips card."""
+    fake_backend.route("GET", "/api/v1/institutions", INSTITUTIONS_DATA)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="Which bank or wallet is this number with?"),
+        AIMessage(content="", tool_calls=[{"name": "list_institutions", "args": {}, "id": "t1"}]),
+        AIMessage(content="Please tap the wallet this number belongs to."),
+    ]))
+    reply, cards = await run_agent(client, [], "pay 100 rupees to 03135468810", "en", model=model)
+    await client.aclose()
+    assert [c["kind"] for c in cards] == ["institution_chips"]
+    assert "tap" in reply.lower()
+    nudges = [m for call in model.received for m in call
+              if "asked for the bank/wallet in prose" in str(m.content)]
+    assert nudges, "institution nudge was never sent"
+
+
+async def test_prose_biller_question_is_nudged_into_list_saved_billers(fake_backend):
+    fake_backend.route("GET", "/api/v1/saved-billers", {"items": [
+        {"id": "sb1", "nickname": "Ghar ka bijli",
+         "biller": {"id": "kel", "name": "K-Electric", "urduName": "کے الیکٹرک", "category": "electricity"},
+         "consumerNo": "0400012345678"},
+        {"id": "sb2", "nickname": "Gas",
+         "biller": {"id": "ssgc", "name": "SSGC", "urduName": "ایس ایس جی سی", "category": "gas"},
+         "consumerNo": "0400099999999"},
+    ]})
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="Which biller is it, and what is your consumer number?"),
+        AIMessage(content="", tool_calls=[{"name": "list_saved_billers", "args": {}, "id": "t1"}]),
+        AIMessage(content="Please tap the biller you want to pay."),
+    ]))
+    reply, cards = await run_agent(client, [], "I want to pay a bill", "en", model=model)
+    await client.aclose()
+    assert [c["kind"] for c in cards] == ["biller_chips"]
+    nudges = [m for call in model.received for m in call
+              if "asked for the biller/reference number in prose" in str(m.content)]
+    assert nudges, "biller nudge was never sent"
+
+
+async def test_prose_nudge_does_not_fire_when_a_tool_already_ran(fake_backend):
+    """A turn that DID call a tool must never be re-invoked by the prose nudge."""
+    fake_backend.route("GET", "/api/v1/me", {"user": {}, "account": {"balancePaisa": 100}, "card": {}})
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="", tool_calls=[{"name": "get_balance", "args": {}, "id": "t1"}]),
+        AIMessage(content="Your balance is ₨1. Which bank or wallet did you mean?"),
+    ]))
+    await run_agent(client, [], "balance for 03135468810?", "en", model=model)
+    await client.aclose()
+    assert len(model.received) == 2  # initial + the post-tool turn, no nudge round
+
+
+async def test_reply_never_leaks_the_cards_context_marker(fake_backend):
+    """Gemini sometimes imitates the [cards] history format as its own reply — that text
+    must never reach the app (it gets persisted and spoken)."""
+    from app.agent import strip_cards_marker
+
+    assert strip_cards_marker('Sara Khan is ready.\n[cards] recipient: id=x') == "Sara Khan is ready."
+    assert strip_cards_marker('[cards]\n{"chips": ["HBL"]}') == ""
+
+    fake_backend.route("GET", "/api/v1/me", {"user": {}, "account": {"balancePaisa": 100}, "card": {}})
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "get_balance", "args": {}, "id": "t1"}]),
+        AIMessage(content='[cards]\n{"balance_paisa": 100}'),
+        AIMessage(content="Your balance is one rupee."),
+    ])
+    reply, _ = await run_agent(client, [], "balance?", "en", model=model)
+    await client.aclose()
+    assert "[cards]" not in reply
+    assert reply == "Your balance is one rupee."
