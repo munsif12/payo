@@ -83,7 +83,6 @@ function BalanceCardView({ card }: { card: ChatCard }) {
 
 function ChipsCardView({ card, onChipTap }: Props) {
   const urdu = useIsUrdu();
-  const { c } = useTheme();
   const prompt = card.prompt as { en: string; ur: string };
   const contacts = card.contacts as { contactId: string; name: string; urduName?: string; detail: string }[];
   return (

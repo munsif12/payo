@@ -51,7 +51,7 @@ export default function Receipt() {
       <View style={{ alignItems: 'center', gap: 10, paddingBottom: space.l }}>
         <Avatar name={name} size={64} />
         <Text variant="hl">{headline}</Text>
-        <Text variant="money">{ltrIsolate(sign + formatPaisa(txn.amountPaisa))}</Text>
+        <Text variant="money" color={amountColor}>{ltrIsolate(sign + formatPaisa(txn.amountPaisa))}</Text>
         <Pill
           label={t('activity.completed')}
           bg={c.greenTint}

@@ -35,19 +35,17 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
 
   const start = async () => {
     try {
-      console.log('[recorder] start; isRecording=', recorder.isRecording);
       if (recorder.isRecording) { await stop(); return; }
       const perm = await AudioModule.requestRecordingPermissionsAsync();
-      console.log('[recorder] permission', perm.granted);
       if (!perm.granted) return;
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       silenceSince.current = null;
       startedAt.current = Date.now();
       await recorder.prepareToRecordAsync();
       recorder.record();
-      console.log('[recorder] recording started');
-    } catch (e) {
-      console.log('[recorder] start failed', String(e));
+    } catch {
+      // mic start failed (permission race, device busy) — surfaced to the user
+      // via the unchanged recording state; nothing to recover here.
     }
   };
 

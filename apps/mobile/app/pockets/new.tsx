@@ -3,7 +3,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react-native';
-import { Screen, Text, Input, Button, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Input, Button } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space, radius } from '../../src/theme/tokens';
 import { useCreatePocketMutation, apiErr } from '../../src/api/client';
@@ -13,7 +13,6 @@ const EMOJIS = ['🕋', '🎓', '🏠', '💍', '🚗', '✈️', '🎁', '🐖'
 export default function NewPocket() {
   const { t } = useTranslation();
   const { c } = useTheme();
-  const urdu = useIsUrdu();
   const router = useRouter();
   const [name, setName] = useState('');
   const [urduName, setUrduName] = useState('');

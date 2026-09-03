@@ -3,7 +3,6 @@ import { Pressable, View, StyleProp, ViewStyle } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 import Animated from 'react-native-reanimated';
 import { useTheme } from '../theme/useTheme';
-import { space } from '../theme/tokens';
 import { usePressScale } from '../motion/usePressScale';
 import { Text, useIsUrdu } from './Text';
 

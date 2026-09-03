@@ -1,5 +1,4 @@
 import React, { forwardRef, useImperativeHandle, useEffect, useRef } from 'react';
-import { View } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, Easing } from 'react-native-reanimated';
 import { useTheme } from '../theme/useTheme';
 import { PIN_DOT_MS, PIN_DOT_SCALE, SHAKE_PX, SHAKE_MS } from '../motion/config';

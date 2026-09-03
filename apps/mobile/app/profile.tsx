@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
-import { Screen, Text, Card, Avatar, useIsUrdu } from '../src/ui';
+import { Screen, Text, Card, Avatar } from '../src/ui';
 import { useTheme } from '../src/theme/useTheme';
 import { space, radius } from '../src/theme/tokens';
 import type { RootState } from '../src/store';
@@ -14,7 +14,6 @@ import i18n from '../src/i18n';
 export default function Profile() {
   const { t } = useTranslation();
   const { c } = useTheme();
-  const urdu = useIsUrdu();
   const router = useRouter();
   const user = useSelector((s: RootState) => s.auth.user);
   const lang = i18n.language;

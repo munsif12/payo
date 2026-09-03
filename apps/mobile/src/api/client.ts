@@ -92,11 +92,6 @@ export const payoApi = createApi({
       transformResponse: (r: Ok<{ items: ContactDto[] }>) => r.data,
       providesTags: ['Contacts'],
     }),
-    createContact: b.mutation<ContactDto, Record<string, unknown>>({
-      query: (body) => ({ url: '/contacts', method: 'POST', body }),
-      transformResponse: (r: Ok<ContactDto>) => r.data,
-      invalidatesTags: ['Contacts'],
-    }),
     banks: b.query<{ items: NamedItem[] }, void>({
       query: () => '/banks',
       transformResponse: (r: Ok<{ items: NamedItem[] }>) => r.data,
@@ -211,7 +206,7 @@ export const payoApi = createApi({
 
 export const {
   useMeQuery, useRequestOtpMutation, useVerifyOtpMutation, useSetPinMutation, useVerifyPinWithOtpMutation,
-  useTransactionsQuery, useContactsQuery, useCreateContactMutation,
+  useTransactionsQuery, useContactsQuery,
   useBanksQuery, useResolveTitleMutation, useCreateTransferMutation,
   useBillersQuery, useDueBillsQuery, useLookupBillMutation, usePayBillMutation,
   useTelcosQuery, useCreateRechargeMutation,

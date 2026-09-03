@@ -7,4 +7,3 @@ export { ListeningRings } from './ListeningRings';
 export { WaveBars } from './WaveBars';
 export { TypingDots } from './TypingDots';
 export { useCountUp } from './useCountUp';
-export { useShake } from './useShake';
