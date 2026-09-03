@@ -17,6 +17,11 @@ const SPEC_LIGHT: Record<string, string> = {
   red: '#D64545',
   redTint: '#FBE3E3',
   navy: '#0D2A3D',
+  avatarBlueTint: '#E3EEF7',
+  avatarBlue: '#2E5B7A',
+  avatarVioletTint: '#EEE6F7',
+  avatarViolet: '#6B4E9B',
+  white: '#FFFFFF',
 };
 
 const SPEC_DARK: Record<string, string> = {
@@ -35,6 +40,11 @@ const SPEC_DARK: Record<string, string> = {
   red: '#F06A6A',
   redTint: '#3A1C1C',
   navy: '#0D2A3D',
+  avatarBlueTint: '#1C2A35',
+  avatarBlue: '#8FB8D6',
+  avatarVioletTint: '#2A2236',
+  avatarViolet: '#B9A3DA',
+  white: '#FFFFFF',
 };
 
 test('light and dark palettes have identical key sets', () => {

@@ -1,46 +1,60 @@
 import React from 'react';
-import { View, Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
-import { Screen, T, Mono, Card, Spacer, Row } from '../src/components/ui';
-import { tokens } from '../src/theme/tokens';
+import { useRouter } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
+import { Screen, Text, Card, Avatar, useIsUrdu } from '../src/ui';
+import { useTheme } from '../src/theme/useTheme';
+import { space, radius } from '../src/theme/tokens';
 import type { RootState } from '../src/store';
+import { ltrIsolate } from '../src/lib/bidi';
 import i18n from '../src/i18n';
 
 export default function Profile() {
   const { t } = useTranslation();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  const router = useRouter();
   const user = useSelector((s: RootState) => s.auth.user);
   const lang = i18n.language;
+  const name = lang === 'ur' && user?.urduName ? user.urduName : user?.name;
 
   return (
     <Screen>
-      <T size={tokens.type.h1} style={{ marginVertical: tokens.space.s }}>{t('profile.title')}</T>
-      <Card>
-        <T size={tokens.type.h2}>{lang === 'ur' && user?.urduName ? user.urduName : user?.name}</T>
-        <Mono color={tokens.color.textMuted}>{user?.email}</Mono>
-        <Mono color={tokens.color.textMuted}>{user?.phone}</Mono>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <Pressable testID="profile-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
+          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
+        </Pressable>
+        <Text variant="h2" weight={800}>{t('profile.title')}</Text>
+      </View>
+
+      <Card style={{ alignItems: 'center', gap: space.s }}>
+        <Avatar name={name ?? '?'} size={64} />
+        <Text variant="h2" center>{name}</Text>
+        {user?.email ? <Text variant="foot" center>{user.email}</Text> : null}
+        {user?.phone ? <Text variant="foot" center>{ltrIsolate(user.phone)}</Text> : null}
       </Card>
-      <Spacer />
-      <T color={tokens.color.textMuted}>{t('profile.language')}</T>
-      <Spacer h={tokens.space.s} />
-      <Row gap={tokens.space.s}>
-        {(['ur', 'en'] as const).map(l => (
+
+      <View style={{ height: space.xl }} />
+      <Text variant="cap" style={{ marginBottom: space.s }}>{t('profile.language')}</Text>
+      <View style={{ flexDirection: 'row', gap: space.s }}>
+        {(['ur', 'en'] as const).map((l) => (
           <Pressable
             key={l}
             testID={`lang-${l}`}
             onPress={() => i18n.changeLanguage(l)}
             style={{
-              flex: 1, borderRadius: tokens.radius.button, paddingVertical: tokens.space.m,
-              backgroundColor: lang === l ? tokens.color.accent : tokens.color.surface,
-              alignItems: 'center',
+              flex: 1, borderRadius: radius.button, paddingVertical: space.m, alignItems: 'center',
+              backgroundColor: lang === l ? c.amber : c.surface,
             }}
           >
-            <T color={lang === l ? tokens.color.bg : tokens.color.text}>
+            <Text weight={600} color={lang === l ? c.navy : c.ink}>
               {l === 'ur' ? t('profile.urdu') : t('profile.english')}
-            </T>
+            </Text>
           </Pressable>
         ))}
-      </Row>
+      </View>
     </Screen>
   );
 }

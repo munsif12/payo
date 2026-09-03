@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import { View, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'react-native-qrcode-svg';
-import { Screen, T, Field, PrimaryButton, Card, ErrorBanner, Spacer, Row } from '../../src/components/ui';
-import { tokens } from '../../src/theme/tokens';
+import { QrCode, ScanLine } from 'lucide-react-native';
+import { Screen, Text, Input, Card, Chip, Button } from '../../src/ui';
+import { useTheme } from '../../src/theme/useTheme';
+import { space } from '../../src/theme/tokens';
 import { useMyQrQuery, useResolveQrMutation, apiErr } from '../../src/api/client';
 
 export default function Qr() {
   const { t } = useTranslation();
+  const { c } = useTheme();
   const router = useRouter();
-  const [tab, setTab] = useState<'mine' | 'scan'>('mine');
+  const params = useLocalSearchParams<{ tab?: 'mine' | 'scan' }>();
+  const [tab, setTab] = useState<'mine' | 'scan'>(params.tab === 'scan' ? 'scan' : 'mine');
   const [pasted, setPasted] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { data: mine } = useMyQrQuery();
@@ -28,41 +32,38 @@ export default function Qr() {
 
   return (
     <Screen>
-      <Row style={{ marginVertical: tokens.space.s, gap: tokens.space.s }}>
-        {(['mine', 'scan'] as const).map(k => (
-          <Pressable
-            key={k}
-            testID={`qr-tab-${k}`}
-            onPress={() => setTab(k)}
-            style={{
-              flex: 1, borderRadius: tokens.radius.pill, paddingVertical: tokens.space.s,
-              backgroundColor: tab === k ? tokens.color.accent : tokens.color.surface,
-            }}
-          >
-            <T center color={tab === k ? tokens.color.bg : tokens.color.text}>
-              {t(k === 'mine' ? 'qr.myCode' : 'qr.scan')}
-            </T>
-          </Pressable>
-        ))}
-      </Row>
+      <View style={{ flexDirection: 'row', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <Chip
+          testID="qr-tab-mine"
+          label={t('qr.myCode')}
+          selected={tab === 'mine'}
+          onPress={() => setTab('mine')}
+        />
+        <Chip
+          testID="qr-tab-scan"
+          label={t('qr.scan')}
+          selected={tab === 'scan'}
+          onPress={() => setTab('scan')}
+        />
+      </View>
 
       {tab === 'mine' ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Card style={{ backgroundColor: '#FFFFFF', padding: tokens.space.xl }}>
-            {mine ? <QRCode value={mine.payload} size={220} /> : <T>{t('common.loading')}</T>}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.l }}>
+          <Card padding={space.xl} style={{ backgroundColor: c.white }}>
+            {mine ? <QRCode value={mine.payload} size={220} /> : <QrCode size={64} color={c.ink3} strokeWidth={1.5} />}
           </Card>
-          <Spacer />
-          <T center color={tokens.color.textMuted}>{t('qr.myCodeHint')}</T>
+          <Text variant="sub" center>{t('qr.myCodeHint')}</Text>
         </View>
       ) : (
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          {/* Camera scanning is unavailable on simulators — paste fallback keeps the flow testable. */}
-          <T center color={tokens.color.textMuted}>{t('qr.pasteHint')}</T>
-          <Spacer h={tokens.space.s} />
-          <Field testID="qr-paste" placeholder="payo:v1:…" autoCapitalize="none" value={pasted} onChangeText={setPasted} />
-          <ErrorBanner message={error} />
-          <Spacer />
-          <PrimaryButton testID="qr-resolve" label={t('common.next')} onPress={onResolve} disabled={!pasted.trim()} loading={isLoading} />
+        <View style={{ flex: 1, justifyContent: 'center', gap: space.l }}>
+          <View style={{ alignItems: 'center', gap: space.m }}>
+            <ScanLine size={40} color={c.ink3} strokeWidth={1.5} />
+            {/* Camera scanning is unavailable on simulators — paste fallback keeps the flow testable. */}
+            <Text variant="sub" center>{t('qr.pasteHint')}</Text>
+          </View>
+          <Input testID="qr-paste" placeholder="payo:v1:…" autoCapitalize="none" value={pasted} onChangeText={setPasted} />
+          {error ? <Text variant="sub" color={c.red} center>{error}</Text> : null}
+          <Button testID="qr-resolve" label={t('common.next')} onPress={onResolve} disabled={!pasted.trim()} loading={isLoading} />
         </View>
       )}
     </Screen>

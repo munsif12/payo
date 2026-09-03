@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Pressable, Modal, Alert } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
-import { Screen, T, Mono, ListRow, PrimaryButton, ErrorBanner, Spacer, Row, useUrdu } from '../../src/components/ui';
-import { tokens } from '../../src/theme/tokens';
+import { useRouter } from 'expo-router';
+import { ChevronLeft, FileText, Download } from 'lucide-react-native';
+import { Screen, Text, Card, Button, Pill, useIsUrdu } from '../../src/ui';
+import { useTheme } from '../../src/theme/useTheme';
+import { space, radius } from '../../src/theme/tokens';
 import { useStatementsQuery, useGenerateStatementMutation, apiErr } from '../../src/api/client';
 import { apiBase } from '../../src/lib/backendUrl';
 import type { RootState } from '../../src/store';
 import { formatPaisa } from '../../src/lib/money';
+import { ltrIsolate } from '../../src/lib/bidi';
 
 const UR_MONTHS = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'];
 const EN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export default function Statements() {
   const { t } = useTranslation();
-  const urdu = useUrdu();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  const router = useRouter();
   const token = useSelector((s: RootState) => s.auth.token);
   const { data } = useStatementsQuery();
   const [generate, { isLoading }] = useGenerateStatementMutation();
@@ -72,56 +78,85 @@ export default function Statements() {
 
   return (
     <Screen>
-      <Row style={{ justifyContent: 'space-between', marginVertical: tokens.space.s }}>
-        <T size={tokens.type.h1}>{t('statements.title')}</T>
-        <Pressable testID="statement-new" onPress={() => setPickerOpen(true)}
-          style={{ backgroundColor: tokens.color.accent, borderRadius: tokens.radius.pill, paddingHorizontal: tokens.space.m, paddingVertical: 6 }}>
-          <T size={tokens.type.caption} color={tokens.color.bg}>{t('statements.generate')}</T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <Pressable testID="statements-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
+          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
         </Pressable>
-      </Row>
-      <ErrorBanner message={error} />
-      <ScrollView>
-        {(data?.items ?? []).length === 0 && <T center color={tokens.color.textMuted}>{t('statements.empty')}</T>}
-        {(data?.items ?? []).map(s => (
-          <ListRow
-            key={s.id}
-            testID={`statement-${s.id}`}
-            left={<T size={24}>📄</T>}
-            title={<T>{label({ year: s.year, month: s.month })}</T>}
-            subtitle={
-              <Mono size={tokens.type.caption} color={tokens.color.textMuted} weight="400">
-                {`${t('statements.moneyIn')} ${formatPaisa(s.totalInPaisa)} · ${t('statements.moneyOut')} ${formatPaisa(s.totalOutPaisa)}`}
-              </Mono>
-            }
-            right={
-              <Pressable testID={`statement-download-${s.id}`} onPress={() => openPdf(s.id)}
-                style={{ backgroundColor: tokens.color.accent, borderRadius: tokens.radius.pill, paddingHorizontal: tokens.space.m, paddingVertical: 8 }}>
-                <T size={tokens.type.caption} color={tokens.color.bg}>{t('statements.download')}</T>
+        <Text variant="h2" weight={800}>{t('statements.title')}</Text>
+      </View>
+
+      {error ? <Text color={c.red} center style={{ marginBottom: space.m }}>{error}</Text> : null}
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
+        <Card style={{ gap: space.s }}>
+          <Text variant="cap">{t('statements.requestOne')}</Text>
+          <Pressable
+            testID="statement-new"
+            onPress={() => setPickerOpen(true)}
+            style={{
+              height: 48, borderRadius: radius.input, backgroundColor: c.surface2,
+              alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.m,
+            }}
+          >
+            <Text color={c.ink3}>{options[0] ? label(options[0]) : ''}</Text>
+          </Pressable>
+          <Text variant="foot">{t('statements.requestFoot')}</Text>
+        </Card>
+
+        <View>
+          <Text variant="cap" style={{ marginBottom: 4 }}>{t('statements.readyTitle')}</Text>
+          {(data?.items ?? []).length === 0 && <Text color={c.ink3} center>{t('statements.empty')}</Text>}
+          {(data?.items ?? []).map((s, i, arr) => (
+            <View
+              key={s.id}
+              testID={`statement-${s.id}`}
+              style={{
+                flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: 14, paddingVertical: 14,
+                borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: c.separator,
+              }}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <FileText size={20} color={c.ink2} strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="hl" numberOfLines={1}>{label({ year: s.year, month: s.month })}</Text>
+                <Text variant="foot" numberOfLines={1}>
+                  {ltrIsolate(`${t('statements.moneyIn')} ${formatPaisa(s.totalInPaisa)} · ${t('statements.moneyOut')} ${formatPaisa(s.totalOutPaisa)}`)}
+                </Text>
+              </View>
+              <Pressable testID={`statement-download-${s.id}`} onPress={() => openPdf(s.id)}>
+                <Pill label="PDF" bg={c.amberTint} color={c.navy} icon={<Download size={14} color={c.navy} strokeWidth={2.6} />} />
               </Pressable>
-            }
-          />
-        ))}
+            </View>
+          ))}
+        </View>
       </ScrollView>
 
       <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <View style={{ backgroundColor: tokens.color.surface, borderTopLeftRadius: tokens.radius.card, borderTopRightRadius: tokens.radius.card, padding: tokens.space.l, maxHeight: '75%' }}>
+          <View style={{ backgroundColor: c.surface, borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.l, maxHeight: '75%', gap: space.m }}>
             {confirming ? (
               <>
-                <T size={tokens.type.h2} center>{t('statements.confirmTitle')}</T>
-                <T center color={tokens.color.textMuted}>{label(confirming)}</T>
-                <Spacer />
-                <PrimaryButton testID="statement-confirm" label={t('common.confirm')} onPress={onGenerate} loading={isLoading} />
-                <Spacer h={tokens.space.s} />
-                <PrimaryButton label={t('common.cancel')} onPress={() => setConfirming(null)} danger />
+                <Text variant="h2" center>{t('statements.confirmTitle')}</Text>
+                <Text color={c.ink3} center>{label(confirming)}</Text>
+                <Button testID="statement-confirm" label={t('common.confirm')} onPress={onGenerate} loading={isLoading} />
+                <Button variant="ghost" label={t('common.cancel')} onPress={() => setConfirming(null)} />
               </>
             ) : (
-              <ScrollView>
+              <ScrollView contentContainerStyle={{ gap: 4 }}>
                 {options.map((o, i) => (
-                  <ListRow key={i} testID={`statement-option-${i}`} onPress={() => setConfirming(o)}
-                    left={<T size={22}>📅</T>} title={<T>{label(o)}</T>} />
+                  <Pressable
+                    key={i}
+                    testID={`statement-option-${i}`}
+                    onPress={() => setConfirming(o)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.separator }}
+                  >
+                    <FileText size={20} color={c.ink2} strokeWidth={2} />
+                    <Text variant="hl">{label(o)}</Text>
+                  </Pressable>
                 ))}
-                <PrimaryButton label={t('common.cancel')} onPress={() => setPickerOpen(false)} danger />
+                <View style={{ height: space.s }} />
+                <Button variant="ghost" label={t('common.cancel')} onPress={() => setPickerOpen(false)} />
               </ScrollView>
             )}
           </View>

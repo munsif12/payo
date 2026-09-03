@@ -2,16 +2,20 @@ import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Screen, T, Field, PrimaryButton, ListRow, ErrorBanner, Spacer, Row, useUrdu } from '../src/components/ui';
-import { tokens } from '../src/theme/tokens';
+import { Smartphone } from 'lucide-react-native';
+import { Screen, Text, Input, ListRow, Chip, Button, useIsUrdu } from '../src/ui';
+import { useTheme } from '../src/theme/useTheme';
+import { space } from '../src/theme/tokens';
 import { useTelcosQuery, useCreateRechargeMutation, apiErr } from '../src/api/client';
 import { holdAction } from '../src/store/pendingActionHolder';
+import { formatPaisa } from '../src/lib/money';
 
 const PRESETS_RS = [100, 500, 1000];
 
 export default function Recharge() {
   const { t } = useTranslation();
-  const urdu = useUrdu();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
   const router = useRouter();
   const [telcoId, setTelcoId] = useState<string | null>(null);
   const [phone, setPhone] = useState('+92');
@@ -33,44 +37,31 @@ export default function Recharge() {
 
   return (
     <Screen>
-      <T size={tokens.type.h1} style={{ marginVertical: tokens.space.s }}>{t('recharge.title')}</T>
-      <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-        <T color={tokens.color.textMuted}>{t('recharge.chooseTelco')}</T>
-        <Spacer h={tokens.space.s} />
-        {(telcos?.items ?? []).map(tc => (
+      <Text variant="h1" style={{ paddingTop: space.l, marginBottom: space.l }}>{t('recharge.title')}</Text>
+      <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
+        <Text variant="sub">{t('recharge.chooseTelco')}</Text>
+        {(telcos?.items ?? []).map((tc) => (
           <ListRow
             key={tc.id}
             testID={`telco-${tc.name}`}
             onPress={() => setTelcoId(tc.id)}
-            left={<T size={22}>{telcoId === tc.id ? '✅' : '📱'}</T>}
-            title={<T>{urdu ? tc.urduName : tc.name}</T>}
+            left={
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: telcoId === tc.id ? c.amberTint : c.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                <Smartphone size={20} color={telcoId === tc.id ? c.navy : c.ink2} strokeWidth={2.2} />
+              </View>
+            }
+            title={urdu ? tc.urduName : tc.name}
           />
         ))}
-        <Field testID="recharge-phone" placeholder={t('recharge.phone')} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-        <Spacer h={tokens.space.s} />
-        <Row>
-          {PRESETS_RS.map(rs => (
-            <View key={rs} style={{ flex: 1 }}>
-              <T
-                center
-                color={rupees === String(rs) ? tokens.color.bg : tokens.color.text}
-                style={{
-                  backgroundColor: rupees === String(rs) ? tokens.color.accent : tokens.color.surface,
-                  borderRadius: tokens.radius.pill, overflow: 'hidden', paddingVertical: tokens.space.s,
-                }}
-                // @ts-expect-error Text onPress
-                onPress={() => setRupees(String(rs))}
-              >
-                {'₨' + rs}
-              </T>
-            </View>
+        <Input testID="recharge-phone" placeholder={t('recharge.phone')} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {PRESETS_RS.map((rs) => (
+            <Chip key={rs} label={formatPaisa(rs * 100)} selected={rupees === String(rs)} onPress={() => setRupees(String(rs))} />
           ))}
-        </Row>
-        <Spacer h={tokens.space.s} />
-        <Field testID="recharge-amount" keyboardType="number-pad" value={rupees} onChangeText={setRupees} />
-        <ErrorBanner message={error} />
-        <Spacer />
-        <PrimaryButton
+        </View>
+        <Input testID="recharge-amount" keyboardType="number-pad" value={rupees} onChangeText={setRupees} />
+        {error ? <Text variant="sub" color={c.red} center>{error}</Text> : null}
+        <Button
           testID="recharge-next"
           label={t('common.next')}
           onPress={submit}

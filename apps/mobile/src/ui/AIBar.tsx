@@ -24,7 +24,7 @@ export function AIBar({ onPress, style }: { onPress: () => void; style?: StylePr
   // so it swaps to the dark palette's surface2, with amber mic unchanged and
   // ink (not literal white) for text/icon contrast.
   const barBg = dark ? c.surface2 : c.navy;
-  const textColor = dark ? c.ink : '#FFFFFF';
+  const textColor = dark ? c.ink : c.white;
   const overlayBg = dark ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)';
 
   return (

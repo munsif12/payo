@@ -18,6 +18,11 @@ export interface Palette {
   red: string;
   redTint: string;
   navy: string;
+  avatarBlueTint: string;
+  avatarBlue: string;
+  avatarVioletTint: string;
+  avatarViolet: string;
+  white: string;
 }
 
 export const light: Palette = {
@@ -36,6 +41,11 @@ export const light: Palette = {
   red: '#D64545',
   redTint: '#FBE3E3',
   navy: '#0D2A3D',
+  avatarBlueTint: '#E3EEF7',
+  avatarBlue: '#2E5B7A',
+  avatarVioletTint: '#EEE6F7',
+  avatarViolet: '#6B4E9B',
+  white: '#FFFFFF',
 };
 
 export const dark: Palette = {
@@ -56,6 +66,11 @@ export const dark: Palette = {
   // Dark keeps the same navy — Wallet.dc.html / Main.dc.html AI bar & bubbles
   // stay navy in both themes (it is already dark).
   navy: '#0D2A3D',
+  avatarBlueTint: '#1C2A35',
+  avatarBlue: '#8FB8D6',
+  avatarVioletTint: '#2A2236',
+  avatarViolet: '#B9A3DA',
+  white: '#FFFFFF',
 };
 
 // Type scale — Foundations.dc.html .money/.h1/.h2/.hl/.body/.sub/.foot/.cap

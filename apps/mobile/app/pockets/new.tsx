@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { ScrollView } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Screen, T, Field, PrimaryButton, ErrorBanner, Spacer, Row, useUrdu } from '../../src/components/ui';
-import { tokens } from '../../src/theme/tokens';
+import { ChevronLeft } from 'lucide-react-native';
+import { Screen, Text, Input, Button, useIsUrdu } from '../../src/ui';
+import { useTheme } from '../../src/theme/useTheme';
+import { space, radius } from '../../src/theme/tokens';
 import { useCreatePocketMutation, apiErr } from '../../src/api/client';
 
 const EMOJIS = ['🕋', '🎓', '🏠', '💍', '🚗', '✈️', '🎁', '🐖'];
 
 export default function NewPocket() {
   const { t } = useTranslation();
-  const urdu = useUrdu();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
   const router = useRouter();
   const [name, setName] = useState('');
   const [urduName, setUrduName] = useState('');
@@ -34,27 +37,35 @@ export default function NewPocket() {
 
   return (
     <Screen>
-      <T size={tokens.type.h1} style={{ marginVertical: tokens.space.s }}>{t('pockets.new')}</T>
-      <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-        <Row style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
-          {EMOJIS.map(e => (
-            <T key={e} size={30}
-              style={{ padding: tokens.space.s, opacity: emoji === e ? 1 : 0.4 }}
-              // @ts-expect-error Text onPress
-              onPress={() => setEmoji(e)}>
-              {e}
-            </T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <Pressable testID="pocket-new-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
+          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
+        </Pressable>
+        <Text variant="h2" weight={800}>{t('pockets.new')}</Text>
+      </View>
+
+      <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.m, paddingBottom: space.xl }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space.xs }}>
+          {EMOJIS.map((e) => (
+            <Pressable
+              key={e}
+              testID={`pocket-emoji-${e}`}
+              onPress={() => setEmoji(e)}
+              hitSlop={6}
+              style={{
+                width: 48, height: 48, borderRadius: radius.tile, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: emoji === e ? c.amberTint : 'transparent',
+              }}
+            >
+              <Text style={{ fontSize: 26 }}>{e}</Text>
+            </Pressable>
           ))}
-        </Row>
-        <Spacer h={tokens.space.s} />
-        <Field testID="pocket-name" placeholder={t('pockets.name')} value={name} onChangeText={setName} />
-        <Spacer h={tokens.space.s} />
-        <Field testID="pocket-urduName" placeholder={t('pockets.urduName')} value={urduName} onChangeText={setUrduName} rtl />
-        <Spacer h={tokens.space.s} />
-        <Field testID="pocket-goal" placeholder={t('pockets.goal')} keyboardType="number-pad" value={goalRs} onChangeText={setGoalRs} />
-        <ErrorBanner message={error} />
-        <Spacer />
-        <PrimaryButton testID="pocket-create" label={t('common.save')} onPress={submit} disabled={!name.trim() || !emoji} loading={isLoading} />
+        </View>
+        <Input testID="pocket-name" placeholder={t('pockets.name')} value={name} onChangeText={setName} />
+        <Input testID="pocket-urduName" placeholder={t('pockets.urduName')} value={urduName} onChangeText={setUrduName} style={{ textAlign: 'right', writingDirection: 'rtl' }} />
+        <Input testID="pocket-goal" placeholder={t('pockets.goal')} keyboardType="number-pad" value={goalRs} onChangeText={setGoalRs} />
+        {error ? <Text color={c.red} center>{error}</Text> : null}
+        <Button testID="pocket-create" label={t('common.save')} onPress={submit} disabled={!name.trim() || !emoji} loading={isLoading} />
       </ScrollView>
     </Screen>
   );

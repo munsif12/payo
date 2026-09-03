@@ -199,7 +199,7 @@ function Bubble({ message, onChipTap }: { message: ChatMessage; onChipTap: (t: s
       >
         {isError && <Text variant="sub" weight={700} color={c.red}>{t('voice.errorPrefix')}</Text>}
         {message.text ? (
-          <Text style={{ fontSize: 16, lineHeight: 22 }} color={isError ? c.red : isUser ? '#FFFFFF' : c.ink}>
+          <Text style={{ fontSize: 16, lineHeight: 22 }} color={isError ? c.red : isUser ? c.white : c.ink}>
             {message.text}
           </Text>
         ) : null}

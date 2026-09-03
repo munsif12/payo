@@ -65,7 +65,7 @@ export function Composer({ value, onChangeText, onSubmit, placeholder, hint, lis
                 pressStyle,
               ]}
             >
-              <X size={26} color="#FFFFFF" strokeWidth={2.6} />
+              <X size={26} color={c.white} strokeWidth={2.6} />
             </AnimatedPressable>
           </View>
         ) : (

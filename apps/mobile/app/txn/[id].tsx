@@ -1,55 +1,88 @@
 import React from 'react';
-import { View, Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Screen, T, Mono, MoneyText, Card, Spacer, Row, useUrdu } from '../../src/components/ui';
-import { tokens } from '../../src/theme/tokens';
+import { ChevronLeft, Check, Download } from 'lucide-react-native';
+import { Screen, Text, Card, Button, Avatar, Pill, useIsUrdu } from '../../src/ui';
+import { useTheme } from '../../src/theme/useTheme';
+import { space } from '../../src/theme/tokens';
+import { formatPaisa } from '../../src/lib/money';
+import { ltrIsolate } from '../../src/lib/bidi';
 import type { Txn } from '../../src/api/types';
+
+function DetailRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  return (
+    <View style={{
+      flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between',
+      paddingVertical: 12, borderBottomWidth: last ? 0 : 1, borderBottomColor: c.separator,
+    }}>
+      <Text variant="sub">{label}</Text>
+      <Text variant="hl">{value}</Text>
+    </View>
+  );
+}
 
 export default function Receipt() {
   const { t } = useTranslation();
-  const urdu = useUrdu();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
   const router = useRouter();
   const { data } = useLocalSearchParams<{ data: string }>();
   const txn: Txn = JSON.parse(data!);
 
+  const name = urdu && txn.counterparty.urduName ? txn.counterparty.urduName : txn.counterparty.name;
+  const sign = txn.direction === 'in' ? '+' : '−';
+  const amountColor = txn.direction === 'in' ? c.green : c.ink;
+  const headline = txn.direction === 'in'
+    ? t('activity.receivedFrom', { name })
+    : t('activity.sentTo', { name });
+
   return (
     <Screen>
-      <Row style={{ justifyContent: 'space-between', paddingVertical: tokens.space.s }}>
-        <T size={tokens.type.h1}>{t('activity.receipt')}</T>
-        <Pressable testID="receipt-close" onPress={() => router.back()}>
-          <T size={tokens.type.h2} color={tokens.color.textMuted}>✕</T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <Pressable testID="receipt-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
+          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
         </Pressable>
-      </Row>
-      <Spacer />
-      <Card style={{ alignItems: 'center' }}>
-        <T size={40}>{txn.direction === 'in' ? '⬇️' : '⬆️'}</T>
-        <MoneyText paisa={txn.amountPaisa} color={txn.direction === 'in' ? tokens.color.success : tokens.color.text} center />
-        <T color={tokens.color.textMuted} center>
-          {urdu && txn.counterparty.urduName ? txn.counterparty.urduName : txn.counterparty.name}
-        </T>
-        <Spacer h={tokens.space.l} />
-        <View style={{ alignSelf: 'stretch', gap: tokens.space.s }}>
-          <Row style={{ justifyContent: 'space-between' }}>
-            <T size={tokens.type.caption} color={tokens.color.textMuted}>{t('activity.refNo')}</T>
-            <Mono size={tokens.type.caption}>{txn.refNo}</Mono>
-          </Row>
-          <Row style={{ justifyContent: 'space-between' }}>
-            <T size={tokens.type.caption} color={tokens.color.textMuted}>{t('activity.date')}</T>
-            <Mono size={tokens.type.caption}>{new Date(txn.createdAt).toLocaleString()}</Mono>
-          </Row>
-          <Row style={{ justifyContent: 'space-between' }}>
-            <T size={tokens.type.caption} color={tokens.color.textMuted}>{t('activity.type')}</T>
-            <Mono size={tokens.type.caption}>{txn.type}</Mono>
-          </Row>
-          {txn.feePaisa > 0 && (
-            <Row style={{ justifyContent: 'space-between' }}>
-              <T size={tokens.type.caption} color={tokens.color.textMuted}>{t('common.fee')}</T>
-              <MoneyText paisa={txn.feePaisa} size={tokens.type.caption} />
-            </Row>
-          )}
-        </View>
+        <Text variant="h2" weight={800}>{t('activity.receipt')}</Text>
+      </View>
+
+      <View style={{ alignItems: 'center', gap: 10, paddingBottom: space.l }}>
+        <Avatar name={name} size={64} />
+        <Text variant="hl">{headline}</Text>
+        <Text variant="money">{ltrIsolate(sign + formatPaisa(txn.amountPaisa))}</Text>
+        <Pill
+          label={t('activity.completed')}
+          bg={c.greenTint}
+          color={c.green}
+          icon={<Check size={14} color={c.green} strokeWidth={3} />}
+        />
+      </View>
+
+      <Card padding={0} style={{ paddingHorizontal: space.l }}>
+        <DetailRow label={t('activity.date')} value={new Date(txn.createdAt).toLocaleString()} />
+        <DetailRow label={t('activity.to')} value={name} />
+        <DetailRow label={t('common.fee')} value={ltrIsolate(formatPaisa(txn.feePaisa))} />
+        <DetailRow label={t('activity.category')} value={txnCategoryLabel(txn.type, t)} />
+        <DetailRow label={t('activity.refNo')} value={ltrIsolate(txn.refNo)} last />
       </Card>
+
+      <View style={{ height: space.l }} />
+      <Button testID="receipt-save" variant="secondary" label={t('activity.saveReceipt')} icon={<Download size={20} color={c.ink2} strokeWidth={2} />} onPress={() => {}} disabled />
+      <Text variant="foot" center style={{ marginTop: space.s }}>{t('common.comingSoon')}</Text>
     </Screen>
   );
+}
+
+function txnCategoryLabel(type: Txn['type'], t: (k: string) => string): string {
+  switch (type) {
+    case 'bill': return t('activity.filter.bills');
+    case 'recharge': return t('activity.filter.recharge');
+    case 'pocket_deposit':
+    case 'pocket_withdraw':
+      return t('activity.filter.savings');
+    default:
+      return t('activity.filter.transfer');
+  }
 }

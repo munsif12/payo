@@ -48,7 +48,7 @@ export function Chip({ label, selected, onPress, style, testID }: {
         style,
       ]}
     >
-      <Text variant="sub" weight={600} color={selected ? '#FFFFFF' : c.ink2} style={{ lineHeight: undefined, fontSize: 14 }}>
+      <Text variant="sub" weight={600} color={selected ? c.white : c.ink2} style={{ lineHeight: undefined, fontSize: 14 }}>
         {label}
       </Text>
     </AnimatedPressable>

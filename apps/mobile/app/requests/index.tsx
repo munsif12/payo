@@ -1,16 +1,31 @@
 import React from 'react';
-import { FlatList, View, Pressable } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Screen, T, Mono, ListRow, PrimaryButton, Spacer, Row, useUrdu } from '../../src/components/ui';
-import { tokens } from '../../src/theme/tokens';
+import { ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react-native';
+import Animated from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import { Screen, Text, ListRow, Pill, useIsUrdu } from '../../src/ui';
+import { useTheme } from '../../src/theme/useTheme';
+import { space } from '../../src/theme/tokens';
+import { usePressScale } from '../../src/motion/usePressScale';
 import { useRequestsQuery, useApproveRequestMutation, useDeclineRequestMutation } from '../../src/api/client';
 import { holdAction } from '../../src/store/pendingActionHolder';
 import { formatPaisa } from '../../src/lib/money';
+import type { RequestDto } from '../../src/api/types';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const STATUS_COLOR: Record<RequestDto['status'], 'ink2' | 'green' | 'red'> = {
+  pending: 'ink2',
+  approved: 'green',
+  declined: 'red',
+};
 
 export default function Requests() {
   const { t } = useTranslation();
-  const urdu = useUrdu();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
   const router = useRouter();
   const { data, isFetching, refetch } = useRequestsQuery();
   const [approve] = useApproveRequestMutation();
@@ -24,30 +39,39 @@ export default function Requests() {
 
   return (
     <Screen>
-      <Row style={{ justifyContent: 'space-between', marginVertical: tokens.space.s }}>
-        <T size={tokens.type.h1}>{t('requests.title')}</T>
-        <PrimaryButtonSmall label={t('requests.new')} onPress={() => router.push('/requests/new')} />
-      </Row>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: space.l, marginBottom: space.l }}>
+        <Text variant="h1">{t('requests.title')}</Text>
+        <MiniButton testID="requests-new" label={t('requests.new')} icon={<Plus size={16} color={c.navy} strokeWidth={2.4} />} onPress={() => router.push('/requests/new')} />
+      </View>
+
       <FlatList
         data={data?.items ?? []}
         keyExtractor={(x) => x.id}
         refreshing={isFetching}
         onRefresh={refetch}
-        ListEmptyComponent={<T center color={tokens.color.textMuted}>{t('requests.empty')}</T>}
+        ListEmptyComponent={<Text variant="sub" center style={{ marginTop: space.xxl }}>{t('requests.empty')}</Text>}
         renderItem={({ item }) => (
           <ListRow
             testID={`request-${item.id}`}
-            left={<T size={24}>{item.direction === 'incoming' ? '📥' : '📤'}</T>}
-            title={<T>{urdu && item.counterparty.urduName ? item.counterparty.urduName : item.counterparty.name}</T>}
-            subtitle={t(`requests.${item.status}`) + (item.note ? ` · ${item.note}` : '')}
+            left={
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                {item.direction === 'incoming'
+                  ? <ArrowDownLeft size={20} color={c.green} strokeWidth={2.2} />
+                  : <ArrowUpRight size={20} color={c.ink2} strokeWidth={2.2} />}
+              </View>
+            }
+            title={urdu && item.counterparty.urduName ? item.counterparty.urduName : item.counterparty.name}
+            subtitle={item.note ?? undefined}
             right={
-              <View style={{ alignItems: 'flex-end', gap: tokens.space.s }}>
-                <Mono weight="700">{formatPaisa(item.amountPaisa)}</Mono>
-                {item.direction === 'incoming' && item.status === 'pending' && (
-                  <Row gap={tokens.space.s} rtlAware={false}>
-                    <PrimaryButtonSmall label={t('requests.approve')} onPress={() => onApprove(item.id)} testID={`approve-${item.id}`} />
-                    <PrimaryButtonSmall label={t('requests.decline')} danger onPress={() => decline(item.id)} testID={`decline-${item.id}`} />
-                  </Row>
+              <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                <Text variant="hl">{formatPaisa(item.amountPaisa)}</Text>
+                {item.direction === 'incoming' && item.status === 'pending' ? (
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <MiniButton testID={`approve-${item.id}`} label={t('requests.approve')} onPress={() => onApprove(item.id)} />
+                    <MiniButton testID={`decline-${item.id}`} label={t('requests.decline')} danger onPress={() => decline(item.id)} />
+                  </View>
+                ) : (
+                  <Pill label={t(`requests.${item.status}`)} bg={c.surface2} color={c[STATUS_COLOR[item.status]]} height={22} />
                 )}
               </View>
             }
@@ -58,18 +82,34 @@ export default function Requests() {
   );
 }
 
-function PrimaryButtonSmall({ label, onPress, danger, testID }: { label: string; onPress: () => void; danger?: boolean; testID?: string }) {
-  const urdu = useUrdu();
+function MiniButton({ label, onPress, danger, icon, testID }: {
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  icon?: React.ReactNode;
+  testID?: string;
+}) {
+  const { c } = useTheme();
+  const { style, onPressIn, onPressOut } = usePressScale();
   return (
-    <Pressable
+    <AnimatedPressable
       testID={testID}
-      onPress={onPress}
-      style={{
-        backgroundColor: danger ? tokens.color.danger : tokens.color.accent,
-        borderRadius: tokens.radius.pill, paddingHorizontal: tokens.space.m, paddingVertical: 6,
-      }}
+      accessibilityRole="button"
+      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+      onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress(); }}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={[
+        {
+          height: 32, minWidth: 44, paddingHorizontal: 12, borderRadius: 16,
+          backgroundColor: danger ? c.redTint : c.amber,
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+        },
+        style,
+      ]}
     >
-      <T size={tokens.type.caption} color={tokens.color.bg}>{label}</T>
-    </Pressable>
+      {icon}
+      <Text variant="foot" weight={700} color={danger ? c.red : c.navy} style={{ lineHeight: undefined }}>{label}</Text>
+    </AnimatedPressable>
   );
 }
