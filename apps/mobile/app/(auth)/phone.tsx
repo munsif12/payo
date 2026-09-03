@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
 import { Wallet } from 'lucide-react-native';
@@ -22,8 +22,11 @@ export default function Phone() {
   const { c } = useTheme();
   const router = useRouter();
   const dispatch = useDispatch();
+  const { expired } = useLocalSearchParams<{ expired?: string }>();
   const [digits, setDigits] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  // An expired otpToken (enter-pin / create-pin bouncing back here) surfaces as an
+  // inline message on first render; it clears as soon as the user starts typing.
+  const [error, setError] = useState<string | null>(expired ? t('auth.otp.expired') : null);
   const [requestOtp, { isLoading }] = useRequestOtpMutation();
 
   const onDigit = (d: string) => {

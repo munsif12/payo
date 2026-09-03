@@ -44,7 +44,7 @@ function txnTypeLabel(type: Txn['type'], t: (k: string) => string): string {
   }
 }
 
-// Icon-circle rows follow theme tokens only (amberTint/navy neutral, redTint/red
+// Icon-circle rows follow theme tokens only (amberTint/onAmber neutral, redTint/red
 // for bills) rather than Activity.dc.html's extra blue swatch, which isn't a
 // Palette token — see r6b-report.md for this deviation.
 function txnVisual(type: Txn['type']): { icon: LucideIcon | null } {
@@ -194,7 +194,7 @@ export default function Activity() {
                   width: 44, height: 44, borderRadius: 22, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: txn.type === 'bill' ? c.redTint : c.amberTint,
                 }}>
-                  <Icon size={22} color={txn.type === 'bill' ? c.red : c.navy} strokeWidth={2} />
+                  <Icon size={22} color={txn.type === 'bill' ? c.red : c.onAmber} strokeWidth={2} />
                 </View>
               ) : (
                 <Avatar name={name} />

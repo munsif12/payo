@@ -18,6 +18,7 @@ export interface Palette {
   red: string;
   redTint: string;
   navy: string;
+  onAmber: string;
   avatarBlueTint: string;
   avatarBlue: string;
   avatarVioletTint: string;
@@ -41,6 +42,7 @@ export const light: Palette = {
   red: '#D64545',
   redTint: '#FBE3E3',
   navy: '#0D2A3D',
+  onAmber: '#0D2A3D',
   avatarBlueTint: '#E3EEF7',
   avatarBlue: '#2E5B7A',
   avatarVioletTint: '#EEE6F7',
@@ -66,6 +68,7 @@ export const dark: Palette = {
   // Dark keeps the same navy — Wallet.dc.html / Main.dc.html AI bar & bubbles
   // stay navy in both themes (it is already dark).
   navy: '#0D2A3D',
+  onAmber: '#F3F6F8',
   avatarBlueTint: '#1C2A35',
   avatarBlue: '#8FB8D6',
   avatarVioletTint: '#2A2236',
@@ -145,32 +148,3 @@ export const shadow = {
   },
 } as const;
 
-// Legacy token shape kept so existing (pre-revamp) screens keep compiling and
-// keep rendering EXACTLY as before, until each is migrated onto light/dark/
-// type/radius/space/touch/shadow in its own phase. These are frozen to the
-// ORIGINAL literal values from git HEAD (pre-R3) — do NOT derive them from
-// the new palette/scale above, and do NOT edit them to match the new design;
-// un-migrated screens must not silently change. New code must import
-// light/dark/type/radius/space/touch/shadow via useTheme() instead of this.
-export const tokens = {
-  color: {
-    bg: '#0B0F14',           // deep ink
-    surface: '#151B23',
-    surfaceRaised: '#1D2530',
-    accent: '#3DF2B6',       // electric mint
-    accentPressed: '#2BD9A0',
-    text: '#F2F6FA',
-    textMuted: '#93A1B0',
-    danger: '#FF5D6C',
-    success: '#3DF2B6',
-    // light mode
-    lightBg: '#F6F8FA', lightSurface: '#FFFFFF', lightText: '#0B0F14',
-  },
-  radius: { card: 20, button: 16, pill: 999 },
-  space: { xs: 4, s: 8, m: 16, l: 24, xl: 32, xxl: 48 },
-  type: {
-    money: 44, h1: 28, h2: 22, body: 18, caption: 15, // elder-friendly floor: body ≥ 18
-    urduFont: 'NotoNastaliqUrdu', urduLineHeightMult: 1.9, // Nastaliq needs tall lines
-  },
-  touch: { primary: 56 }, // min touch target for primary actions
-} as const;

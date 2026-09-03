@@ -92,7 +92,13 @@ export default function CardScreen() {
           <Snowflake size={22} color={c.ink} strokeWidth={2} />
           <Text variant="sub">{card.frozen ? t('card.unfreeze') : t('card.freeze')}</Text>
         </Pressable>
-        <View style={{ flex: 1, backgroundColor: c.surface, borderRadius: radius.tile, paddingVertical: 14, alignItems: 'center', gap: space.s }}>
+        {/* Not yet wired to a screen — rendered as a plain, dimmed View (not Pressable)
+            so it doesn't invite a tap that does nothing. */}
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{ flex: 1, backgroundColor: c.surface, borderRadius: radius.tile, paddingVertical: 14, alignItems: 'center', gap: space.s, opacity: 0.4 }}
+        >
           <SlidersHorizontal size={22} color={c.ink} strokeWidth={2} />
           <Text variant="sub">{t('card.limits')}</Text>
         </View>

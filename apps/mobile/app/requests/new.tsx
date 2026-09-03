@@ -46,7 +46,7 @@ export default function NewRequest() {
             key={ctc.id}
             testID={`request-contact-${ctc.id}`}
             onPress={() => setPhone(ctc.phone!)}
-            left={<Avatar name={ctc.name} bg={phone === ctc.phone ? c.amberTint : c.surface2} color={phone === ctc.phone ? c.navy : c.ink2} />}
+            left={<Avatar name={ctc.name} bg={phone === ctc.phone ? c.amberTint : c.surface2} color={phone === ctc.phone ? c.onAmber : c.ink2} />}
             title={urdu && ctc.urduName ? ctc.urduName : ctc.name}
             subtitle={ctc.phone}
           />

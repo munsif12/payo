@@ -141,7 +141,7 @@ export default function SendRecipient() {
                   key={b.id}
                   testID={`bank-${b.name.replace(/\s/g, '-')}`}
                   onPress={() => { setBankId(b.id); setResolvedTitle(null); }}
-                  left={<Avatar name={b.name} bg={bankId === b.id ? c.amberTint : c.surface2} color={bankId === b.id ? c.navy : c.ink2} />}
+                  left={<Avatar name={b.name} bg={bankId === b.id ? c.amberTint : c.surface2} color={bankId === b.id ? c.onAmber : c.ink2} />}
                   title={b.name}
                   showChevron
                 />

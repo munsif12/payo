@@ -22,6 +22,7 @@
   "auth.logout": "Log out",
   "auth.otp.change": "Change",
   "auth.otp.demoCode": "Demo build: your code is {{code}}",
+  "auth.otp.expired": "Your session expired — please verify your number again.",
   "auth.otp.resend": "Resend {{time}}",
   "auth.otp.resendNow": "Resend",
   "auth.otp.sentTo": "Sent by SMS to {{phone}}",

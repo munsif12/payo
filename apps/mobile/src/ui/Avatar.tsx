@@ -34,7 +34,7 @@ export function Avatar({ name, size = 44, bg, color, style }: {
         style,
       ]}
     >
-      <Text variant="sub" weight={700} color={color ?? c.navy} style={{ lineHeight: undefined, fontSize: 15 }}>
+      <Text variant="sub" weight={700} color={color ?? c.onAmber} style={{ lineHeight: undefined, fontSize: 15 }}>
         {initials(name)}
       </Text>
     </View>

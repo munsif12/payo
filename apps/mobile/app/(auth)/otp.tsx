@@ -120,8 +120,8 @@ export default function Otp() {
           </View>
         ) : (
           <View style={{ backgroundColor: c.amberTint, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Sparkles size={18} color={c.navy} strokeWidth={2.2} />
-            <Text variant="sub" weight={600} color={c.navy} style={{ flex: 1 }}>
+            <Sparkles size={18} color={c.onAmber} strokeWidth={2.2} />
+            <Text variant="sub" weight={600} color={c.onAmber} style={{ flex: 1 }}>
               {t('auth.otp.demoCode', { code: ltrIsolate(demoOtp) })}
             </Text>
           </View>

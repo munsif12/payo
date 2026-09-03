@@ -65,5 +65,27 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.isRecording, state.metering, state.durationMillis]);
 
+  // Unmount cleanup: a screen using this hook can go away mid-recording (nav away,
+  // tab switch) — stop/unload the native recorder and release the mic session so it
+  // doesn't keep running in the background. Deliberately bypasses `stop()`'s
+  // onFinished callback: the screen is gone, there's nowhere to deliver the result.
+  useEffect(() => {
+    return () => {
+      // The native shared object backing `recorder` may already be torn down by the
+      // time this runs (e.g. React 18 Strict Mode's dev-only mount/unmount/remount, or
+      // a fast reload) — reading `isRecording` or calling `stop()` on it can throw in
+      // that case, and there is nothing left to clean up, so swallow it.
+      try {
+        if (recorder.isRecording) {
+          recorder.stop().catch(() => {});
+          setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+        }
+      } catch {
+        // native object already gone — nothing to release.
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return { recording: state.isRecording, start, stop };
 }

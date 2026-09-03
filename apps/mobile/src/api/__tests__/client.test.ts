@@ -15,3 +15,15 @@ test('non-401 errors and already-signed-out state do not sign out', () => {
   expect(shouldSignOut(401, '/me', false)).toBe(false);
   expect(shouldSignOut(undefined, '/me', true)).toBe(false);
 });
+
+test('/actions/:id/execute is exempted by error CODE, not URL', () => {
+  // A dead session hitting execute still signs out, like anywhere else.
+  expect(shouldSignOut(401, '/actions/abc123/execute', true, 'SESSION_EXPIRED')).toBe(true);
+  expect(shouldSignOut(401, '/actions/abc123/execute', true, 'UNAUTHORIZED')).toBe(true);
+  expect(shouldSignOut(401, '/actions/abc123/execute', true, 'OTP_SCOPE')).toBe(true);
+  // A mistyped or locked-out PIN never signs out, on execute or elsewhere.
+  expect(shouldSignOut(401, '/actions/abc123/execute', true, 'INVALID_PIN')).toBe(false);
+  expect(shouldSignOut(401, '/actions/abc123/execute', true, 'PIN_LOCKED')).toBe(false);
+  expect(shouldSignOut(401, '/me', true, 'INVALID_PIN')).toBe(false);
+  expect(shouldSignOut(401, '/me', true, 'PIN_LOCKED')).toBe(false);
+});

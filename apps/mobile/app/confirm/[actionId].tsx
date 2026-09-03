@@ -98,7 +98,7 @@ export default function ConfirmAction() {
 
         <View style={{ flex: 1, alignItems: 'center', gap: space.xxl, paddingTop: space.l }}>
           <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
-            <Lock size={28} color={c.navy} strokeWidth={2.2} />
+            <Lock size={28} color={c.onAmber} strokeWidth={2.2} />
           </View>
 
           <View style={{ alignItems: 'center' }}>

@@ -125,7 +125,7 @@ export default function Statements() {
                 </Text>
               </View>
               <Pressable testID={`statement-download-${s.id}`} onPress={() => openPdf(s.id)}>
-                <Pill label="PDF" bg={c.amberTint} color={c.navy} icon={<Download size={14} color={c.navy} strokeWidth={2.6} />} />
+                <Pill label="PDF" bg={c.amberTint} color={c.onAmber} icon={<Download size={14} color={c.onAmber} strokeWidth={2.6} />} />
               </Pressable>
             </View>
           ))}

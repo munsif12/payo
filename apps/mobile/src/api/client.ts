@@ -26,7 +26,8 @@ export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBa
   async (args, api, extra) => {
     const result = await rawBaseQuery(args, api, extra);
     const url = typeof args === 'string' ? args : args.url;
-    if (shouldSignOut(result.error?.status, url, !!(api.getState() as RootState).auth.token)) {
+    const code = (result.error?.data as { code?: string } | undefined)?.code;
+    if (shouldSignOut(result.error?.status, url, !!(api.getState() as RootState).auth.token, code)) {
       api.dispatch(signedOut());
     }
     return result;

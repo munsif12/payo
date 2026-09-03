@@ -14,7 +14,7 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import '../global.css';
 import '../src/i18n';
 import i18n from '../src/i18n';
-import { tokens } from '../src/theme/tokens';
+import { useTheme } from '../src/theme/useTheme';
 import { store, RootState } from '../src/store';
 import { hydrated, loadStoredAuth } from '../src/store/authSlice';
 
@@ -82,11 +82,18 @@ export default function RootLayout() {
 
   return (
     <Provider store={store}>
-      <View style={{ flex: 1, backgroundColor: tokens.color.bg }}>
-        <AuthGate>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: tokens.color.bg } }} />
-        </AuthGate>
-      </View>
+      <RootShell />
     </Provider>
+  );
+}
+
+function RootShell() {
+  const { c } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <AuthGate>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />
+      </AuthGate>
+    </View>
   );
 }

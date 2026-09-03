@@ -26,7 +26,7 @@ const TILES: { key: string; icon: LucideIcon; href: TileHref }[] = [
 function avatarHue(c: ReturnType<typeof useTheme>['c'], index: number) {
   const hues = [
     { bg: c.avatarBlueTint, color: c.avatarBlue },
-    { bg: c.amberTint, color: c.navy },
+    { bg: c.amberTint, color: c.onAmber },
     { bg: c.greenTint, color: c.green },
     { bg: c.avatarVioletTint, color: c.avatarViolet },
   ];
@@ -82,7 +82,7 @@ export default function PayHub() {
                 ]}
               >
                 <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon size={22} color={c.navy} strokeWidth={2.2} />
+                  <Icon size={22} color={c.onAmber} strokeWidth={2.2} />
                 </View>
                 <Text variant="hl">{t(key)}</Text>
               </Pressable>

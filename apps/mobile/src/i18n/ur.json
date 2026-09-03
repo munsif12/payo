@@ -22,6 +22,7 @@
   "auth.logout": "لاگ آؤٹ",
   "auth.otp.change": "تبدیل کریں",
   "auth.otp.demoCode": "ڈیمو بلڈ: آپ کا کوڈ {{code}} ہے",
+  "auth.otp.expired": "آپ کا سیشن ختم ہو گیا — براہ کرم اپنا نمبر دوبارہ تصدیق کریں۔",
   "auth.otp.resend": "دوبارہ بھیجیں {{time}}",
   "auth.otp.resendNow": "دوبارہ بھیجیں",
   "auth.otp.sentTo": "SMS کے ذریعے {{phone}} پر بھیجا گیا",

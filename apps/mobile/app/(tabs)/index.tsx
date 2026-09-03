@@ -163,7 +163,7 @@ function SuggestionCard({ suggestion, delay, onPress }: { suggestion: Suggestion
           }}
         >
           <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon size={22} color={c.navy} strokeWidth={2.2} />
+            <Icon size={22} color={c.onAmber} strokeWidth={2.2} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="hl">{suggestion.title}</Text>
@@ -226,7 +226,7 @@ function ListeningContent() {
   const { c } = useTheme();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.l, paddingHorizontal: space.xxl }}>
-      <WaveBars color={c.navy} />
+      <WaveBars color={c.amber} />
       <Text variant="h2" center>{t('home.hint.listening')}</Text>
       <Card style={{ maxWidth: 320 }}>
         <Text center style={{ fontSize: 19, lineHeight: 27 }}>{t('home.hint.speak')}</Text>

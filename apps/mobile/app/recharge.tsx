@@ -47,7 +47,7 @@ export default function Recharge() {
             onPress={() => setTelcoId(tc.id)}
             left={
               <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: telcoId === tc.id ? c.amberTint : c.surface2, alignItems: 'center', justifyContent: 'center' }}>
-                <Smartphone size={20} color={telcoId === tc.id ? c.navy : c.ink2} strokeWidth={2.2} />
+                <Smartphone size={20} color={telcoId === tc.id ? c.onAmber : c.ink2} strokeWidth={2.2} />
               </View>
             }
             title={urdu ? tc.urduName : tc.name}

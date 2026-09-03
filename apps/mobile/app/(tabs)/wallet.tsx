@@ -57,14 +57,16 @@ export default function Wallet() {
       <View style={{ paddingHorizontal: space.gutter }}>
         <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: space.l, paddingBottom: space.s }}>
           <Text variant="h2" weight={800}>{t('wallet.title')}</Text>
-          <Pressable
+          {/* Not yet wired to a notifications screen — plain, dimmed View (not
+              Pressable) so it doesn't invite a tap that does nothing. */}
+          <View
             testID="wallet-notifications"
-            accessibilityRole="button"
-            hitSlop={8}
-            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', opacity: 0.4 }}
           >
             <Bell size={22} color={c.ink} strokeWidth={2} />
-          </Pressable>
+          </View>
         </View>
       </View>
 
@@ -82,7 +84,7 @@ export default function Wallet() {
             {revealed ? (
               <>
                 <Text variant="money">{'₨' + Math.floor(balancePaisa / 100).toLocaleString('en-PK')}</Text>
-                <Text variant="h2" color={c.ink3}>.00</Text>
+                <Text variant="h2" color={c.ink3}>.{String(Math.round(balancePaisa) % 100).padStart(2, '0')}</Text>
               </>
             ) : (
               <Text variant="money">₨ ••••••</Text>
@@ -199,10 +201,10 @@ function TxnRow({ txn, separator }: { txn: Txn; separator: boolean }) {
     >
       {isTransfer ? (
         <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <WalletIcon size={22} color={c.navy} strokeWidth={2} />
+          <WalletIcon size={22} color={c.onAmber} strokeWidth={2} />
         </View>
       ) : (
-        <Avatar name={name} bg={c.amberTint} color={c.navy} />
+        <Avatar name={name} bg={c.amberTint} color={c.onAmber} />
       )}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="hl" numberOfLines={1}>{name}</Text>

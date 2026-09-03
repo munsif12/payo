@@ -51,6 +51,15 @@ export default function EnterPin() {
         setError(err.message);
         return;
       }
+      // The otpToken this screen relies on has expired or is no longer valid
+      // (anything other than a locked-out or mistyped PIN) — the session
+      // can't be recovered here, so clear it and send the user back to
+      // verify their number again, mirroring create-pin.tsx's handling.
+      if (err.code === 'OTP_SCOPE' || err.code === 'UNAUTHORIZED') {
+        dispatch(pendingCleared());
+        router.replace({ pathname: '/(auth)/phone', params: { expired: '1' } });
+        return;
+      }
       dotsRef.current?.shake();
     }
   };
