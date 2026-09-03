@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "jest --runInBand",
+    "typecheck": "tsc --noEmit",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "seed": "tsx src/seed/seed.ts"

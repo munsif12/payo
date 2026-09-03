@@ -22,6 +22,7 @@ export async function resolveQr(req: Request, res: Response) {
   if (parts.length !== 5 || parts[0] !== 'payo' || parts[1] !== 'v1')
     throw new ApiError(400, 'INVALID_QR', 'Not a PAYO QR code');
   const [, , userId, phone, gotSig] = parts;
+  if (!userId || !phone || !gotSig) throw new ApiError(400, 'INVALID_QR', 'Not a PAYO QR code');
   const base = `payo:v1:${userId}:${phone}`;
   const expected = sig(base);
   if (gotSig.length !== expected.length ||

@@ -30,6 +30,17 @@ test('new user path: request-otp → verify-otp → set-pin → session; welcome
   expect(me.body.data.card.last4).toMatch(/^\d{4}$/);
 });
 
+test('a brand-new user defaults to English (spec §1.1) — visible on GET /me', async () => {
+  const phone = '+923001119999';
+  const r = await request(app).post('/api/v1/auth/request-otp').send({ phone });
+  const v = await request(app).post('/api/v1/auth/verify-otp').send({ phone, otp: r.body.data.demoOtp });
+  const sp = await request(app).post('/api/v1/auth/set-pin')
+    .set('Authorization', `Bearer ${v.body.data.otpToken}`).send({ pin: '1234' });
+
+  const me = await request(app).get('/api/v1/me').set('Authorization', `Bearer ${sp.body.data.token}`);
+  expect(me.body.data.user.language).toBe('en');
+});
+
 test('set-pin twice → 409 PIN_ALREADY_SET', async () => {
   const r = await request(app).post('/api/v1/auth/request-otp').send({ phone: PHONE });
   const v = await request(app).post('/api/v1/auth/verify-otp').send({ phone: PHONE, otp: r.body.data.demoOtp });

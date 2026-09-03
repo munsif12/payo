@@ -7,5 +7,5 @@ export function djb2(s: string): number {
 }
 
 export function resolveFakeTitle(iban: string): string {
-  return NAMES[djb2(iban) % NAMES.length];
+  return NAMES[djb2(iban) % NAMES.length] ?? NAMES[0]!;
 }

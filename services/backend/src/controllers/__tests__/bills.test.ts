@@ -51,6 +51,22 @@ test('pay → execute → balance debited, bill paid; re-pay → 410', async () 
   expect(again.status).toBe(410);
 });
 
+test('pay someone else\'s bill → 404 (ownership check)', async () => {
+  const { token: tokenA } = await createVerifiedUser(app);
+  const { token: tokenB } = await createVerifiedUser(app);
+  const biller = await makeBiller();
+
+  const lookup = await request(app).post('/api/v1/bills/lookup')
+    .set('Authorization', `Bearer ${tokenA}`).send({ billerId: String(biller._id), consumerNo: CONSUMER_NO });
+  const { billId } = lookup.body.data;
+
+  const pay = await request(app).post('/api/v1/bills/pay')
+    .set('Authorization', `Bearer ${tokenB}`).send({ billId });
+  expect(pay.status).toBe(404);
+  expect(pay.body.code).toBe('NOT_FOUND');
+  expect((await Bill.findById(billId))!.status).toBe('due');
+});
+
 test('second pending on same bill → executor 410, action back to pending', async () => {
   const { token } = await createVerifiedUser(app);
   const biller = await makeBiller();

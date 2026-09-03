@@ -43,6 +43,7 @@ export async function runSeed() {
   for (const [idx, su] of SEED_USERS.entries()) {
     const user = await User.create({
       name: su.name, urduName: su.urduName, email: su.email, phone: su.phone, pinHash, pinSet: true,
+      language: su.language,
     });
     const rand = mulberry32(idx + 1);
     const panRest = String(Math.floor(rand() * 1e10)).padStart(10, '0');
@@ -60,7 +61,9 @@ export async function runSeed() {
     for (let m = 3; m >= 1; m--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - m, 1);
       const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
-      const salaryPaisa = SALARY_RS[idx] * 100;
+      const salaryRs = SALARY_RS[idx];
+      if (salaryRs === undefined) throw new Error(`No SALARY_RS entry for seed user index ${idx}`);
+      const salaryPaisa = salaryRs * 100;
       txns.push({
         userId: user._id, type: 'p2p', direction: 'in', amountPaisa: salaryPaisa, feePaisa: 0,
         counterparty: { name: 'Salary', urduName: 'تنخواہ', detail: 'Employer' },
@@ -70,7 +73,7 @@ export async function runSeed() {
       net += salaryPaisa;
       const outs = 18 + Math.floor(rand() * 4); // 18–21 spends per month
       for (let i = 0; i < outs; i++) {
-        const tpl = SPEND_TEMPLATES[Math.floor(rand() * SPEND_TEMPLATES.length)];
+        const tpl = SPEND_TEMPLATES[Math.floor(rand() * SPEND_TEMPLATES.length)]!;
         const rs = tpl.minRs + Math.floor(rand() * (tpl.maxRs - tpl.minRs));
         const amountPaisa = rs * 100;
         const day = 1 + Math.floor(rand() * (daysInMonth - 1));
@@ -109,7 +112,9 @@ export async function runSeed() {
     users.push(user);
   }
 
-  const [ammi, bilal, saraKhan, saraMalik] = users;
+  const [ammi, bilal, saraKhan, saraMalik] = users as [
+    (typeof users)[number], (typeof users)[number], (typeof users)[number], (typeof users)[number],
+  ];
   const kElectric = billers.find(b => b.name === 'K-Electric')!;
   const meezan = banks.find(b => b.name === 'Meezan Bank')!;
 

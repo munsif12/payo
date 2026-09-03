@@ -18,6 +18,7 @@ test('seed builds the Contract 4 demo world', async () => {
   expect(await User.countDocuments()).toBe(6);
   const ammi = (await User.findOne({ email: 'ammi@payo.demo' }))!;
   expect((await Account.findOne({ userId: ammi._id }))!.balancePaisa).toBe(8_450_000);
+  expect(ammi.language).toBe('en');
 
   const txns = await Transaction.find({ userId: ammi._id });
   expect(txns.length).toBeGreaterThanOrEqual(60);

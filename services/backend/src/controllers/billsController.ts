@@ -67,7 +67,7 @@ export async function payBill(req: Request, res: Response) {
   const { billId } = z.object({ billId: z.string() }).parse(req.body);
   if (!mongoose.isValidObjectId(billId)) throw new ApiError(404, 'NOT_FOUND', 'Bill not found');
   const bill = await Bill.findById(billId);
-  if (!bill) throw new ApiError(404, 'NOT_FOUND', 'Bill not found');
+  if (!bill || String(bill.userId) !== req.userId) throw new ApiError(404, 'NOT_FOUND', 'Bill not found');
   if (bill.status === 'paid') throw new ApiError(410, 'ALREADY_PAID', 'Bill already paid');
   const biller = await Biller.findById(bill.billerId);
   if (!biller) throw new ApiError(404, 'NOT_FOUND', 'Biller not found');

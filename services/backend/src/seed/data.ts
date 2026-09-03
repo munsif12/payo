@@ -1,10 +1,10 @@
 export const SEED_USERS = [
-  { name: 'Ammi Jaan', urduName: 'امی', email: 'ammi@payo.demo', phone: '+923001110001', targetBalancePaisa: 8_450_000 },
-  { name: 'Bilal Ahmed', urduName: 'بلال احمد', email: 'bilal@payo.demo', phone: '+923001110002', targetBalancePaisa: 6_230_000 },
-  { name: 'Sara Khan', urduName: 'سارہ خان', email: 'sara.khan@payo.demo', phone: '+923001110003', targetBalancePaisa: 4_780_000 },
-  { name: 'Sara Malik', urduName: 'سارہ ملک', email: 'sara.malik@payo.demo', phone: '+923001110004', targetBalancePaisa: 5_120_000 },
-  { name: 'Hamza', urduName: 'حمزہ', email: 'hamza@payo.demo', phone: '+923001110005', targetBalancePaisa: 3_940_000 },
-  { name: 'Ayesha', urduName: 'عائشہ', email: 'ayesha@payo.demo', phone: '+923001110006', targetBalancePaisa: 7_310_000 },
+  { name: 'Ammi Jaan', urduName: 'امی', email: 'ammi@payo.demo', phone: '+923001110001', targetBalancePaisa: 8_450_000, language: 'en' },
+  { name: 'Bilal Ahmed', urduName: 'بلال احمد', email: 'bilal@payo.demo', phone: '+923001110002', targetBalancePaisa: 6_230_000, language: 'en' },
+  { name: 'Sara Khan', urduName: 'سارہ خان', email: 'sara.khan@payo.demo', phone: '+923001110003', targetBalancePaisa: 4_780_000, language: 'en' },
+  { name: 'Sara Malik', urduName: 'سارہ ملک', email: 'sara.malik@payo.demo', phone: '+923001110004', targetBalancePaisa: 5_120_000, language: 'en' },
+  { name: 'Hamza', urduName: 'حمزہ', email: 'hamza@payo.demo', phone: '+923001110005', targetBalancePaisa: 3_940_000, language: 'en' },
+  { name: 'Ayesha', urduName: 'عائشہ', email: 'ayesha@payo.demo', phone: '+923001110006', targetBalancePaisa: 7_310_000, language: 'en' },
 ] as const;
 
 export const SEED_BANKS = [

@@ -10,7 +10,7 @@ const userSchema = new Schema({
   pinAttempts: { type: Number, required: true, default: 0 },
   pinLockedUntil: Date,
   avatar: String,
-  language: { type: String, enum: ['ur', 'en'], default: 'ur' },
+  language: { type: String, enum: ['ur', 'en'], default: 'en' },
 }, { timestamps: true });
 
 export const User = model('User', userSchema);

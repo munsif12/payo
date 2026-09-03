@@ -17,6 +17,7 @@ const listQuery = z.object({
 function decodeCursor(cursor: string): { createdAt: Date; id: string } | null {
   try {
     const [iso, id] = Buffer.from(cursor, 'base64').toString('utf8').split('|');
+    if (!iso || !id) return null;
     const d = new Date(iso);
     if (isNaN(d.getTime()) || !Types.ObjectId.isValid(id)) return null;
     return { createdAt: d, id };

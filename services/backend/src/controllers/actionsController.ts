@@ -8,13 +8,15 @@ import { executeAction, txnDto } from '../lib/pendingActions';
 
 export async function execute(req: Request, res: Response) {
   const { pin } = z.object({ pin: z.string().optional() }).parse(req.body ?? {});
-  const txn = await executeAction(req.userId, req.params.id, pin);
+  const { id } = req.params;
+  if (typeof id !== 'string') throw new ApiError(404, 'NOT_FOUND', 'Action not found');
+  const txn = await executeAction(req.userId, id, pin);
   return ok(res, { transaction: txnDto(txn) });
 }
 
 export async function cancel(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.isValidObjectId(id)) throw new ApiError(404, 'NOT_FOUND', 'Action not found');
+  if (!id || !mongoose.isValidObjectId(id)) throw new ApiError(404, 'NOT_FOUND', 'Action not found');
   const cancelled = await PendingAction.findOneAndUpdate(
     { _id: id, userId: req.userId, status: 'pending' }, { status: 'cancelled' });
   if (!cancelled) {

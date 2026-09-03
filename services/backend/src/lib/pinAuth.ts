@@ -19,18 +19,31 @@ export async function assertPinOk(user: InstanceType<typeof User>, pin: string |
 
   const matches = !!pin && !!user.pinHash && (await bcrypt.compare(pin, user.pinHash));
   if (!matches) {
-    user.pinAttempts = (user.pinAttempts ?? 0) + 1;
-    if (user.pinAttempts >= MAX_PIN_ATTEMPTS) {
-      user.pinLockedUntil = new Date(now.getTime() + LOCK_MS);
-      user.pinAttempts = 0;
+    // Atomic $inc so two concurrent wrong attempts each land their own +1 instead of a
+    // read-modify-write race clobbering one another (both reading pinAttempts=0, both
+    // writing 1). Lock-set is a second atomic write, guarded by the just-incremented
+    // count so only the attempt that actually crosses the threshold locks the account.
+    const updated = await User.findOneAndUpdate(
+      { _id: user._id },
+      { $inc: { pinAttempts: 1 } },
+      { new: true },
+    );
+    if (updated && updated.pinAttempts >= MAX_PIN_ATTEMPTS) {
+      await User.updateOne(
+        { _id: user._id, pinAttempts: { $gte: MAX_PIN_ATTEMPTS } },
+        { $set: { pinLockedUntil: new Date(now.getTime() + LOCK_MS), pinAttempts: 0 } },
+      );
     }
-    await user.save();
     throw new ApiError(401, 'INVALID_PIN', 'Wrong PIN');
   }
 
-  if (user.pinAttempts || user.pinLockedUntil) {
-    user.pinAttempts = 0;
-    user.pinLockedUntil = undefined;
-    await user.save();
+  // Re-read before the reset write: `user` may be a stale in-memory doc (e.g. loaded
+  // before a just-failed sibling attempt incremented pinAttempts in the DB), and we
+  // must not save() a stale pinAttempts/pinLockedUntil back over a fresher value.
+  const fresh = (await User.findById(user._id)) ?? user;
+  if (fresh.pinAttempts || fresh.pinLockedUntil) {
+    fresh.pinAttempts = 0;
+    fresh.pinLockedUntil = null;
+    await fresh.save();
   }
 }

@@ -8,7 +8,7 @@ const refNo = customAlphabet('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 10);
 export interface PostTxnInput {
   userId: string; type: string; direction: 'in' | 'out';
   amountPaisa: number; feePaisa: number;
-  counterparty: { name: string; urduName?: string; detail: string }; category: string;
+  counterparty: { name: string; urduName?: string | undefined; detail: string }; category: string;
 }
 
 export async function postTransaction(session: ClientSession, i: PostTxnInput) {
@@ -19,5 +19,6 @@ export async function postTransaction(session: ClientSession, i: PostTxnInput) {
   const upd = await Account.updateOne(guard, { $inc: { balancePaisa: delta } }, { session });
   if (upd.modifiedCount === 0) throw new ApiError(400, 'INSUFFICIENT_FUNDS', 'Not enough balance');
   const [txn] = await Transaction.create([{ ...i, status: 'completed', refNo: `PAYO-${refNo()}` }], { session });
+  if (!txn) throw new ApiError(500, 'TXN_CREATE_FAILED', 'Transaction creation failed');
   return txn;
 }

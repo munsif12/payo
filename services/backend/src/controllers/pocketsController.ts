@@ -30,8 +30,8 @@ export async function createPocket(req: Request, res: Response) {
   return ok(res, pocketDto(p), 201);
 }
 
-async function findOwnPocket(userId: string, id: string) {
-  if (!mongoose.isValidObjectId(id)) throw new ApiError(404, 'NOT_FOUND', 'Pocket not found');
+async function findOwnPocket(userId: string, id: unknown) {
+  if (typeof id !== 'string' || !mongoose.isValidObjectId(id)) throw new ApiError(404, 'NOT_FOUND', 'Pocket not found');
   const p = await Pocket.findOne({ _id: id, userId });
   if (!p) throw new ApiError(404, 'NOT_FOUND', 'Pocket not found');
   return p;

@@ -27,8 +27,8 @@ export async function listSessions(req: Request, res: Response) {
   return ok(res, { items: items.map(sessionDto) });
 }
 
-async function findOwnSession(userId: string, id: string) {
-  if (!mongoose.isValidObjectId(id)) throw new ApiError(404, 'NOT_FOUND', 'Session not found');
+async function findOwnSession(userId: string, id: unknown) {
+  if (typeof id !== 'string' || !mongoose.isValidObjectId(id)) throw new ApiError(404, 'NOT_FOUND', 'Session not found');
   const s = await ChatSession.findOne({ _id: id, userId });
   if (!s) throw new ApiError(404, 'NOT_FOUND', 'Session not found');
   return s;
