@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Screen, T, Mono, ListRow, useUrdu } from '../../src/components/ui';
-import { tokens } from '../../src/theme/tokens';
-import { useTransactionsQuery } from '../../src/api/client';
-import { formatPaisa } from '../../src/lib/money';
-import type { Txn } from '../../src/api/types';
+import { Screen, T, Mono, ListRow, useUrdu } from '../src/components/ui';
+import { tokens } from '../src/theme/tokens';
+import { useTransactionsQuery } from '../src/api/client';
+import { formatPaisa } from '../src/lib/money';
+import type { Txn } from '../src/api/types';
 
 const FILTERS = [
   { key: 'all', labelKey: 'activity.all' },

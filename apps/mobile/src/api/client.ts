@@ -42,16 +42,29 @@ export const payoApi = createApi({
       transformResponse: (r: Ok<Me>) => r.data,
       providesTags: ['Me'],
     }),
-    login: b.mutation<{ token: string; user: PublicUser }, { email: string; pin: string }>({
-      query: (body) => ({ url: '/auth/login', method: 'POST', body }),
+    requestOtp: b.mutation<{ demoOtp: string; isNewUser: boolean }, { phone: string }>({
+      query: (body) => ({ url: '/auth/request-otp', method: 'POST', body }),
+      transformResponse: (r: Ok<{ demoOtp: string; isNewUser: boolean }>) => r.data,
+    }),
+    verifyOtp: b.mutation<{ otpToken: string; isNewUser: boolean; pinSet: boolean }, { phone: string; otp: string }>({
+      query: (body) => ({ url: '/auth/verify-otp', method: 'POST', body }),
+      transformResponse: (r: Ok<{ otpToken: string; isNewUser: boolean; pinSet: boolean }>) => r.data,
+    }),
+    // set-pin / verify-pin are called while the user has no session token yet (only a
+    // short-lived otp-scope token), so the otpToken is sent explicitly here rather than
+    // relying on baseQueryWithAuth's prepareHeaders (which only injects the session token).
+    setPin: b.mutation<{ token: string; user: PublicUser }, { pin: string; otpToken: string }>({
+      query: ({ pin, otpToken }) => ({
+        url: '/auth/set-pin', method: 'POST', body: { pin },
+        headers: { Authorization: `Bearer ${otpToken}` },
+      }),
       transformResponse: (r: Ok<{ token: string; user: PublicUser }>) => r.data,
     }),
-    signup: b.mutation<{ userId: string; demoOtp: string }, { name: string; urduName?: string; email: string; phone: string; pin: string }>({
-      query: (body) => ({ url: '/auth/signup', method: 'POST', body }),
-      transformResponse: (r: Ok<{ userId: string; demoOtp: string }>) => r.data,
-    }),
-    verifyOtp: b.mutation<{ token: string; user: PublicUser }, { userId: string; otp: string }>({
-      query: (body) => ({ url: '/auth/verify-otp', method: 'POST', body }),
+    verifyPinWithOtp: b.mutation<{ token: string; user: PublicUser }, { pin: string; otpToken: string }>({
+      query: ({ pin, otpToken }) => ({
+        url: '/auth/verify-pin', method: 'POST', body: { pin },
+        headers: { Authorization: `Bearer ${otpToken}` },
+      }),
       transformResponse: (r: Ok<{ token: string; user: PublicUser }>) => r.data,
     }),
     transactions: b.query<{ items: Txn[]; nextCursor: string | null }, { cursor?: string; type?: string; category?: string }>({
@@ -191,7 +204,7 @@ export const payoApi = createApi({
 });
 
 export const {
-  useMeQuery, useLoginMutation, useSignupMutation, useVerifyOtpMutation,
+  useMeQuery, useRequestOtpMutation, useVerifyOtpMutation, useSetPinMutation, useVerifyPinWithOtpMutation,
   useTransactionsQuery, useContactsQuery, useCreateContactMutation,
   useBanksQuery, useResolveTitleMutation, useCreateTransferMutation,
   useBillersQuery, useLookupBillMutation, usePayBillMutation,

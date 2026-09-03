@@ -1,6 +1,6 @@
 export interface PublicUser {
-  id: string; name: string; urduName?: string; email: string; phone: string;
-  avatar?: string; language: 'ur' | 'en';
+  id: string; name: string; urduName?: string; email?: string; phone: string;
+  avatar?: string; language: 'ur' | 'en'; pinSet: boolean;
 }
 
 export interface Txn {
