@@ -1,24 +1,28 @@
-# PAYO — voice-first Urdu banking MVP
+# PAYO — AI-first banking demo (English-first, Urdu bilingual)
 
-PAYO is an AI-first, voice-first banking demo for non-tech Urdu-speaking users. Tap the
-mic, say what you want in Urdu ("بلال کو 1500 بھیجو"), and the agent understands,
-gathers what's missing, and prepares the action — always behind a
-**speak-aloud → tap-confirm → PIN** safety gate for anything that moves money. A full
-classic wallet UI (tabs: home / activity / pay / more) covers every capability by hand.
-Demo only: no real money movement, no payment gateways.
+PAYO is an AI-first banking demo built for a non-tech, Urdu-speaking user. Sign in with
+just a **phone number** (OTP → PIN, no email/password), land on an animated AI-first
+**Home** that greets you and offers the five things people actually do, and ask PAYO for
+anything by typing or speaking ("Pay a bill", "بلال کو 1500 بھیجو", "bijli ka bill pay
+karna hai"). Every money-moving request is understood by the agent but only ever
+**prepared** — a confirmation card + PIN is the only thing that ever executes it. A full
+classic wallet UI (tabs: Home / Wallet / Pay / More) covers every capability by hand, in
+either language. Demo only: no real money movement, no payment gateways.
 
 ## What's inside
 
 | Piece | Stack | Highlights |
 |---|---|---|
-| `apps/mobile` | Expo SDK 57 · TypeScript · expo-router · RTK Query · i18next | Urdu-first RTL UI (Noto Nastaliq), voice home w/ silence auto-stop recording, SSE chat with native cards, shared confirm→PIN→execute flow, bilingual ur/en toggle |
-| `services/backend` | Node 20 · Express 4 · Mongoose 8 · TS · zod · pdfkit | All money movement; pending-action engine (PIN-gated, idempotent, 2-min expiry, atomic Mongo transactions); auth/OTP, transfers, bills, recharges, requests, pockets, cards, statements (PDF), QR, chat persistence; deterministic seed world; **56 jest tests** |
-| `services/ai` | Python 3.12 · FastAPI · LangGraph · Gemini · Cartesia | The agent is *just another client*: 17 tools calling the backend with the user's JWT — write tools only ever create pending actions. Gemini native-audio in, Cartesia TTS out (silent stub without a key), SSE per contract; **24 pytest tests** |
-| `scripts/mock-ai` | FastAPI | Offline/no-key demo fallback: same SSE contract, real backend actions, canned reasoning for the five demo utterances |
+| `apps/mobile` | Expo SDK 57 · TypeScript · expo-router · RTK Query · i18next | Phone → OTP → PIN auth; AI-first animated Home (greeting + stagger, listening state, wrong-PIN shake); English default with an instant Urdu (RTL, Nastaliq) toggle; new design-system tokens/UI kit/motion primitives across every screen; shared confirm → PIN → execute flow |
+| `services/backend` | Node 20 · Express 4 · Mongoose 8 · TS · zod · pdfkit | All money movement; pending-action engine (PIN-gated, idempotent, 2-min expiry, atomic Mongo transactions); phone-only OTP auth, profile, due bills, transfers, bills, recharges, requests, pockets, cards, statements (PDF, English-only), QR, chat persistence; deterministic seed world; **81 jest tests** |
+| `services/ai` | Python 3.12 · FastAPI · LangGraph · Gemini · Cartesia | The agent is *just another client*: tools calling the backend with the user's JWT — write tools only ever create pending actions. Understands English, Urdu script, and Roman Urdu; always replies in the user's selected language. Gemini native-audio in, Cartesia TTS out (silent stub without a key), SSE per contract; **40 pytest tests** |
+| `scripts/mock-ai` | FastAPI | Offline/no-key demo fallback: same SSE contract, real backend actions, canned reasoning for the demo utterances |
 
-Docs: `docs/` — product spec, roadmap with all cross-service contracts, six phase plans,
-`DEMO-SCRIPT.md` (bilingual pitch), `qa/QA-REPORT.md` (verification evidence),
-`BLOCKERS.md`.
+Docs: `docs/` — product spec (`2026-09-01-payo-mvp-design.md`), revamp spec
+(`2026-09-02-payo-revamp-design.md`), roadmap with cross-service contracts
+(`plans/2026-09-01-payo-roadmap.md`), phase plans (`plans/`), design artboards
+(`design/revamp-v1/*.dc.html`), `DEMO-SCRIPT.md` (bilingual pitch),
+`qa/revamp/QA-REPORT.md` (verification evidence), `BLOCKERS.md`.
 
 ## Prerequisites
 
@@ -36,8 +40,9 @@ Docs: `docs/` — product spec, roadmap with all cross-service contracts, six ph
 | AI fallback without keys | `cd services/ai && uv run uvicorn mock_ai:app --port 8000 --app-dir ../../scripts/mock-ai` |
 | Mobile (Metro :8081) | `cd apps/mobile && npx expo start` → open in Expo Go on the iOS simulator (`i`) / Android emulator (`a`) |
 
-Log in as **`ammi@payo.demo` / PIN `1234`** (five more users: bilal, sara.khan,
-sara.malik, hamza, ayesha — same PIN). Then follow `docs/DEMO-SCRIPT.md`.
+**Sign in:** phone `+923001110001` (Ammi Jaan; five more seeded users, same pattern), OTP
+is echoed back by the demo backend (`demoOtp`), PIN `1234`. New phone numbers go through
+Create PIN instead of Enter PIN. Then follow `docs/DEMO-SCRIPT.md`.
 
 ### API keys (`services/ai/.env`, gitignored)
 
@@ -49,12 +54,24 @@ CARTESIA_API_KEY=...   # optional; without it TTS is a silent stub (text+cards s
 ### Tests
 
 ```bash
-cd services/backend && npm test     # 56 tests (money invariants, pending-action engine, e2e)
-cd services/ai && uv run pytest     # 24 tests (tools, agent w/ fake model, SSE)
-cd apps/mobile && npx jest          # unit tests (money format, SSE parser, urls)
+cd services/backend && npm test           # 81 tests (money invariants, pending-action engine, auth, e2e)
+cd services/ai && uv run pytest           # 40 tests (tools, agent w/ fake model, SSE, bilingual prompt)
+cd apps/mobile && npx jest                # 35 tests (money format, SSE parser, urls, hooks)
+cd apps/mobile && npx tsc --noEmit -p .   # typecheck (no package.json script yet — run tsc directly)
 ```
+
+### How to demo
+
+1. Bring up Mongo, backend, AI service, Metro (table above); seed the world once.
+2. Open the app in Expo Go — you land on Phone entry. Sign in as Ammi (or any seeded
+   user) via OTP → PIN.
+3. Walk `docs/DEMO-SCRIPT.md`'s five hero moments in order: greeting + suggestion cards,
+   "Pay a bill" end-to-end, a Roman-Urdu typed send, the Urdu toggle (RTL + two-Sara
+   disambiguation), then the classic Wallet/Activity layer.
+4. To reset state mid-demo, re-run `npm run seed` in `services/backend` (idempotent).
 
 > **Notes:** Mongo publishes on host port **27018** (container 27017) to avoid clashing
 > with any locally installed MongoDB — the replica set is required for transactions.
 > The mobile app reaches the host via `127.0.0.1` (iOS sim) / `10.0.2.2` (Android
 > emulator); override with `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_AI_URL` for a real device.
+> Statements PDFs are English-only regardless of the app's display language.

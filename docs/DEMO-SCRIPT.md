@@ -1,8 +1,9 @@
-# PAYO — Demo Script / ڈیمو اسکرپٹ
+# PAYO — Demo Script
 
-Bilingual pitch script for the five hero flows. Each step lists **what you say** (ur + en)
-and **what the audience sees**. Demo persona: **امی (Ammi Jaan)** — `ammi@payo.demo`,
-PIN `1234`, balance seeded at ₨84,500 with 3 months of realistic history.
+English-first pitch script for the five hero moments. Each step lists **what you say**
+(EN, with the UR line you can use in either language mode) and **what the audience
+sees**. Demo persona: **Ammi Jaan** — phone `+923001110001`, PIN `1234`, balance seeded
+with realistic history and a due K-Electric bill.
 
 **Setup (2 min before the demo):**
 ```bash
@@ -13,83 +14,82 @@ cd services/ai && uv run uvicorn app.main:app --port 8000  # needs GEMINI_API_KE
 #   cd services/ai && uv run uvicorn mock_ai:app --port 8000 --app-dir ../../scripts/mock-ai
 cd apps/mobile && npx expo start                           # open on simulator/device
 ```
-Log in as Ammi. Leave the app on the home (voice) tab, Urdu mode.
+Sign in as Ammi: phone → OTP (demo echoes the code back) → PIN `1234`. Land on Home,
+English mode.
 
 ---
 
 ## Opening (30 s)
 
-**کہیں:** «یہ PAYO ہے — پاکستان کا پہلا آواز سے چلنے والا بینک، امی کے لیے بنایا گیا۔
-نہ فارم، نہ انگریزی، نہ چھوٹے بٹن — بس بولیں۔»
-**Say (en):** "This is PAYO — voice-first banking built for the smartphone's hardest
-customer: our parents. No forms, no English, no tiny buttons. You just speak."
-**Audience sees:** dark ink home screen, giant mint mic, four big Urdu suggestion tiles,
-Nastaliq script everywhere.
+**Say (en):** "This is PAYO — an AI-first bank built for the hardest customer on a
+smartphone: our parents. Phone number and a PIN — no passwords, no forms. It greets you
+by name and hands you the five things you actually came to do."
+**اردو کے لیے:** «یہ PAYO ہے — ایک AI بینک، سب سے مشکل صارف کے لیے: ہمارے والدین۔ نہ
+پاس ورڈ، نہ فارم — بس فون نمبر اور پن۔»
+**Audience sees:** Home screen — animated greeting ("Good morning, Ammi Jaan"), balance
+pill, five suggestion cards staggering in.
 
-## Flow A — Send money by voice (2 min) ⭐ the hero
+## Flow A — Pay a bill, AI-first (2 min) ⭐ the hero
 
-**کہیں (مائیک دبا کر):** «بلال کو پندرہ سو روپے بھیجو»
-**Say (en):** *tap the mic and speak:* "Send fifteen hundred rupees to Bilal."
+**Say (en):** *tap "Pay a bill"* — or type/speak "Pay my electricity bill."
 **Audience sees:**
-1. Mic turns red — «سن رہی ہوں…» — and auto-stops when you stop talking.
-2. Your words appear as an Urdu transcript bubble.
-3. PAYO answers in spoken Urdu, and a **confirmation card** slides in:
-   «بلال احمد کو ₨1,500 بھیجیں» — recipient, amount, zero fee.
+1. PAYO finds the due K-Electric bill and answers with a **bill card** — amount, due
+   date, "Pay now."
+2. Tap **Pay now** → a **confirmation card** slides in: *Pay K-Electric ₨4,320*.
 
-**کہیں:** «نوٹ کریں — AI نے پیسے نہیں بھیجے۔ صرف انسان بھیج سکتا ہے۔»
-**Say (en):** "Note what did NOT happen: the AI didn't move any money. Only a human can."
-4. Tap **تصدیق** → the PIN pad appears → enter `1234`.
-5. Green **کامیاب!** with a reference number. Tap the balance pill — it dropped by ₨1,500.
-6. Open **سرگرمی** (Activity): the transfer is at the top, timestamped.
+**Say (en):** "Note what did NOT happen: the AI didn't move any money — only a human
+confirmation + PIN can."
+3. Tap **Confirm** → PIN pad → enter `1234`.
+4. Green **Success** with a reference number; the balance pill drops by ₨4,320.
+5. Open **Activity**: the payment is at the top, timestamped, and looking the bill up
+   again shows nothing due — the backend refuses double payment.
 
-**Punchline (en):** "Mishearing is harmless here. The tap and the PIN move money — the
-LLM never does. That's our safety architecture: every write goes through a
-pending-action that expires in two minutes and executes exactly once."
+**Punchline (en):** "Every write goes through a pending action that expires in two
+minutes and executes exactly once. The model prepares; the human and the PIN execute."
 
-## Flow B — E-statement (1 min)
+## Flow B — Roman Urdu, typed (1 min) — "it actually understands"
 
-**کہیں (مائیک):** «پچھلے مہینے کا گوشوارہ چاہیے»
-**Say (en):** "I need last month's statement." *(or tap the گوشوارہ tile)*
-**Audience sees:** a statement card in the chat — month, money in / money out, and one
-big **PDF ڈاؤن لوڈ کریں** button → tap → a real PDF statement opens in the share sheet
-(header, totals, category breakdown, every transaction).
+**Say (en):** *tap the AI bar and type:* "bilal ko 1500 bhejo"
+**Audience sees:** PAYO understands the Roman-Urdu request as "send ₨1,500 to Bilal,"
+resolves Bilal from contacts, and answers **in English** (the app's current language)
+with the same confirmation → PIN → success flow as Flow A.
+**Say (en):** "Type it in Urdu script, Roman Urdu, or English — PAYO understands all
+three and always replies in whichever language you're using."
 
-## Flow C — Pay a bill, classic UI (1 min)
+## Flow C — The Urdu switch + two Saras (1 min) — for the room
 
-**Say (en):** "Everything the voice can do, hands can do too — that's the second layer."
-Navigate: **ادائیگی → بل ادا کریں → کے الیکٹرک**, type consumer no `0400012345678`.
-**Audience sees:** the bill resolves to *Ammi Jaan, ₨4,320, due this month* →
-**ابھی ادا کریں** → same confirmation card → PIN → paid. Re-looking it up shows no due
-bill: the backend refuses double payment.
+**Do:** More → Profile → tap **اردو**.
+**Audience sees:** the entire app — including cards already in the conversation — flips
+to right-to-left Urdu (Nastaliq) instantly.
+**Say (اردو):** «سارہ کو پیسے بھیجنے ہیں»
+**Audience sees:** PAYO asks back — «کون سی سارہ؟» — with two tappable chips, **سارہ
+خان** and **سارہ ملک**, each with its phone number. Tap one; the choice returns as your
+reply and PAYO replies in Urdu, RTL, throughout.
+**Say (en):** "It doesn't guess with your money — ambiguity becomes a question. Same
+brain, either language."
 
-## Flow D — Two Saras (1 min) — the "it actually understands" moment
+## Flow D — Classic layer: Wallet / Activity (45 s)
 
-**کہیں (مائیک):** «سارہ کو پیسے بھیجنے ہیں»
-**Say (en):** "Send money to Sara."
-**Audience sees:** PAYO asks back — «کون سی سارہ؟» — with two tappable chips:
-**سارہ خان** and **سارہ ملک**, each with its phone number. Tap one; the choice goes back
-into the conversation as your reply.
-**Say (en):** "It doesn't guess with your money. Ambiguity becomes a question."
-
-## Flow E — The English switch (45 s) — for the room
-
-**Do:** مزید → پروفائل → tap **English**.
-**Audience sees:** the entire app — including the cards already sitting in the chat —
-flips to left-to-right English instantly. Ask "what is my balance" and the reply comes
-back in English with the same balance card.
-**Say (en):** "Same brain, both languages. Urdu-first is a choice, not a limitation."
+**Say (en):** "Everything the AI can do, your hands can do too — that's the second
+layer, always one tab away."
+**Do:** tap **Wallet** → balance card, Send/Request/QR actions, pockets. Tap
+**Activity** → grouped-by-month transaction history with category chips.
+**Audience sees:** the same new design system — same tokens, same motion — applied to
+every screen, not just the AI surface.
 
 ## Close (20 s)
 
-**Say (en):** "Three services, one safety gate, forty-plus seeded demo users and
-transactions, and a grandmother who never has to see a form again. That's PAYO."
+**Say (en):** "One safety gate, three languages of input, a design system that scales
+to every screen, and a grandmother who never has to see a form. That's PAYO."
 
 ---
 
 ### Recovery notes for the presenter
-- If the network/LLM hiccups, the app shows a polite Urdu error bubble — just repeat the
-  turn, or fall back to the scripted demo server (`scripts/mock-ai/`) which needs no
-  cloud at all and handles exactly these five utterances.
-- If the mic misfires in a simulator, use the ⌨️ typed fallback — the flow is identical.
-- Wrong PIN on purpose is a nice extra beat: the pad shakes back with
-  «پن غلط ہے، دوبارہ کوشش کریں» and nothing moves.
+- If the network/LLM hiccups, PAYO shows a polite error bubble in the current language —
+  repeat the turn, or fall back to the scripted demo server (`scripts/mock-ai/`), which
+  needs no cloud and handles the demo utterances above.
+- If the mic misfires in a simulator, use the typed input — the flow is identical; there
+  is no real microphone in a simulator, so lean on typed/Roman-Urdu input for Flow B.
+- Wrong PIN on purpose is a nice extra beat: the pad shakes back with an inline error
+  ("Wrong PIN, try again" / «پن غلط ہے، دوبارہ کوشش کریں») and nothing moves — the
+  session stays signed in either way.

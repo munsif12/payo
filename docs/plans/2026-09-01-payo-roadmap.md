@@ -34,6 +34,7 @@ replica set (required for multi-doc transactions).
 | 4 | AI service (voice loop) | `plans/2026-09-02-phase-4-ai-service.md` | done |
 | 5 | Voice home + confirmation gate | `plans/2026-09-02-phase-5-voice-home.md` | done |
 | 6 | Polish + demo pass | `plans/2026-09-02-phase-6-polish-demo.md` | done |
+| R1–R7 | Revamp v2 (AI-first Home, phone auth, new design system) | `plans/2026-09-02-revamp-plan.md` | done 2026-09-03 |
 
 Just-in-time plans MUST be written with the writing-plans skill, argue from this
 roadmap's contracts, and be saved next to the two existing phase plans before any code
