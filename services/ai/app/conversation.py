@@ -13,6 +13,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from .agent import run_agent
 from .backend_client import BackendClient, BackendError
 from .config import settings
+from .lang import reply_language
 from .stt import TranscribeProvider
 from .tts import TtsProvider
 
@@ -65,7 +66,10 @@ async def converse_turn(
 
         await client.add_message(session_id, "user", text)
 
-        reply, cards = await run_agent(client, history, text, language, model=model)
+        # The reply language follows the input's own script when it's Urdu, even if the
+        # UI language is English — e.g. a Roman-Urdu UI user who types/speaks Urdu script.
+        turn_language = reply_language(text, language)
+        reply, cards = await run_agent(client, history, text, turn_language, model=model)
 
         for token in reply.split(" "):
             yield sse("token", {"text": token + " "})

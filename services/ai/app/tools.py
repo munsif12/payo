@@ -8,8 +8,9 @@ from typing import Any
 
 from .backend_client import BackendClient, BackendError
 from .cards import (
-    BalanceCard, BillCard, ContactChip, ContactChipsCard, Bilingual, PocketCard,
-    StatementCard, TransactionsCard, Txn, confirmation_from_action,
+    BalanceCard, BillCard, BillerChip, BillerChipsCard, Bilingual, InstitutionChip,
+    InstitutionChipsCard, InstitutionRef, PocketCard, RecipientCard, RecipientChip,
+    RecipientChipsCard, StatementCard, TransactionsCard, Txn, confirmation_from_action,
 )
 from .config import settings
 
@@ -82,39 +83,96 @@ async def get_statement(client: BackendClient, year: int, month: int | None = No
     )
 
 
-async def search_contacts(client: BackendClient, query: str) -> Result:
+async def list_institutions(client: BackendClient, query: str | None = None) -> Result:
     try:
-        data = await client.contacts()
+        data = await client.institutions(query)
     except BackendError as e:
         return _fail(e)
-    q = query.strip().lower()
-    matches = [
-        c for c in data["items"]
-        if q in c["name"].lower() or q in (c.get("urduName") or "").lower() or q in (c.get("phone") or "")
-    ]
-    if not matches:
-        return _ok(f"No saved contact matches '{query}'.")
-    if len(matches) == 1:
-        c = matches[0]
-        detail = c.get("phone") or f"{c.get('bankName', '')} {c.get('iban', '')[-4:]}"
-        return _ok(f"Found one contact: {c['name']} ({c.get('urduName', '')}) — {detail}, id {c['id']}, kind {c['kind']}.")
+    items = data["items"]
+    if query:
+        matches = items
+        if not matches:
+            return _ok(f"No bank or wallet matches '{query}'.")
+    else:
+        matches = [i for i in items if i.get("popular")]
     chips = [
-        ContactChip(
-            contactId=c["id"], name=c["name"], urduName=c.get("urduName"),
-            detail=c.get("phone") or f"{c.get('bankName', '')} ****{(c.get('iban') or '')[-4:]}",
-        )
-        for c in matches
+        InstitutionChip(institutionId=i["id"], name=i["name"], urduName=i.get("urduName"), kind=i["kind"])
+        for i in matches
     ]
-    card = ContactChipsCard(
-        prompt=Bilingual(en=f"Which '{query}' do you mean?", ur=f"کون سے «{query}»؟ نیچے سے چنیں"),
-        contacts=chips,
+    card = InstitutionChipsCard(
+        prompt=Bilingual(en="Which bank or wallet?", ur="کون سا بینک یا والٹ؟"),
+        institutions=chips,
+    )
+    text = (
+        "Banks/wallets: " + "; ".join(f"{c.name} (id {c.institutionId}, {c.kind})" for c in chips)
+        + ". A chip card was shown — ask the user to tap one, do NOT guess."
+    )
+    return _ok(text, card)
+
+
+async def resolve_recipient(client: BackendClient, institution_id: str, identifier: str) -> Result:
+    try:
+        data = await client.resolve_recipient(institution_id, identifier)
+    except BackendError as e:
+        return _fail(e)
+    inst = data["institution"]
+    card = RecipientCard(
+        title=data["title"],
+        institution=InstitutionRef(id=inst["id"], name=inst["name"], urduName=inst.get("urduName"), kind=inst["kind"]),
+        identifier=data["identifier"],
+        linkedUserId=data.get("linkedUserId"),
+        prompt=Bilingual(en=f"Send to {data['title']}?", ur=f"{data['title']} کو بھیجیں؟"),
     )
     return _ok(
-        f"Multiple contacts match '{query}': "
-        + "; ".join(f"{c.name} ({c.detail})" for c in chips)
+        f"Resolved recipient: {data['title']} at {inst['name']} ({data['identifier']}), "
+        f"institution_id {inst['id']}. A recipient card was shown — the user must confirm "
+        "before send_money is called; do not call send_money yet.",
+        card,
+    )
+
+
+async def search_recipients(client: BackendClient, query: str) -> Result:
+    try:
+        data = await client.recipients(query)
+    except BackendError as e:
+        return _fail(e)
+    items = data["items"]
+    if not items:
+        return _ok(
+            f"No saved recipient matches '{query}'. Ask the user for the phone/IBAN and which "
+            "bank or wallet, or call list_institutions if they don't know."
+        )
+    if len(items) == 1:
+        r = items[0]
+        return _ok(
+            f"Found one saved recipient: {r['nickname']} ({r['title']}) at {r['institution']['name']} — "
+            f"{r['identifier']}, recipient_id {r['id']}."
+        )
+    chips = [
+        RecipientChip(
+            recipientId=r["id"], nickname=r["nickname"], title=r["title"],
+            institutionName=r["institution"]["name"], identifier=r["identifier"],
+        )
+        for r in items
+    ]
+    card = RecipientChipsCard(
+        prompt=Bilingual(en=f"Which '{query}' do you mean?", ur=f"کون سے «{query}»؟ نیچے سے چنیں"),
+        recipients=chips,
+    )
+    return _ok(
+        f"Multiple saved recipients match '{query}': "
+        + "; ".join(f"{c.nickname} ({c.institutionName} {c.identifier})" for c in chips)
         + ". A chip card was shown — ask the user to tap the right one, do NOT guess.",
         card,
     )
+
+
+async def save_recipient(client: BackendClient, institution_id: str, identifier: str, nickname: str) -> Result:
+    try:
+        r = await client.create_recipient(nickname, institution_id, identifier)
+    except BackendError as e:
+        return _fail(e)
+    return _ok(f"Saved recipient '{nickname}' ({r.get('title', '')}).")
 
 
 async def list_billers(client: BackendClient) -> Result:
@@ -172,6 +230,50 @@ async def list_due_bills(client: BackendClient) -> Result:
     return {"text": text, "card": cards}
 
 
+async def list_saved_billers(client: BackendClient) -> Result:
+    try:
+        data = await client.saved_billers()
+    except BackendError as e:
+        return _fail(e)
+    items = data["items"]
+    if not items:
+        return _ok(
+            "No saved billers. Ask the user for the biller and reference/consumer number, "
+            "then call list_billers and lookup_bill."
+        )
+    if len(items) == 1:
+        b = items[0]
+        return _ok(
+            f"Found one saved biller: {b['nickname']} — {b['biller']['name']}, "
+            f"consumer {b['consumerNo']}, biller_id {b['biller']['id']}, savedBillerId {b['id']}. "
+            "Call lookup_bill(biller_id, consumer_no) then pay_bill — do not ask the user again."
+        )
+    chips = [
+        BillerChip(
+            savedBillerId=b["id"], billerId=b["biller"]["id"], name=b["biller"]["name"],
+            urduName=b["biller"].get("urduName"), consumerNo=b["consumerNo"],
+        )
+        for b in items
+    ]
+    card = BillerChipsCard(
+        prompt=Bilingual(en="Which saved biller?", ur="کون سا محفوظ شدہ بلر؟"),
+        billers=chips,
+    )
+    return _ok(
+        "Multiple saved billers: " + "; ".join(f"{c.name} ({c.consumerNo})" for c in chips)
+        + ". A chip card was shown — ask the user to tap the right one, do NOT guess.",
+        card,
+    )
+
+
+async def save_biller(client: BackendClient, biller_id: str, consumer_no: str, nickname: str) -> Result:
+    try:
+        b = await client.create_saved_biller(nickname, biller_id, consumer_no)
+    except BackendError as e:
+        return _fail(e)
+    return _ok(f"Saved biller '{nickname}' ({b.get('consumerName', '')}).")
+
+
 async def list_pockets(client: BackendClient) -> Result:
     try:
         data = await client.pockets()
@@ -220,17 +322,15 @@ async def list_requests(client: BackendClient) -> Result:
 
 # ---- write tools: each creates a PendingAction and returns a confirmation card ----
 
-async def send_money(client: BackendClient, amount_paisa: int, phone: str | None = None,
-                     contact_id: str | None = None, bank_id: str | None = None, iban: str | None = None) -> Result:
+async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str | None = None,
+                     institution_id: str | None = None, identifier: str | None = None) -> Result:
     to: dict[str, Any]
-    if contact_id:
-        to = {"kind": "contact", "contactId": contact_id}
-    elif phone:
-        to = {"kind": "payo", "phone": phone}
-    elif bank_id and iban:
-        to = {"kind": "bank", "bankId": bank_id, "iban": iban}
+    if recipient_id:
+        to = {"recipientId": recipient_id}
+    elif institution_id and identifier:
+        to = {"institutionId": institution_id, "identifier": identifier}
     else:
-        return _ok("ERROR: need a contact_id, a phone, or bank_id+iban to send money.")
+        return _ok("ERROR: need a recipient_id, or institution_id+identifier, to send money.")
     try:
         action = await client.create_transfer(to, amount_paisa)
     except BackendError as e:

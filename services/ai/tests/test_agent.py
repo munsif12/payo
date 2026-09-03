@@ -52,14 +52,16 @@ async def test_agent_send_money_flow_collects_confirmation(fake_backend):
         "summary": {"en": "Send ₨1,500 to Bilal Ahmed", "ur": "بلال احمد کو ₨1,500 بھیجیں"},
         "lines": [], "requiresPin": True, "expiresAt": "2026-09-02T12:00:00.000Z", "status": "pending",
     }
-    fake_backend.route("GET", "/api/v1/contacts", {"items": [
-        {"id": "c3", "name": "Bilal Ahmed", "urduName": "بلال احمد", "kind": "payo", "phone": "+923001110002"},
+    fake_backend.route("GET", "/api/v1/recipients", {"items": [
+        {"id": "c3", "nickname": "Bilal", "title": "Bilal Ahmed",
+         "institution": {"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet"},
+         "identifier": "+923001110002"},
     ]})
     fake_backend.route("POST", "/api/v1/transfers", pending)
     client = BackendClient("jwt", transport=fake_backend.transport)
     model = scripted([
-        AIMessage(content="", tool_calls=[{"name": "search_contacts", "args": {"query": "بلال"}, "id": "t1"}]),
-        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {"amount_paisa": 150000, "contact_id": "c3"}, "id": "t2"}]),
+        AIMessage(content="", tool_calls=[{"name": "search_recipients", "args": {"query": "بلال"}, "id": "t1"}]),
+        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {"amount_paisa": 150000, "recipient_id": "c3"}, "id": "t2"}]),
         AIMessage(content="تصدیق کا کارڈ دیکھیں اور PIN ڈالیں۔"),
     ])
     reply, cards = await run_agent(client, [], "بلال کو 1500 بھیجو", "ur", model=model)
@@ -104,15 +106,17 @@ async def test_agent_reprompts_once_when_card_promised_but_no_tool_called(fake_b
         "summary": {"en": "Send ₨1,500 to Bilal Ahmed", "ur": "بلال احمد کو ₨1,500 بھیجیں"},
         "lines": [], "requiresPin": True, "expiresAt": "2026-09-02T12:00:00.000Z", "status": "pending",
     }
-    fake_backend.route("GET", "/api/v1/contacts", {"items": [
-        {"id": "c3", "name": "Bilal Ahmed", "urduName": "بلال احمد", "kind": "payo", "phone": "+923001110002"},
+    fake_backend.route("GET", "/api/v1/recipients", {"items": [
+        {"id": "c3", "nickname": "Bilal", "title": "Bilal Ahmed",
+         "institution": {"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet"},
+         "identifier": "+923001110002"},
     ]})
     fake_backend.route("POST", "/api/v1/transfers", pending)
     client = BackendClient("jwt", transport=fake_backend.transport)
     model = scripted([
         AIMessage(content="آپ بلال احمد کو پندرہ سو روپے بھیج رہے ہیں۔ تصدیق کے لیے کارڈ دیکھیں۔"),  # narrated, no tool
-        AIMessage(content="", tool_calls=[{"name": "search_contacts", "args": {"query": "بلال"}, "id": "t1"}]),
-        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {"amount_paisa": 150000, "contact_id": "c3"}, "id": "t2"}]),
+        AIMessage(content="", tool_calls=[{"name": "search_recipients", "args": {"query": "بلال"}, "id": "t1"}]),
+        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {"amount_paisa": 150000, "recipient_id": "c3"}, "id": "t2"}]),
         AIMessage(content="تصدیق کا کارڈ دیکھیں اور PIN ڈالیں۔"),
     ])
     reply, cards = await run_agent(client, [], "بلال کو 1500 بھیجو", "ur", model=model)
@@ -204,7 +208,7 @@ def test_system_prompt_carries_reply_language_rule_and_suggestion_intents():
     ]
     for intent in en_intents:
         assert intent in en
-    for tool in ("search_contacts", "list_due_bills", "get_balance", "recharge", "get_statement"):
+    for tool in ("search_recipients", "list_institutions", "list_saved_billers", "get_balance", "recharge", "get_statement"):
         assert tool in en and tool in ur
 
     ur_intents = [
@@ -214,6 +218,113 @@ def test_system_prompt_carries_reply_language_rule_and_suggestion_intents():
     for intent in ur_intents:
         assert intent in ur
 
-    # list_due_bills-first, single-bill-immediate-pay rule (R2.2), in both prompts.
-    assert "list_due_bills" in en and "pay_bill(bill_id)" in en
-    assert "list_due_bills" in ur and "pay_bill(bill_id)" in ur
+    # list_saved_billers-first, single-saved-biller-immediate-pay rule (V2.2), in both prompts.
+    assert "list_saved_billers" in en and "pay_bill" in en
+    assert "list_saved_billers" in ur and "pay_bill" in ur
+
+    # Send-money policy: identifier without institution -> ask; never send before a
+    # resolved+confirmed recipient card.
+    assert "list_institutions" in en and "resolve_recipient" in en and "NEVER call send_money" in en
+    assert "list_institutions" in ur and "resolve_recipient" in ur
+
+
+async def test_agent_saved_biller_flow_lookup_then_pays(fake_backend):
+    """'pay a bill' intent with one saved biller: list_saved_billers -> lookup_bill -> pay_bill."""
+    fake_backend.route("GET", "/api/v1/saved-billers", {"items": [
+        {"id": "sb1", "nickname": "Bijli",
+         "biller": {"id": "kel", "name": "K-Electric", "urduName": "کے الیکٹرک"}, "consumerNo": "0400012345678"},
+    ]})
+    fake_backend.route("POST", "/api/v1/bills/lookup", {
+        "billId": "b1", "consumerName": "Ammi Jaan", "amountPaisa": 432000,
+        "dueDate": "2026-09-10T00:00:00.000Z", "month": "2026-08",
+    })
+    fake_backend.route("GET", "/api/v1/billers", {"items": [
+        {"id": "kel", "name": "K-Electric", "urduName": "کے الیکٹرک", "category": "electricity"},
+    ]})
+    pending = {
+        "id": "act12", "kind": "pay_bill", "amountPaisa": 432000, "feePaisa": 0,
+        "summary": {"en": "Pay K-Electric ₨4,320", "ur": "کے الیکٹرک کا ₨4,320 بل ادا کریں"},
+        "lines": [], "requiresPin": True, "expiresAt": "2026-09-02T12:00:00.000Z", "status": "pending",
+    }
+    fake_backend.route("POST", "/api/v1/bills/pay", pending)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "list_saved_billers", "args": {}, "id": "t1"}]),
+        AIMessage(content="", tool_calls=[{"name": "lookup_bill", "args": {"biller_id": "kel", "consumer_no": "0400012345678"}, "id": "t2"}]),
+        AIMessage(content="", tool_calls=[{"name": "pay_bill", "args": {"bill_id": "b1"}, "id": "t3"}]),
+        AIMessage(content="Please confirm on the card and enter your PIN."),
+    ])
+    reply, cards = await run_agent(client, [], "I want to pay a bill", "en", model=model)
+    assert [c["kind"] for c in cards] == ["bill", "confirmation"]
+    assert cards[-1]["actionId"] == "act12"
+    assert "PIN" in reply
+    await client.aclose()
+
+
+async def test_agent_number_without_institution_flow_shows_institution_chips(fake_backend):
+    """A phone number with no bank/wallet named: list_institutions must be called and its
+    chips card surfaced before resolve_recipient/send_money."""
+    fake_backend.route("GET", "/api/v1/institutions", {"items": [
+        {"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet", "popular": True},
+        {"id": "jazzcash", "name": "JazzCash", "urduName": "جاز کیش", "kind": "wallet", "popular": True},
+    ]})
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "list_institutions", "args": {}, "id": "t1"}]),
+        AIMessage(content="کون سا بینک یا والٹ؟"),
+    ])
+    reply, cards = await run_agent(client, [], "0333 کو 100 روپے بھیجو", "ur", model=model)
+    assert cards[-1]["kind"] == "institution_chips"
+    assert [i["institutionId"] for i in cards[-1]["institutions"]] == ["easypaisa", "jazzcash"]
+    await client.aclose()
+
+
+async def test_agent_send_money_blocked_without_prior_resolve_recipient(fake_backend):
+    """Guard: send_money(institution_id, identifier) must be rejected — no confirmation
+    card — unless resolve_recipient was called for that exact pair earlier this turn."""
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{
+            "name": "send_money",
+            "args": {"amount_paisa": 150000, "institution_id": "easypaisa", "identifier": "+923001110002"},
+            "id": "t1",
+        }]),
+        AIMessage(content="Please tell me which bank or wallet first."),
+    ])
+    reply, cards = await run_agent(client, [], "Send 1500 to +923001110002", "en", model=model)
+    assert cards == []
+    assert not fake_backend.requests  # /transfers was never called
+    await client.aclose()
+
+
+async def test_agent_send_money_allowed_after_resolve_recipient(fake_backend):
+    """Same pair, but resolve_recipient ran first this turn: send_money proceeds and
+    returns a confirmation card."""
+    fake_backend.route("POST", "/api/v1/transfers/resolve", {
+        "title": "Bilal Ahmed",
+        "institution": {"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet"},
+        "identifier": "+923001110002",
+    })
+    pending = {
+        "id": "act13", "kind": "send_money", "amountPaisa": 150000, "feePaisa": 0,
+        "summary": {"en": "Send ₨1,500 to Bilal Ahmed", "ur": "بلال احمد کو ₨1,500 بھیجیں"},
+        "lines": [], "requiresPin": True, "expiresAt": "2026-09-02T12:00:00.000Z", "status": "pending",
+    }
+    fake_backend.route("POST", "/api/v1/transfers", pending)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{
+            "name": "resolve_recipient",
+            "args": {"institution_id": "easypaisa", "identifier": "+923001110002"}, "id": "t1",
+        }]),
+        AIMessage(content="", tool_calls=[{
+            "name": "send_money",
+            "args": {"amount_paisa": 150000, "institution_id": "easypaisa", "identifier": "+923001110002"},
+            "id": "t2",
+        }]),
+        AIMessage(content="Please confirm on the card and enter your PIN."),
+    ])
+    reply, cards = await run_agent(client, [], "Send 1500 to Bilal Ahmed at Easypaisa +923001110002", "en", model=model)
+    assert [c["kind"] for c in cards] == ["recipient", "confirmation"]
+    assert cards[-1]["actionId"] == "act13"
+    await client.aclose()

@@ -101,13 +101,15 @@ async def test_audio_turn_emits_transcript_first(fake_backend, wired_app, monkey
         "lines": [], "requiresPin": True, "expiresAt": "2026-09-02T12:00:00.000Z", "status": "pending",
     }
     wire_routes(fake_backend, {
-        ("GET", "/api/v1/contacts"): {"items": [
-            {"id": "c3", "name": "Bilal Ahmed", "urduName": "بلال احمد", "kind": "payo", "phone": "+923001110002"},
+        ("GET", "/api/v1/recipients"): {"items": [
+            {"id": "c3", "nickname": "Bilal", "title": "Bilal Ahmed",
+             "institution": {"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet"},
+             "identifier": "+923001110002"},
         ]},
         ("POST", "/api/v1/transfers"): pending,
     })
     wired_app.state.model_override = scripted([
-        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {"amount_paisa": 150000, "phone": "+923001110002"}, "id": "t1"}]),
+        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {"amount_paisa": 150000, "recipient_id": "c3"}, "id": "t1"}]),
         AIMessage(content="تصدیق کے لیے کارڈ دیکھیں۔"),
     ])
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wired_app), base_url="http://test") as client:
@@ -150,3 +152,23 @@ async def test_missing_auth_header_is_401(wired_app):
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wired_app), base_url="http://test") as client:
         res = await client.post("/converse", json={"text": "x"})
     assert res.status_code == 401
+
+
+async def test_urdu_script_text_input_with_english_ui_language_uses_urdu_system_prompt(fake_backend, wired_app):
+    """Urdu-script input with ui language 'en' must still get the Urdu system prompt —
+    reply_language() overrides the UI language whenever the input itself is Arabic-script."""
+    from langchain_core.messages import SystemMessage
+    from tests.test_agent import RecordingFakeToolModel
+
+    wire_routes(fake_backend)
+    model = RecordingFakeToolModel(messages=iter([AIMessage(content="آپ کا بیلنس ₨84,500 ہے۔")]))
+    wired_app.state.model_override = model
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wired_app), base_url="http://test") as client:
+        res = await client.post("/converse", json={"text": "میرا بیلنس کیا ہے؟", "language": "en"},
+                                headers={"Authorization": "Bearer jwt1"})
+    assert res.status_code == 200
+    assert model.received, "model was never invoked"
+    system_msgs = [m for m in model.received[0] if isinstance(m, SystemMessage)]
+    assert len(system_msgs) == 1
+    assert "ہمیشہ اردو میں ہی دیں" in system_msgs[0].content
+    assert "ALWAYS reply in English" not in system_msgs[0].content

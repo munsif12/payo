@@ -55,11 +55,30 @@ class BackendClient:
     async def spending_summary(self, **params: Any) -> Any:
         return await self.get("/transactions/spending-summary", params={k: v for k, v in params.items() if v is not None})
 
-    async def contacts(self) -> Any:
-        return await self.get("/contacts")
+    async def institutions(self, q: str | None = None) -> Any:
+        return await self.get("/institutions", params={"q": q} if q else None)
+
+    async def resolve_recipient(self, institution_id: str, identifier: str) -> Any:
+        return await self.post("/transfers/resolve", {"institutionId": institution_id, "identifier": identifier})
+
+    async def recipients(self, q: str | None = None) -> Any:
+        return await self.get("/recipients", params={"q": q} if q else None)
+
+    async def create_recipient(self, nickname: str, institution_id: str, identifier: str) -> Any:
+        return await self.post(
+            "/recipients", {"nickname": nickname, "institutionId": institution_id, "identifier": identifier}
+        )
 
     async def billers(self) -> Any:
         return await self.get("/billers")
+
+    async def saved_billers(self) -> Any:
+        return await self.get("/saved-billers")
+
+    async def create_saved_biller(self, nickname: str, biller_id: str, consumer_no: str) -> Any:
+        return await self.post(
+            "/saved-billers", {"nickname": nickname, "billerId": biller_id, "consumerNo": consumer_no}
+        )
 
     async def telcos(self) -> Any:
         return await self.get("/telcos")

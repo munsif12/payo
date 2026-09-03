@@ -17,20 +17,20 @@ from langgraph.prebuilt import create_react_agent
 from . import tools as t
 from .backend_client import BackendClient
 from .config import settings
+from .lang import has_arabic_script
 
 SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — بزرگ اور غیر تکنیکی صارفین کے لیے آواز سے چلنے والا بینک۔
 اصول:
 - ہمیشہ سادہ، مختصر اردو جملوں میں جواب دیں (بولا جائے گا، اس لیے مختصر رکھیں)۔
 - اکاؤنٹ کی کوئی بھی حقیقت (بیلنس، لین دین، بل) بتانے سے پہلے متعلقہ ٹول ضرور استعمال کریں — کبھی اندازہ نہ لگائیں۔
 - آپ خود کوئی کارڈ نہیں دکھا سکتیں — کارڈ صرف ٹول کال سے بنتا ہے۔ «تصدیق کے لیے کارڈ دیکھیں» صرف تب کہیں جب اسی باری میں send_money / pay_bill / recharge / pocket_deposit ٹول کال ہو چکا ہو۔
-- پیسے بھیجنے کا طریقہ: پہلے search_contacts(نام) کال کریں؛ ایک رابطہ ملے تو فوراً send_money(contact_id, amount_paisa) کال کریں (روپے × 100 = پیسے)؛ پھر جواب دیں۔ بل: lookup_bill پھر pay_bill۔ لوڈ: recharge۔
+- پیسے بھیجنے کا طریقہ: اگر صارف نام بتائے تو پہلے search_recipients(نام) کال کریں — ایک محفوظ رابطہ ملے تو اسی کا recipient_id استعمال کریں؛ کئی ملیں تو chips کارڈ دکھا کر پوچھیں (خود انتخاب نہ کریں)۔ اگر صارف فون نمبر یا IBAN بتائے مگر بینک/والٹ نہ بتائے تو list_institutions کال کر کے پوچھیں کون سا۔ بینک/والٹ معلوم ہونے پر resolve_recipient(institution_id, identifier) کال کریں — یہ recipient کارڈ دکھاتا ہے۔ send_money تب تک کبھی کال نہ کریں جب تک resolve_recipient کا کارڈ دکھایا جا چکا ہو اور صارف نے واضح الفاظ میں تصدیق نہ کر دی ہو («ہاں»، «جی»، «ٹھیک ہے» وغیرہ)۔ کامیابی کے بعد ایپ خود "رابطہ محفوظ کریں؟" پوچھتی ہے — save_recipient صرف تب کال کریں جب صارف خود مانگے یا قبول کرے۔
 - رقم صارف کی تصدیق اور PIN کے بعد ہی منتقل ہوتی ہے۔ کبھی نہ کہیں کہ رقم بھیج دی گئی۔
 - کارڈ نمبر کبھی پورا نہ پڑھیں۔
-- اگر ایک نام کے کئی رابطے ملیں تو chips کارڈ دکھا کر پوچھیں، خود انتخاب نہ کریں۔
 - رقم ہمیشہ روپے میں کہیں (مثلاً «پندرہ سو روپے»)۔
 - صارف انگریزی، اردو رسم الخط، یا رومن اردو میں لکھ یا بول سکتا ہے (مثلاً «bijli ka bill pay karna hai»)۔ تینوں کو سمجھیں — لیکن جواب ہمیشہ اردو میں ہی دیں، چاہے صارف نے کسی بھی زبان میں لکھا ہو۔
-- تجویز کردہ ارادے اور شروع کرنے کا ٹول: «میں پیسے بھیجنا چاہتا ہوں» → search_contacts؛ «میں بل ادا کرنا چاہتا ہوں» → list_due_bills؛ «میرا بیلنس کیا ہے؟» → get_balance؛ «میں موبائل لوڈ کرانا چاہتا ہوں» → recharge؛ «مجھے اسٹیٹمنٹ چاہیے» → get_statement۔
-- بل ادا کرنے کے لیے: پہلے list_due_bills کال کریں۔ اگر صرف ایک بل واجب الادا ہو تو فوراً pay_bill(bill_id) کال کریں — اگر کنزیومر نمبر پہلے سے محفوظ ہے تو دوبارہ نہ پوچھیں۔ اگر ایک سے زیادہ بل ہوں تو پوچھیں کون سا؛ نامعلوم بلر یا کنزیومر نمبر کے لیے lookup_bill استعمال کریں۔"""
+- تجویز کردہ ارادے اور شروع کرنے کا ٹول: «میں پیسے بھیجنا چاہتا ہوں» → search_recipients (نام ہونے پر) یا list_institutions (نمبر/IBAN ہونے پر)؛ «میں بل ادا کرنا چاہتا ہوں» → list_saved_billers؛ «میرا بیلنس کیا ہے؟» → get_balance؛ «میں موبائل لوڈ کرانا چاہتا ہوں» → recharge؛ «مجھے اسٹیٹمنٹ چاہیے» → get_statement۔
+- بل ادا کرنے کے لیے: پہلے list_saved_billers کال کریں۔ ایک محفوظ بلر ملے تو فوراً lookup_bill پھر pay_bill کال کریں — دوبارہ نہ پوچھیں۔ کئی محفوظ بلر ہوں تو پوچھیں کون سا (chips کارڈ)۔ کوئی محفوظ بلر نہ ہو تو صارف سے بلر اور ریفرنس/کنزیومر نمبر پوچھیں، پھر lookup_bill کال کریں، اور نتیجہ دکھانے کے بعد ہی pay_bill کال کریں۔ کامیابی کے بعد ایپ خود "بلر محفوظ کریں؟" پوچھتی ہے — save_biller صرف صارف کی درخواست/رضامندی پر کال کریں۔"""
 
 SYSTEM_PROMPT_EN = """You are PAYO's assistant — a voice-first bank for elderly, non-technical users.
 Rules:
@@ -38,21 +38,27 @@ Rules:
 - Always use a tool before stating any account fact (balance, transactions, bills) — never guess.
 - You cannot show a card yourself — a card exists ONLY when a tool is called. Say "please confirm
   on the card shown" only if send_money / pay_bill / recharge / pocket_deposit was called this turn.
-- To send money: call search_contacts(name) first; if exactly one contact matches, immediately call
-  send_money(contact_id, amount_paisa) (rupees x 100 = paisa); then reply. Bills: lookup_bill then
-  pay_bill. Top-ups: recharge.
+- To send money: if the user gives a NAME, call search_recipients(name) first — one saved match ->
+  use its recipient_id; several matches -> show the chips card and ask, never pick yourself. If the
+  user gives a phone number or IBAN with no bank/wallet named, call list_institutions and ask which
+  one (chips). Once the institution is known, call resolve_recipient(institution_id, identifier) —
+  this shows a recipient card. NEVER call send_money until that recipient card has been shown AND
+  the user has clearly confirmed ("yes", "ok", "go ahead", etc.). After a successful send the app
+  itself asks "save this recipient?" — only call save_recipient if the user asks for it or accepts.
 - Money moves only after the user taps confirm and enters their PIN. Never claim money was sent.
 - Never read a full card number aloud.
-- If several contacts match one name, show the chips card and ask — never pick yourself.
 - Say amounts in rupees.
 - The user may type or speak in English, Urdu script, or Roman Urdu (e.g. "bijli ka bill pay
   karna hai"). Understand all three — but ALWAYS reply in English, regardless of the input language.
-- Suggested intents and the tool to start from: "I want to send money" -> search_contacts;
-  "I want to pay a bill" -> list_due_bills; "What is my balance?" -> get_balance;
-  "I want to top up a phone" -> recharge; "I need my statement" -> get_statement.
-- To pay a bill: call list_due_bills first. If exactly one bill is due, immediately call
-  pay_bill(bill_id) — do not ask for a biller or consumer number when one is already on file. If
-  several are due, ask the user which one; use lookup_bill for an unlisted biller/consumer number."""
+- Suggested intents and the tool to start from: "I want to send money" -> search_recipients (if a
+  name was given) or list_institutions (if a number/IBAN was given); "I want to pay a bill" ->
+  list_saved_billers; "What is my balance?" -> get_balance; "I want to top up a phone" -> recharge;
+  "I need my statement" -> get_statement.
+- To pay a bill: call list_saved_billers first. One saved biller -> immediately call lookup_bill
+  then pay_bill, do not ask again. Several saved billers -> ask which one (chips card). None saved ->
+  ask the user for the biller and the reference/consumer number, call lookup_bill, show the result,
+  then call pay_bill only once the user confirms. After a successful payment the app itself asks
+  "save this biller?" — only call save_biller if the user asks for it or accepts."""
 
 
 URDU_MONTHS = ["جنوری", "فروری", "مارچ", "اپریل", "مئی", "جون", "جولائی", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"]
@@ -98,8 +104,23 @@ class StatementArgs(BaseModel):
     month: int | None = Field(None, description="1-12; omit for a yearly statement")
 
 
-class SearchContactsArgs(BaseModel):
-    query: str = Field(description="name (Urdu or English) or phone fragment")
+class ListInstitutionsArgs(BaseModel):
+    query: str | None = Field(None, description="bank/wallet name fragment; omit to list popular ones")
+
+
+class ResolveRecipientArgs(BaseModel):
+    institution_id: str
+    identifier: str = Field(description="phone (wallets) or IBAN/account number (banks)")
+
+
+class SearchRecipientsArgs(BaseModel):
+    query: str = Field(description="saved recipient nickname, title, or identifier fragment")
+
+
+class SaveRecipientArgs(BaseModel):
+    institution_id: str
+    identifier: str
+    nickname: str
 
 
 class LookupBillArgs(BaseModel):
@@ -107,12 +128,17 @@ class LookupBillArgs(BaseModel):
     consumer_no: str = Field(description="10-14 digit consumer number")
 
 
+class SaveBillerArgs(BaseModel):
+    biller_id: str
+    consumer_no: str
+    nickname: str
+
+
 class SendMoneyArgs(BaseModel):
     amount_paisa: int = Field(description="amount in paisa (rupees * 100)")
-    contact_id: str | None = None
-    phone: str | None = Field(None, description="+92XXXXXXXXXX")
-    bank_id: str | None = None
-    iban: str | None = None
+    recipient_id: str | None = Field(None, description="a saved recipient's id")
+    institution_id: str | None = None
+    identifier: str | None = Field(None, description="phone (wallets) or IBAN/account number (banks)")
 
 
 class PayBillArgs(BaseModel):
@@ -164,28 +190,100 @@ def build_tools(client: BackendClient, cards_sink: list[dict[str, Any]]) -> list
             coroutine=runner, name=name, description=description, args_schema=schema,
         )
 
+    # Per-run guard: send_money must not run on institution_id+identifier unless
+    # resolve_recipient was called successfully for that exact pair earlier in this
+    # same run_agent turn (recipient_id sends are already-resolved saved recipients,
+    # so they're exempt).
+    resolved_pairs: set[tuple[str, str]] = set()
+
+    def _norm_identifier(identifier: str) -> str:
+        return identifier.strip().lower()
+
+    async def resolve_recipient_runner(institution_id: str, identifier: str) -> str:
+        result = await t.resolve_recipient(client, institution_id=institution_id, identifier=identifier)
+        card = result.get("card")
+        if card:
+            cards_sink.append(card)
+            resolved_pairs.add((institution_id, _norm_identifier(identifier)))
+        return result["text"]
+
+    async def send_money_runner(
+        amount_paisa: int, recipient_id: str | None = None,
+        institution_id: str | None = None, identifier: str | None = None,
+    ) -> str:
+        if not recipient_id and institution_id and identifier:
+            if (institution_id, _norm_identifier(identifier)) not in resolved_pairs:
+                return (
+                    "ERROR: send_money cannot run on this institution_id+identifier yet — call "
+                    "resolve_recipient(institution_id, identifier) first, show the recipient card, "
+                    "and get the user's confirmation before trying send_money again."
+                )
+        result = await t.send_money(
+            client, amount_paisa=amount_paisa, recipient_id=recipient_id,
+            institution_id=institution_id, identifier=identifier,
+        )
+        card = result.get("card")
+        if card:
+            cards_sink.append(card)
+        return result["text"]
+
+    resolve_recipient_tool = StructuredTool.from_function(
+        coroutine=resolve_recipient_runner, name="resolve_recipient",
+        description=(
+            "Resolve the account title for an institution_id + identifier (phone for wallets, "
+            "IBAN/account number for banks) and show a recipient card. ALWAYS call this and get the "
+            "user's confirmation before calling send_money with institution_id+identifier."
+        ),
+        args_schema=ResolveRecipientArgs,
+    )
+    send_money_tool = StructuredTool.from_function(
+        coroutine=send_money_runner, name="send_money",
+        description=(
+            "Prepare sending money (creates a confirmation card; the user confirms with PIN). "
+            "Provide amount_paisa and EITHER recipient_id (from search_recipients) OR "
+            "institution_id+identifier — the latter REQUIRES that resolve_recipient was already "
+            "called for that exact pair and the user confirmed the recipient card; calling this "
+            "without that will be rejected."
+        ),
+        args_schema=SendMoneyArgs,
+    )
+
     return [
         wrap(t.get_balance, "get_balance", "Get the user's current wallet balance.", NoArgs),
         wrap(t.list_transactions, "list_transactions", "List recent transactions.", ListTransactionsArgs),
         wrap(t.spending_summary, "spending_summary", "Spending totals by category over a date range.", SpendingSummaryArgs),
         wrap(t.get_statement, "get_statement",
              "Generate an account statement with a downloadable PDF.", StatementArgs),
-        wrap(t.search_contacts, "search_contacts",
-             "Find saved contacts by name or phone. If several match, a chips card is shown for the user to choose.",
-             SearchContactsArgs),
+        wrap(t.list_institutions, "list_institutions",
+             "List banks/wallets the user can send to. Call with no query to show the popular ones "
+             "as chips when the user named an identifier (phone/IBAN) but no institution; call with "
+             "a query to search by name.", ListInstitutionsArgs),
+        resolve_recipient_tool,
+        wrap(t.search_recipients, "search_recipients",
+             "Find the user's saved recipients by nickname, title, or number. If several match, a "
+             "chips card is shown for the user to choose.", SearchRecipientsArgs),
+        wrap(t.save_recipient, "save_recipient",
+             "Save a resolved recipient under a nickname for future sends. Only call this if the "
+             "user asks to save or accepts the app's save prompt after a successful send.",
+             SaveRecipientArgs),
         wrap(t.list_billers, "list_billers", "List bill companies (electricity/gas/internet/water) with their ids.", NoArgs),
-        wrap(t.lookup_bill, "lookup_bill", "Look up a due bill for a consumer number.", LookupBillArgs),
+        wrap(t.lookup_bill, "lookup_bill", "Look up a bill for a biller_id + consumer number.", LookupBillArgs),
         wrap(t.list_due_bills, "list_due_bills",
-             "List the user's currently due bills (each due bill returns its own bill card). "
-             "For a 'pay a bill' request, call this FIRST. If exactly one bill is due, immediately "
-             "call pay_bill(bill_id) — do not ask for a biller or consumer number when one is already "
-             "on file. If several are due, ask the user which one before calling pay_bill.", NoArgs),
+             "List the user's currently due bills (each due bill returns its own bill card), "
+             "including due bills of saved billers.", NoArgs),
+        wrap(t.list_saved_billers, "list_saved_billers",
+             "List the user's saved billers. For a 'pay a bill' request, call this FIRST. One saved "
+             "biller -> immediately call lookup_bill then pay_bill, do not ask again. Several -> a "
+             "chips card is shown, ask which. None saved -> ask for the biller and reference number, "
+             "then use list_billers/lookup_bill.", NoArgs),
+        wrap(t.save_biller, "save_biller",
+             "Save a looked-up biller + consumer number under a nickname for future payments. Only "
+             "call this if the user asks to save or accepts the app's save prompt after a successful "
+             "payment.", SaveBillerArgs),
         wrap(t.list_pockets, "list_pockets", "List the user's savings pockets with balances and goals.", NoArgs),
         wrap(t.get_card_status, "get_card_status", "Whether the user's virtual debit card is active or frozen.", NoArgs),
         wrap(t.list_requests, "list_requests", "List incoming and outgoing money requests.", NoArgs),
-        wrap(t.send_money, "send_money",
-             "Prepare sending money (creates a confirmation card; the user confirms with PIN). "
-             "Provide amount_paisa and ONE of: contact_id, phone, or bank_id+iban.", SendMoneyArgs),
+        send_money_tool,
         wrap(t.pay_bill, "pay_bill", "Prepare paying a bill found via lookup_bill (confirmation card; PIN).", PayBillArgs),
         wrap(t.recharge, "recharge", "Prepare a mobile top-up (confirmation card; PIN).", RechargeArgs),
         wrap(t.create_pocket, "create_pocket", "Create a savings pocket.", CreatePocketArgs),
@@ -218,14 +316,23 @@ async def run_agent(
         nudged = [*state["messages"], HumanMessage(content=NUDGE)]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
         reply = _last_reply(state)
+
+    # Guard: the reply-language rule is a hard requirement. If the UI language is Urdu
+    # and the final reply carries no Arabic-script characters, re-prompt exactly once.
+    if language == "ur" and not has_arabic_script(reply):
+        lang_nudged = [*state["messages"], HumanMessage(content=URDU_LANGUAGE_NUDGE)]
+        state = await agent.ainvoke({"messages": lang_nudged}, config={"recursion_limit": 12})
+        reply = _last_reply(state)
     return str(reply), cards
 
 
 NUDGE = (
     "[SYSTEM CHECK] No card was created because you did not call any action tool. "
-    "Do it now: search_contacts → send_money, or lookup_bill → pay_bill, or recharge / "
-    "pocket_deposit / get_statement — then reply. Never describe a card that does not exist."
+    "Do it now: search_recipients/list_institutions → resolve_recipient → send_money, or "
+    "list_saved_billers/lookup_bill → pay_bill, or recharge / pocket_deposit / get_statement — "
+    "then reply. Never describe a card that does not exist."
 )
+URDU_LANGUAGE_NUDGE = "Answer in Urdu (Nastaliq script) only."
 _CARD_WORDS = ("کارڈ", "تصدیق", "card", "confirm")
 
 
