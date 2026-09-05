@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PinSheet } from '../ui/PinSheet';
 import { useExecuteActionMutation, apiErr } from '../api/client';
@@ -17,6 +17,9 @@ interface PinSheetContextValue {
    *  transaction (+ optional save suggestions), or rejects with an Error whose
    *  message is 'cancelled' if the user swipes down / taps Cancel / the backdrop. */
   openPinSheet: (action: PendingAction) => Promise<PinSheetResolution>;
+  /** True while the sheet is showing. The voice loop pauses listening on this so
+   *  PIN audio never reaches the AI service. */
+  isOpen: boolean;
 }
 
 const PinSheetContext = createContext<PinSheetContextValue | null>(null);
@@ -88,8 +91,10 @@ export function PinSheetProvider({ children }: { children: React.ReactNode }) {
   const onBackspace = useCallback(() => dispatch({ type: 'backspace' }), []);
   const onClose = useCallback(() => close('cancelled'), [close]);
 
+  const value = useMemo(() => ({ openPinSheet, isOpen: action != null }), [openPinSheet, action]);
+
   return (
-    <PinSheetContext.Provider value={{ openPinSheet }}>
+    <PinSheetContext.Provider value={value}>
       {children}
       <PinSheet
         visible={!!action}

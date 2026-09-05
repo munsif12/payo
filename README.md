@@ -4,7 +4,9 @@ PAYO is an AI-first banking demo built for a non-tech, Urdu-speaking user. Sign 
 just a **phone number** (OTP → PIN, no email/password), land on an animated AI-first
 **Home** that greets you and offers the five things people actually do, and ask PAYO for
 anything by typing or speaking ("Pay a bill", "بلال کو 1500 بھیجو", "bijli ka bill pay
-karna hai"). Every money-moving request is understood by the agent but only ever
+karna hai"). **Hands-free:** one mic tap starts a conversation that keeps listening after
+every reply — no tap per turn; tap to interrupt, tap X to end, and it ends by itself on
+silence or after 12 turns. Every money-moving request is understood by the agent but only ever
 **prepared** — a confirmation card + PIN is the only thing that ever executes it. A full
 classic wallet UI (tabs: Home / Wallet / Pay / More) covers every capability by hand, in
 either language. Demo only: no real money movement, no payment gateways.
@@ -22,7 +24,7 @@ separate page.
 
 | Piece | Stack | Highlights |
 |---|---|---|
-| `apps/mobile` | Expo SDK 57 · TypeScript · expo-router · RTK Query · i18next | Phone → OTP → PIN auth; AI-first animated Home (greeting + stagger, listening state, wrong-PIN shake); English default with an instant Urdu (RTL, Nastaliq) toggle; new design-system tokens/UI kit/motion primitives across every screen; shared confirm → PIN → execute flow |
+| `apps/mobile` | Expo SDK 57 · TypeScript · expo-router · RTK Query · i18next | Phone → OTP → PIN auth; AI-first animated Home (greeting + stagger, listening state, wrong-PIN shake); English default with an instant Urdu (RTL, Nastaliq) toggle; new design-system tokens/UI kit/motion primitives across every screen; shared confirm → PIN → execute flow; hands-free voice loop (pure reducer + `useVoiceLoop`: two-timer silence detection, no send without speech, tap-to-interrupt, PIN pause, 12-turn credit cap); **99 jest tests** |
 | `services/backend` | Node 20 · Express 4 · Mongoose 8 · TS · zod · pdfkit | All money movement; pending-action engine (PIN-gated, idempotent, 2-min expiry, atomic Mongo transactions); phone-only OTP auth, profile, institutions directory + recipient resolve/save, due bills, transfers, bills, saved billers, recharges, requests, pockets, cards, statements (PDF, English-only), QR, chat persistence; deterministic seed world; **91 jest tests** |
 | `services/ai` | Python 3.12 · FastAPI · LangGraph · Gemini · Cartesia | The agent is *just another client*: tools calling the backend with the user's JWT — write tools only ever create pending actions. Bank-aware send flow (institution chips, resolve gate, saved recipients), saved billers, in-chat save prompts. Understands English, Urdu script, and Roman Urdu; always replies in the user's selected language, Urdu transcription in Perso-Arabic script only. Gemini native-audio in, Cartesia TTS out (silent stub without a key), SSE per contract; **69 pytest tests** |
 | `scripts/mock-ai` | FastAPI | Offline/no-key demo fallback: same SSE contract, real backend actions, canned reasoning for the demo utterances |

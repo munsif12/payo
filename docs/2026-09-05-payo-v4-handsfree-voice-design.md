@@ -24,6 +24,11 @@ Rules the user will feel:
 6. **Typing ends the conversation.** Sending a typed message while live switches back to
    tap-per-turn (the user changed modality). Tapping a suggestion card while live keeps it live.
 7. Backgrounding the app or leaving the Home tab ends the conversation (no hot mic).
+8. **A conversation is capped at 12 spoken turns.** Every hands-free turn costs a Gemini
+   call and a Cartesia synthesis, and a live mic in a noisy room never goes silent (seen on
+   the simulator: room conversation kept the loop alive). After the 12th turn the reply is
+   still spoken, then the loop ends with "Conversation paused after 12 turns — tap the mic
+   to continue". One tap resumes.
 
 ## 2. Mobile design (apps/mobile — the only service that changes)
 
@@ -79,6 +84,11 @@ Constants in `src/voice/loopConfig.ts` (unit-tested for the documented values):
 | `MAX_CLIP_MS` | 15000 | hard cap per clip (unchanged) |
 | `REARM_DELAY_MS` | 300 | gap after playback ends before the mic opens (audio tail) |
 | `MAX_SILENT_TURNS` | 2 | consecutive no-speech windows before the loop ends |
+| `MAX_AUTO_TURNS` | 12 | spoken turns per conversation before it ends with reason `limit` (rule 8) |
+
+`VoiceLoopState` also carries `autoTurns` (reset on `start`, +1 on each live `sent`) and
+`endedReason` gains `'limit'`. When `autoTurns` has reached `MAX_AUTO_TURNS`, the next
+`audioEnded` / `turnDone` goes to `off` (reason `limit`) instead of `listening`.
 
 ### 2.2 Recorder — `src/voice/useRecorder.ts`
 
@@ -140,7 +150,8 @@ can pause; no other PIN changes.
   you're done — tap X to end"); after an automatic end, `home.voice.ended` ("Conversation
   ended — tap the mic to start again") until the next tap.
 - i18n keys (en + ur): `home.voice.listening`, `home.voice.thinking`,
-  `home.voice.speakingTap`, `home.voice.paused`, `home.voice.hintLive`, `home.voice.ended`.
+  `home.voice.speakingTap`, `home.voice.paused`, `home.voice.hintLive`, `home.voice.ended`,
+  `home.voice.endedLimit` (shown for reason `limit`).
   Existing `home.hint.listeningFootnote` becomes "Just pause when you're done".
 - Motion: existing primitives only; reduced motion already handled inside them.
 - Accessibility: the status bar has `accessibilityRole="button"` only while speaking, with a
@@ -160,10 +171,13 @@ Unit (jest + tsc): reducer covers every row of the table plus the silent-turn ca
 pause/resume; `silenceDecision` covers pre-speech timeout, post-speech silence, speech
 detection; `speakSafetyMs` covers known/unknown duration; i18n parity.
 
-Simulator (no microphone available — the recorder hears silence):
+Simulator (the iOS simulator forwards the Mac's microphone, so real speech works; run
+item 1 in a quiet room or with the Mac's input muted):
 
 1. Tap mic → status bar "Listening…", mic shows X → after ~6 s it re-arms once → after
    ~6 s more the loop ends with the "Conversation ended" hint. No `/converse` call was made.
+   With speech present instead: the clip is sent, the reply is spoken, and "Listening…"
+   returns by itself — no tap.
 2. Tap mic → tap the "Check my balance" suggestion → "Thinking…" → "Speaking… tap to
    interrupt" (with TTS on) → tap it → playback stops, "Listening…" within ~300 ms.
 3. Tap mic → type a message → the loop ends (`typed`), the message is sent normally.

@@ -7,6 +7,7 @@ import { postSse } from '../lib/sse';
 import type { RootState } from '../store';
 import i18n from '../i18n';
 import { createInFlightGate } from './inFlightGate';
+import { speakSafetyMs } from './speakSafety';
 
 export interface ChatCard { kind: string; [k: string]: unknown }
 export interface ChatMessage {
@@ -18,10 +19,19 @@ export interface ChatMessage {
 
 export type ConverseStatus = 'idle' | 'thinking' | 'speaking';
 
+export interface ConverseOptions {
+  /** Playback of this turn's audio finished (didJustFinish) or the safety cap fired. Once per turn. */
+  onSpeechEnd?: () => void;
+  /** SSE `done` arrived and no `audio` event was seen in this turn (text-only reply). */
+  onTurnDone?: () => void;
+  /** A server-sent `error` event, or a transport error on the stream. */
+  onError?: () => void;
+}
+
 let nextId = 0;
 const mid = () => `local-${Date.now().toString(36)}-${++nextId}`;
 
-export function useConverse() {
+export function useConverse(opts?: ConverseOptions) {
   const token = useSelector((s: RootState) => s.auth.token);
   const dispatch = useDispatch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -30,6 +40,20 @@ export function useConverse() {
   const soundRef = useRef<AudioPlayer | null>(null);
   const speakTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightGate = useRef(createInFlightGate()).current;
+  // Kept in a ref so the SSE/player callbacks below always see the latest
+  // handlers without having to be re-created on every render.
+  const optsRef = useRef<ConverseOptions | undefined>(opts);
+  optsRef.current = opts;
+  /** Did this turn ever produce an `audio` event? Decides onTurnDone vs onSpeechEnd. */
+  const audioThisTurn = useRef(false);
+  /** onSpeechEnd fires at most once per turn (didJustFinish *and* the cap can race). */
+  const speechEndFired = useRef(false);
+
+  const fireSpeechEnd = () => {
+    if (speechEndFired.current) return;
+    speechEndFired.current = true;
+    optsRef.current?.onSpeechEnd?.();
+  };
 
   useEffect(() => {
     return () => {
@@ -49,28 +73,80 @@ export function useConverse() {
     }
   };
 
+  const endSpeaking = () => {
+    setStatus(cur => (cur === 'speaking' ? 'idle' : cur));
+    fireSpeechEnd();
+  };
+
+  /** (Re)arms the safety cap from the audio still left to play.
+   *  v3 used a flat 4 s, which truncated any reply longer than that. The cap is
+   *  now derived from the player (speakSafetyMs) and re-armed on *every* status
+   *  update, so a buffering stall or an output-route change pushes it back
+   *  instead of firing over live audio and opening the mic into the speaker.
+   *  @param remainingMs audio left to play in ms, or null while unknown. */
+  const armSpeakTimeout = (remainingMs?: number | null) => {
+    clearSpeakTimeout();
+    const ms = speakSafetyMs(remainingMs);
+    speakTimeoutRef.current = setTimeout(() => {
+      speakTimeoutRef.current = null;
+      endSpeaking();
+    }, ms);
+  };
+
   const playAudio = async (url: string) => {
     try {
       soundRef.current?.remove();
       clearSpeakTimeout();
+      audioThisTurn.current = true;
+      speechEndFired.current = false;
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
       const player = createAudioPlayer({ uri: `${aiUrl()}${url}` });
       soundRef.current = player;
       setStatus('speaking');
+      let finished = false;
       player.addListener('playbackStatusUpdate', (s) => {
-        if (s.didJustFinish) setStatus(cur => (cur === 'speaking' ? 'idle' : cur));
+        // expo-audio can keep emitting after the end of the track; once this
+        // turn is done, no later update may re-arm the cap.
+        if (finished) return;
+        if (s.didJustFinish) {
+          finished = true;
+          clearSpeakTimeout();
+          endSpeaking();
+          return;
+        }
+        if (!s.playing) {
+          // Buffering / interrupted / not started yet: nothing is being
+          // consumed, so the remaining-time cap would be meaningless. Fall back
+          // to the unknown ceiling, which also stops a permanent stall from
+          // leaving the UI stuck in "speaking".
+          armSpeakTimeout(null);
+          return;
+        }
+        const remainingMs = s.duration > 0 ? (s.duration - s.currentTime) * 1000 : null;
+        armSpeakTimeout(remainingMs);
       });
       player.play();
-      // Safety: never leave the UI stuck in "speaking" (stub audio is ~0.1s).
-      // Kept in a ref so a new turn (or unmount) can cancel it — otherwise a
-      // stale timer could flip a later turn's "speaking" back to "idle".
-      speakTimeoutRef.current = setTimeout(() => {
-        setStatus(cur => (cur === 'speaking' ? 'idle' : cur));
-        speakTimeoutRef.current = null;
-      }, 4000);
+      // Until the first status update arrives, hold the generous unknown
+      // ceiling so the UI can never be stuck in "speaking". Kept in a ref so a
+      // new turn (or unmount, or interrupt) can cancel it.
+      armSpeakTimeout(null);
     } catch {
       setStatus('idle');
     }
+  };
+
+  /** Stops and removes the player immediately (tap-to-interrupt). Deliberately
+   *  does NOT fire onSpeechEnd — the loop hook dispatches `interrupt` itself. */
+  const interrupt = () => {
+    clearSpeakTimeout();
+    speechEndFired.current = true;
+    try {
+      soundRef.current?.remove();
+    } catch {
+      // player already torn down — nothing to release.
+    }
+    soundRef.current = null;
+    setStatus('idle');
   };
 
   const run = (opts: { text?: string; audioUri?: string; userBubble: string | null }) => {
@@ -80,6 +156,8 @@ export function useConverse() {
     soundRef.current?.remove();
     soundRef.current = null;
     clearSpeakTimeout();
+    audioThisTurn.current = false;
+    speechEndFired.current = false;
     setStatus('thinking');
     if (opts.userBubble != null) append({ id: mid(), role: 'user', text: opts.userBubble, cards: [] });
     const assistantId = mid();
@@ -127,6 +205,7 @@ export function useConverse() {
           case 'done':
             sessionId.current = String(d.sessionId);
             setStatus(s => (s === 'thinking' ? 'idle' : s));
+            if (!audioThisTurn.current) optsRef.current?.onTurnDone?.();
             break;
           case 'error':
             append({ id: mid(), role: 'error', text: String(d.message ?? 'Error'), cards: [] });
@@ -138,6 +217,7 @@ export function useConverse() {
             // a harmless no-op.
             inFlightGate.release();
             // The AI service forwards backend auth failures verbatim: the stored session is dead.
+            optsRef.current?.onError?.();
             if (d.code === 'UNAUTHORIZED' || d.code === 'SESSION_EXPIRED') dispatch(signedOut());
             break;
         }
@@ -149,6 +229,7 @@ export function useConverse() {
       onError: () => {
         append({ id: mid(), role: 'error', text: i18n.t('voice.networkError'), cards: [] });
         setStatus('idle');
+        optsRef.current?.onError?.();
         inFlightGate.release();
       },
     });
@@ -164,5 +245,5 @@ export function useConverse() {
   const appendLocal = (message: Omit<ChatMessage, 'id'> & { id?: string }) =>
     append({ id: message.id ?? mid(), role: message.role, text: message.text, cards: message.cards });
 
-  return { messages, status, sendText, sendAudio, appendLocal };
+  return { messages, status, sendText, sendAudio, appendLocal, interrupt };
 }

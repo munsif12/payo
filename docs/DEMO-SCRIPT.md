@@ -23,7 +23,9 @@ English mode.
 
 **Say (en):** "This is PAYO — an AI-first bank built for the hardest customer on a
 smartphone: our parents. Phone number and a PIN — no passwords, no forms. It greets you
-by name and hands you the five things you actually came to do."
+by name and hands you the five things you actually came to do. And you talk to it like a
+phone call — tap the mic once, then just speak and listen; it keeps the conversation going
+until your job is done."
 **اردو کے لیے:** «یہ PAYO ہے — ایک AI بینک، سب سے مشکل صارف کے لیے: ہمارے والدین۔ نہ
 پاس ورڈ، نہ فارم — بس فون نمبر اور پن۔»
 **Audience sees:** Home screen — animated greeting ("Good morning, Ammi Jaan"), balance
@@ -97,8 +99,14 @@ to every screen, and a grandmother who never has to see a form. That's PAYO."
 - If the network/LLM hiccups, PAYO shows a polite error bubble in the current language —
   repeat the turn, or fall back to the scripted demo server (`scripts/mock-ai/`), which
   needs no cloud and handles the demo utterances above.
-- If the mic misfires in a simulator, use the typed input — the flow is identical; there
-  is no real microphone in a simulator, so lean on typed/Roman-Urdu input for Flow B.
+- The iOS simulator forwards the Mac's microphone, so speaking works there too. If the
+  mic misfires, use the typed input — the flow is identical. Typing while a hands-free
+  conversation is live ends it (by design); tap the mic again to go hands-free.
+- Hands-free: one mic tap starts a conversation that keeps listening after every reply.
+  Tap "Speaking… tap to interrupt" to cut the assistant off; tap X to end. It ends on its
+  own after two silent turns or after 12 spoken turns (credit guard). In a noisy room
+  mute the Mac's input between flows — stray speech is a real turn and costs a Gemini +
+  Cartesia call.
 - Wrong PIN on purpose is a nice extra beat: the pad shakes back with an inline error
   ("Wrong PIN, try again" / «پن غلط ہے، دوبارہ کوشش کریں») and nothing moves — the
   session stays signed in either way. This works identically whether the PIN sheet

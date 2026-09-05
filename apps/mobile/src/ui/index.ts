@@ -22,3 +22,5 @@ export { AIBar } from './AIBar';
 export { Composer } from './Composer';
 export type { ComposerProps } from './Composer';
 export { Screen } from './Screen';
+export { VoiceStatusBar } from './VoiceStatusBar';
+export type { VoiceStatusBarProps } from './VoiceStatusBar';

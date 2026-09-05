@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, View, StyleProp, ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, StyleProp, ViewStyle } from 'react-native';
 import { Keyboard, Mic, X } from 'lucide-react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -19,7 +19,8 @@ export interface ComposerProps {
   onSubmit?: () => void;
   placeholder: string;
   hint?: string;
-  listening: boolean;
+  /** True while the hands-free conversation is live: the mic shows the navy X. */
+  live: boolean;
   onMicPress: () => void;
   onStopListening: () => void;
   style?: StyleProp<ViewStyle>;
@@ -29,7 +30,7 @@ export interface ComposerProps {
 // input pill + 64pt amber mic that breathes while idle. Listening flips the
 // mic to a navy button with an X and two expanding ListeningRings, per
 // Motion.dc.html "Mic idle" / "Listening" rows.
-export function Composer({ value, onChangeText, onSubmit, placeholder, hint, listening, onMicPress, onStopListening, style }: ComposerProps) {
+export function Composer({ value, onChangeText, onSubmit, placeholder, hint, live, onMicPress, onStopListening, style }: ComposerProps) {
   const { c } = useTheme();
   const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
 
@@ -42,12 +43,19 @@ export function Composer({ value, onChangeText, onSubmit, placeholder, hint, lis
           onChangeText={onChangeText}
           onSubmitEditing={onSubmit}
           placeholder={placeholder}
-          editable={!listening}
+          // Stays editable while live: typing is how the user hands the
+          // conversation back to tap-per-turn (v4 spec §1 rule 6).
           containerStyle={{ flex: 1, borderRadius: 28 }}
         />
-        {listening ? (
+        {live ? (
           <View style={{ width: MIC_SIZE, height: MIC_SIZE }}>
-            <ListeningRings size={MIC_SIZE} color={c.amber} />
+            {/* The rings render in normal flow inside their own MIC_SIZE box, so
+                they must be taken out of it — otherwise the X button stacks
+                *below* them and lands on the hint line. ListeningRings itself is
+                left untouched: the Home listening takeover lays it out inline. */}
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+              <ListeningRings size={MIC_SIZE} color={c.amber} />
+            </View>
             <AnimatedPressable
               testID="composer-stop-listening"
               accessibilityRole="button"

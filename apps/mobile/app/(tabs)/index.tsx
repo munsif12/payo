@@ -1,14 +1,16 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, Eye, EyeOff, Sparkles } from 'lucide-react-native';
-import { Screen, Text, Card, Pill, Avatar, Composer, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, Pill, Avatar, Composer, VoiceStatusBar, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space, radius } from '../../src/theme/tokens';
 import { Rise, TypingDots, WaveBars } from '../../src/motion';
 import { CardView } from '../../src/components/cards/CardView';
 import { useConverse, type ChatMessage } from '../../src/voice/useConverse';
 import { useRecorder } from '../../src/voice/useRecorder';
+import { useVoiceLoop, type VoiceLoopHandlers } from '../../src/voice/useVoiceLoop';
+import { usePinSheet } from '../../src/pin/usePinSheet';
 import { useHomeGreeting, type Suggestion } from '../../src/home/useHomeGreeting';
 import { formatPaisa } from '../../src/lib/money';
 import { ltrIsolate } from '../../src/lib/bidi';
@@ -24,20 +26,49 @@ export default function Home() {
   const { greetingFoot, name, greetingMessage, suggestions, balancePaisa } = useHomeGreeting();
   const [balanceRevealed, setBalanceRevealed] = useState(false);
   const [draft, setDraft] = useState('');
-  const { messages, status, sendText, sendAudio, appendLocal } = useConverse();
-  const { recording, start, stop } = useRecorder(({ uri }) => sendAudio(uri));
+  // useConverse and useRecorder own native state and must exist before the loop
+  // that drives them, so their callbacks are forwarded through this ref to the
+  // loop's stable handlers (see useVoiceLoop's VoiceLoopHandlers).
+  const loopRef = useRef<VoiceLoopHandlers | null>(null);
+  const converse = useConverse({
+    onSpeechEnd: () => loopRef.current?.onSpeechEnd(),
+    onTurnDone: () => loopRef.current?.onTurnDone(),
+    onError: () => loopRef.current?.onError(),
+  });
+  const { messages, status, sendText, appendLocal } = converse;
+  const recorder = useRecorder((result) => loopRef.current?.onRecordingFinished(result));
+  const { recording } = recorder;
+  const { isOpen: pinSheetOpen } = usePinSheet();
+  const loop = useVoiceLoop({ recorder, converse, pinSheetOpen });
+  // Assigned in an effect, not during render — render must stay side-effect
+  // free (Strict Mode double-renders, and a discarded render would otherwise
+  // leave the ref pointing at a loop that never mounted).
+  useEffect(() => {
+    loopRef.current = loop.handlers;
+  }, [loop.handlers]);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+
+  const live = loop.mode !== 'off';
 
   const submitDraft = () => {
     const text = draft.trim();
     if (!text) return;
     setDraft('');
-    sendText(text);
+    // Typing hands the conversation back to tap-per-turn (spec §1 rule 6).
+    loop.onTextSend(text);
   };
 
   const hasMessages = messages.length > 0;
   const placeholder = recording ? t('home.hint.listening') : t('home.composerPlaceholder');
-  const hint = recording ? undefined : status === 'thinking' ? t('home.hint.thinking') : t('home.hint.tap');
+  // 'typed' ends the loop because the user took over by hand — no "conversation
+  // ended" nudge is wanted there; 'limit' gets its own copy (the cost guard).
+  const endedHint =
+    loop.endedReason === 'limit' ? t('home.voice.endedLimit')
+      : loop.endedReason && loop.endedReason !== 'typed' ? t('home.voice.ended')
+        : null;
+  const hint = live
+    ? t('home.voice.hintLive')
+    : endedHint ?? (status === 'thinking' ? t('home.hint.thinking') : t('home.hint.tap'));
 
   return (
     <Screen padded={false}>
@@ -73,7 +104,11 @@ export default function Home() {
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        {recording ? (
+        {recording && !live ? (
+          // The full-screen listening takeover only applies to a legacy
+          // tap-per-turn recording. While a hands-free conversation is live the
+          // VoiceStatusBar above the composer carries the state instead, so the
+          // messages and suggestion cards stay reachable (spec §4 item 2).
           <ListeningContent />
         ) : hasMessages ? (
           <FlatList
@@ -110,22 +145,29 @@ export default function Home() {
 
             <View style={{ gap: space.s }}>
               {suggestions.map((s, i) => (
-                <SuggestionCard key={s.key} suggestion={s} delay={(i + 1) * 60} onPress={() => sendText(s.intent)} />
+                <SuggestionCard
+                  key={s.key}
+                  suggestion={s}
+                  delay={(i + 1) * 60}
+                  // A suggestion tap keeps the conversation live (spec §1 rule 6).
+                  onPress={() => (live ? loop.sendSuggestion(s.intent) : sendText(s.intent))}
+                />
               ))}
             </View>
           </View>
         )}
 
         <View style={{ paddingHorizontal: space.gutter, paddingBottom: space.s, paddingTop: space.s }}>
+          {live ? <VoiceStatusBar mode={loop.mode} onInterrupt={loop.interrupt} style={{ marginBottom: space.s }} /> : null}
           <Composer
             value={draft}
             onChangeText={setDraft}
             onSubmit={submitDraft}
             placeholder={placeholder}
             hint={hint}
-            listening={recording}
-            onMicPress={start}
-            onStopListening={stop}
+            live={live}
+            onMicPress={loop.start}
+            onStopListening={() => loop.stop('user')}
           />
         </View>
       </KeyboardAvoidingView>
