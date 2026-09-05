@@ -11,7 +11,12 @@ shows it as a card:** last transaction (receipt), spend by category with month-o
 comparison, your card (masked; freeze instantly, unfreeze with PIN), statements, saved
 recipients and billers, pockets, money requests with Approve/Decline, your QR, profile and
 language ("switch to Urdu"), and help. When a card is shown the text is spoken, not
-displayed — the card carries the detail, the voice carries the gist. Every money-moving request is understood by the agent but only ever
+displayed — the card carries the detail, the voice carries the gist. **Built for the family
+around the user:** a **trusted contact** approves large sends to new recipients with their
+own PIN (people you already pay never wait; loosening the rule cools for 24 h — set
+`GUARDIAN_COOLING_MS=0` for a demo), a **scam check-in** asks one calm question before a risky
+send and stops it if someone asked you to pay, and PAYO **speaks first** when you open the
+app (money received, bills due, approvals waiting — a setting, on by default). Every money-moving request is understood by the agent but only ever
 **prepared** — a confirmation card + PIN is the only thing that ever executes it. A full
 classic wallet UI (tabs: Home / Wallet / Pay / More) covers every capability by hand, in
 either language. Demo only: no real money movement, no payment gateways.

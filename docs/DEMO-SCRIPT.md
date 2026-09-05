@@ -98,6 +98,28 @@ here on. Try «مدد» for the help card, «میرے بچت والے پاکٹ �
 **Say (en):** "Every screen in the classic app has a spoken equivalent, and every answer
 is a card — because our users don't read menus, they ask."
 
+## Flow F — "Ask my son first": the guardian and the scam call (2 min) ⭐ for investors
+
+**Setup:** second phone/simulator signed in as Bilal (`3001110002`). Backend started with
+`GUARDIAN_COOLING_MS=0` (demo) so guardian changes apply instantly.
+**Say (en):** *say:* "Make 03001110002 my trusted contact." → guardian card → Manage in
+Settings → PIN. "Now Bilal is asked before I send a large amount to someone new — but not
+for the people I already pay."
+**Say (en):** *say:* "Send 30,000 rupees to 03001110003 on PAYO." → recipient card → Yes.
+**Audience sees:** the **check-in card** — "Did someone call or message you and ask you to
+send this?" with "Large payment to someone new". Tap *No, this is my own idea*. The card turns
+into **Waiting for Bilal** with a 30-minute clock and a Remind button. No PIN yet.
+**On Bilal's phone:** say "anything waiting for my approval?" → the approval card → Approve →
+**his** PIN. **On Ammi's phone:** within three seconds the PIN sheet opens by itself — "Bilal
+approved — enter your PIN" → sent.
+**Say (en):** "Now the call every family fears." *say:* "Someone called and said my account
+will be blocked unless I send 5,000 rupees to 03001110004 right now." → Yes → the check-in
+card again. Tap *Yes, someone asked me*.
+**Audience sees:** "Stopped — nothing was sent. That is how most scams work… I can call your
+trusted contact if you want."
+**Say (en):** "PAYO never argues with the customer and never blocks them. It asks one calm
+question, at the one moment it matters, and it knows who to call."
+
 ## Flow D — Classic layer: Wallet / Activity (45 s)
 
 **Say (en):** "Everything the AI can do, your hands can do too — that's the second
