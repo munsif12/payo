@@ -41,6 +41,19 @@ export function shouldAutoOpenPin(input: {
   return true;
 }
 
+/** Should a confirmation card render its money line?
+ *
+ *  Not every pending action moves money: `card_unfreeze` (F1.2) is created with
+ *  `amountPaisa: 0` purely so it can be PIN-gated. Rendering that as "₨0" reads
+ *  like a broken amount, so the line is dropped and the summary carries the
+ *  whole message. Pure so the rule is unit-testable without rendering.
+ *
+ *  Only exactly zero hides the line — a negative or NaN amount is a bug worth
+ *  seeing on screen rather than silently swallowing. */
+export function showConfirmationAmount(amountPaisa: number): boolean {
+  return amountPaisa !== 0;
+}
+
 /** Consult shouldAutoOpenPin for `actionId` and, when it says yes, record the id
  *  so no later mount of the same card can open the sheet again. The single
  *  entry point CardView uses — keeping the check and the record together is what

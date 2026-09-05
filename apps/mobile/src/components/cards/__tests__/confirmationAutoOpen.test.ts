@@ -1,5 +1,6 @@
 import {
   shouldAutoOpenPin, claimAutoOpenPin, releaseAutoOpen, buildResultCards, resetAutoOpenGuard,
+  showConfirmationAmount,
 } from '../confirmationPolicy';
 
 const base = { requiresPin: true, live: true, done: false, alreadyOpened: false };
@@ -76,6 +77,21 @@ describe('claimAutoOpenPin (the once-per-actionId guard)', () => {
     expect(claimAutoOpenPin('a-3', { requiresPin: true, live: false, done: false })).toBe(false);
     // Same card arriving live later (e.g. history replaced by a live turn) still opens.
     expect(claimAutoOpenPin('a-3', { requiresPin: true, live: true, done: false })).toBe(true);
+  });
+});
+
+describe('showConfirmationAmount (non-money actions)', () => {
+  test('hides the money line for a zero-amount action (card_unfreeze)', () => {
+    expect(showConfirmationAmount(0)).toBe(false);
+  });
+
+  test('shows the money line for any real amount', () => {
+    expect(showConfirmationAmount(1)).toBe(true);
+    expect(showConfirmationAmount(50000)).toBe(true);
+  });
+
+  test('a negative amount is still shown — that is a bug worth seeing, not one to hide', () => {
+    expect(showConfirmationAmount(-100)).toBe(true);
   });
 });
 

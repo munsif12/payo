@@ -21,7 +21,9 @@ import { maskIdentifier } from '../../lib/mask';
 import i18n, { applyLanguage } from '../../i18n';
 import type { PendingAction, CardSummary, RecipientSuggestion, BillerSuggestion } from '../../api/types';
 import type { ChatCard, ChatMessage } from '../../voice/useConverse';
-import { claimAutoOpenPin, releaseAutoOpen, buildResultCards } from './confirmationPolicy';
+import {
+  claimAutoOpenPin, releaseAutoOpen, buildResultCards, showConfirmationAmount,
+} from './confirmationPolicy';
 import type {
   RecipientCard as RecipientCardShape,
   RecipientChip, InstitutionChip, BillerChip, SavePromptCard as SavePromptCardShape,
@@ -158,7 +160,9 @@ function ConfirmationCardView({ card, onAppendLocal, live }: {
   return (
     <NewCard style={{ marginTop: space.s, borderWidth: 1, borderColor: undefined, gap: space.m, alignItems: 'center' }}>
       <Text variant="hl" center>{urdu ? summary.ur : summary.en}</Text>
-      <Text variant="money">{formatPaisa(Number(card.amountPaisa))}</Text>
+      {showConfirmationAmount(Number(card.amountPaisa)) ? (
+        <Text variant="money">{formatPaisa(Number(card.amountPaisa))}</Text>
+      ) : null}
       <Button
         testID={done ? 'chat-confirm-done' : 'chat-confirm'}
         variant={done ? 'secondary' : 'primary'}
