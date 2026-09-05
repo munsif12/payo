@@ -10,7 +10,7 @@ from typing import Any, AsyncIterator
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from .agent import run_agent
+from .agent import normalize_identifier, run_agent
 from .backend_client import BackendClient, BackendError
 from .config import settings
 from .lang import reply_language
@@ -270,7 +270,7 @@ def _resolved_pairs_from_messages(items: list[dict[str, Any]]) -> set[tuple[str,
                 institution_id = (card.get("institution") or {}).get("id")
                 identifier = card.get("identifier")
                 if institution_id and identifier:
-                    pairs.add((institution_id, identifier.strip().lower()))
+                    pairs.add((institution_id, normalize_identifier(identifier)))
     return pairs
 
 

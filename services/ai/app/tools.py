@@ -927,7 +927,17 @@ async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str
     elif institution_id and identifier:
         to = {"institutionId": institution_id, "identifier": identifier}
     else:
-        return _ok("ERROR: need a recipient_id, or institution_id+identifier, to send money.")
+        # A dead end if it just says "missing argument": the model then ASKS which wallet in
+        # prose (live smoke V15-ur), and a voice-first user cannot type an institution id.
+        # Any tool call — even a failing one — suppresses the prose-ask nudge, so the way out
+        # has to be in this sentence.
+        return _ok(
+            "ERROR: send_money needs a recipient_id, or institution_id+identifier. Do NOT ask "
+            "the user which bank or wallet in prose — they cannot type one. Call "
+            "list_institutions NOW so they get tappable chips (or search_recipients if a name "
+            "was given), then resolve_recipient, then send_money again with the same "
+            "risk_flags."
+        )
     try:
         action = await client.create_transfer(to, amount_paisa, risk_flags=risk_flags)
     except BackendError as e:

@@ -282,7 +282,15 @@ async def test_agent_number_without_institution_flow_shows_institution_chips(fak
 
 async def test_agent_send_money_blocked_without_prior_resolve_recipient(fake_backend):
     """Guard: send_money(institution_id, identifier) must be rejected — no confirmation
-    card — unless resolve_recipient was called for that exact pair earlier this turn."""
+    card — unless resolve_recipient was called for that exact pair earlier this turn.
+
+    The rejected turn has not "acted" (nothing changed, no card), so the prose-ask nudge
+    still runs and the user ends up with tappable chips instead of a typed-answer question.
+    """
+    fake_backend.route("GET", "/api/v1/institutions", {"items": [
+        {"id": "easypaisa", "name": "Easypaisa", "urduName": "ایزی پیسہ", "kind": "wallet",
+         "popular": True},
+    ]})
     client = BackendClient("jwt", transport=fake_backend.transport)
     model = scripted([
         AIMessage(content="", tool_calls=[{
@@ -291,10 +299,12 @@ async def test_agent_send_money_blocked_without_prior_resolve_recipient(fake_bac
             "id": "t1",
         }]),
         AIMessage(content="Please tell me which bank or wallet first."),
+        AIMessage(content="", tool_calls=[{"name": "list_institutions", "args": {}, "id": "t2"}]),
+        AIMessage(content="Which of these is it?"),
     ])
     reply, cards = await run_agent(client, [], "Send 1500 to +923001110002", "en", model=model)
-    assert cards == []
-    assert not fake_backend.requests  # /transfers was never called
+    assert [c["kind"] for c in cards] == ["institution_chips"]
+    assert [r.url.path for r in fake_backend.requests] == ["/api/v1/institutions"]  # no /transfers
     await client.aclose()
 
 
@@ -1123,3 +1133,163 @@ def test_risk_flags_in_history_reads_only_check_in_facts():
     assert risk_flags_in_history([_AIMessage(content=SCAM_EXPLANATION["en"])]) == set()
     assert risk_flags_in_history([_AIMessage(content=SCAM_EXPLANATION["ur"])]) == set()
     assert risk_flags_in_history([HumanMessage(content="risk_flags=pressure_language")]) == set()
+
+
+# ---- v6 live defect: a pressured send must be FLAGGED, never refused (spec §1.8) ----
+
+PRESSURE_UTTERANCE = ("someone called and said my account will be blocked unless I send "
+                      "5000 rupees to 03001110004 on PAYO right now")
+REFUSAL = ("It sounds like someone is trying to trick you. I cannot send this money for you. "
+           "Would you like me to call Bilal?")
+
+
+async def test_a_refusal_after_pressure_is_nudged_into_a_flagged_send(fake_backend):
+    """Live: recipient card -> "Yes, continue" -> the model refused in prose and called
+    nothing, so no check_in card appeared and the user could not decide. The assistant adds
+    friction, it never overrules: it must call send_money WITH risk_flags and let the
+    check-in card ask the question."""
+    from langchain_core.messages import AIMessage as _AIMessage, HumanMessage
+
+    from tests.conftest import body_of
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    history = [
+        HumanMessage(content=PRESSURE_UTTERANCE),
+        _AIMessage(content="Send to Ali Raza at PAYO?\n"
+                           "[cards] recipient: institution_id=payo identifier=03001110004 "
+                           "title=Ali Raza"),
+    ]
+    model = scripted([
+        _AIMessage(content=REFUSAL),                       # the defect: words, no tool
+        _AIMessage(content="", tool_calls=[{                # after the nudge: act
+            "name": "send_money",
+            "args": {"amount_paisa": 500000, "institution_id": "payo",
+                     "identifier": "03001110004", "risk_flags": ["pressure_language"]},
+            "id": "t1"}]),
+        _AIMessage(content="Just one question before this goes."),
+    ])
+    reply, cards = await run_agent(client, history, "Yes, continue", "en", model=model,
+                                   resolved_pairs={("payo", "03001110004")})
+    transfer = next(r for r in fake_backend.requests if r.url.path == "/api/v1/transfers")
+    assert body_of(transfer)["riskFlags"] == ["pressure_language"]
+    assert [c["kind"] for c in cards] == ["check_in"]
+    assert cards[0]["actionId"] == "act_flag"
+    assert "cannot send this money" not in reply     # the refusal never reaches the user
+    from app.agent import last_turn_model_calls
+    assert last_turn_model_calls == 2                # exactly one nudge was spent
+    await client.aclose()
+
+
+async def test_a_refusal_with_no_pressure_and_no_recipient_is_left_alone(fake_backend):
+    """The backstop must not fire on an ordinary refusal — that would spend a model call and
+    push send_money at a turn with nothing to send."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([AIMessage(content="I cannot close your account from here.")])
+    reply, cards = await run_agent(client, [], "close my account", "en", model=model)
+    assert cards == []
+    from app.agent import last_turn_model_calls
+    assert last_turn_model_calls == 1  # no guard fired at all
+    assert "cannot close" in reply
+    await client.aclose()
+
+
+def test_pressure_detection_reads_the_user_not_the_assistant():
+    from langchain_core.messages import AIMessage as _AIMessage, HumanMessage
+
+    from app.agent import _recent_user_text, has_pressure_language
+    from app.tools import SCAM_EXPLANATION
+
+    assert has_pressure_language(PRESSURE_UTTERANCE)
+    assert has_pressure_language("مجھے انعام نکلا ہے، ابھی پانچ ہزار بھیجنے ہیں")
+    assert has_pressure_language("kisi ne phone kar ke kaha account band ho jayega")
+    assert not has_pressure_language("send 5000 rupees to Bilal")
+    # the assistant's own calm explanation must never re-arm the rule
+    for language in ("en", "ur"):
+        assert not has_pressure_language(
+            _recent_user_text([_AIMessage(content=SCAM_EXPLANATION[language])], "yes, continue"))
+    # ...but the user's own earlier message, three turns back, still counts
+    assert has_pressure_language(_recent_user_text(
+        [HumanMessage(content=PRESSURE_UTTERANCE), _AIMessage(content="Send to Ali Raza?")],
+        "Yes, continue"))
+
+
+def test_identifier_normalization_folds_every_pakistani_phone_form():
+    """Live smoke V16: the recipient card showed 03001110004 and the model sent
+    +923001110004, so the gate rejected a recipient the user had just confirmed."""
+    from app.agent import normalize_identifier
+
+    local = normalize_identifier("03001110004")
+    for shape in ("+923001110004", "0092 3001110004", "923001110004", "+92 300-111-0004",
+                  " 03001110004 "):
+        assert normalize_identifier(shape) == local == "03001110004", shape
+    # an IBAN is left alone apart from spacing/case
+    assert normalize_identifier("PK36 SCBL 0000 0011 2345 6702") == "pk36scbl0000001123456702"
+    # a non-PK number keeps its own shape rather than being mangled
+    assert normalize_identifier("+14155550123") == "+14155550123"
+
+
+def _transfers_rejecting_unknown_recipients(fake_backend):
+    """The backend 404s a recipientId it does not own; institutionId+identifier sends work.
+    wire_all's responder accepts anything, so the NOT_FOUND path needs its own wiring."""
+    import json
+
+    from tests.conftest import err, ok
+    from tests.fixtures_backend import FLAGGED_ACTION, pending
+
+    def responder(request):
+        body = json.loads(request.content.decode() or "{}")
+        to = body.get("to") or {}
+        if to.get("recipientId") and to["recipientId"] != "rec1":
+            return err(404, "NOT_FOUND", "Recipient not found")
+        return ok(FLAGGED_ACTION if body.get("riskFlags") else pending("act1", "send_money", 150000))
+
+    fake_backend.route("POST", "/api/v1/transfers", responder=responder)
+
+
+async def test_a_bogus_recipient_id_falls_back_to_the_one_resolved_recipient(fake_backend):
+    """Live smoke V16-ur: straight after a recipient card the model passed the INSTITUTION's
+    id as recipient_id. The send died on NOT_FOUND, so the risk-flagged action — and with it
+    the check-in card — never existed. One known recipient means no guessing is involved."""
+    from tests.conftest import body_of
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    _transfers_rejecting_unknown_recipients(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {
+            "amount_paisa": 500000, "recipient_id": "payo",   # the institution id, not a recipient
+            "risk_flags": ["pressure_language"]}, "id": "t1"}]),
+        AIMessage(content="One question before this goes."),
+    ])
+    _reply, cards = await run_agent(client, [], "Yes, continue", "en", model=model,
+                                    resolved_pairs={("payo", "03001110004")})
+    sent = body_of(next(r for r in fake_backend.requests if r.url.path == "/api/v1/transfers"
+                        and "institutionId" in r.content.decode()))
+    assert sent["to"] == {"institutionId": "payo", "identifier": "03001110004"}
+    assert sent["riskFlags"] == ["pressure_language"]
+    assert [c["kind"] for c in cards] == ["check_in"]
+    await client.aclose()
+
+
+async def test_a_bogus_recipient_id_is_not_guessed_when_several_were_resolved(fake_backend):
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    _transfers_rejecting_unknown_recipients(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "send_money", "args": {
+            "amount_paisa": 500000, "recipient_id": "payo"}, "id": "t1"}]),
+        AIMessage(content="I could not find that recipient."),
+    ])
+    _reply, cards = await run_agent(client, [], "Yes, continue", "en", model=model,
+                                    resolved_pairs={("payo", "03001110004"),
+                                                    ("easypaisa", "03001110002")})
+    assert cards == []  # ambiguous: ask, never pick for the user
+    await client.aclose()

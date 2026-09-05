@@ -111,6 +111,7 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — گھر کے بزر�
 - مٹانے والے کام (رابطہ یا بلر مٹانا، درخواست رد کرنا، زیرِ التوا کام منسوخ کرنا): ایک بار سادہ الفاظ میں پوچھیں، «جی ہاں» سنیں، پھر کریں۔
 - بھروسے والا فرد (guardian): ایک شخص جسے صارف خود چنتا ہے؛ کسی نئے وصول کنندہ کو، یا حد سے بڑی رقم بھیجنے پر، منظوری وہی دیتا ہے۔ بات نکلے تو ایک ہی جملے میں سمجھا دیں۔ PIN آپ کبھی نہیں لیتیں: set_guardian اور remove_guardian صرف تجویز کرتے ہیں، approve_action صرف دکھاتا ہے — PIN صرف ایپ میں ڈلتا ہے (More ← Settings ← بھروسے والا فرد، یا منظوری کارڈ کا Approve بٹن)۔ چیٹ میں PIN کبھی نہ پوچھیں اور کبھی نہ کہیں کہ کام ہو گیا۔ بھروسے والا فرد ہٹانا یا حد بڑھانا نرمی ہے: یہ ٹھنڈی مدت کے بعد لاگو ہوتا ہے اور بھروسے والے فرد کو بتا دیا جاتا ہے۔
 - دباؤ والی بات — ہر باری send_money سے پہلے دیکھیں۔ صرف صارف کے اپنے پچھلے تین پیغام دیکھیں، اپنے الفاظ ہرگز نہیں: سکیم کی جو وضاحت آپ خود کرتی ہیں اُس میں یہی سب نشانیاں آتی ہیں، اور اُس سے یہ اصول دوبارہ نہیں چلنا چاہیے۔ اگر صارف کے کسی پیغام میں یہ ذکر ہو کہ کسی نے فون یا پیغام کر کے پیسے بھیجنے کو کہا، اکاؤنٹ بند یا معطل ہونے کی بات ہوئی، انعام یا لاٹری کا لالچ دیا گیا، OTP یا PIN مانگا گیا، یا جلدی مچائی گئی، تو send_money کو risk_flags=['pressure_language'] کے ساتھ چلائیں۔ کسی پر الزام نہ لگائیں، نصیحت نہ کریں — بس نشان لگا دیں۔
+- چیک اِن سے پہلے انکار یا نصیحت ہرگز نہیں۔ دباؤ والی بات نشان لگانے کی وجہ ہے، روکنے کی نہیں: صارف جس وصول کنندہ کی تصدیق کر دے (جو آپ پہلے حل کر چکی ہیں)، اُس پر send_money کو risk_flags=['pressure_language'] کے ساتھ ضرور چلائیں۔ «یہ تو دھوکہ لگتا ہے، میں یہ رقم نہیں بھیج سکتی» کہہ کر کوئی ٹول نہ چلانا غلط ہے — صارف کے پاس نہ کارڈ بچتا ہے نہ فیصلہ کرنے کا راستہ۔ فیصلہ check_in کارڈ پر ہوتا ہے؛ آپ کی سکون والی وضاحت اُس کے «جی ہاں، کسی نے کہا تھا» کہنے کے بعد آتی ہے، پہلے نہیں۔
 - جب تک check_in کارڈ کھلا ہے ([cards] میں سب سے نیا کارڈ وہی ہو) صرف دو ہی ٹول چل سکتے ہیں: answer_check_in (اُسی کارڈ کے action_id کے ساتھ) اور cancel_action۔ ادائیگی دوبارہ کرنے کے لیے send_money ہرگز نہ چلائیں — اس سے دوسری نشان زدہ ادائیگی بن جاتی ہے اور پہلی لٹکی رہ جاتی ہے۔
 - چیک اِن: check_in کارڈ آئے تو صرف وہی ایک سوال نرمی سے پوچھیں — نہ PIN کی بات، نہ منظوری کی، نہ ڈانٹ۔ صارف کہے کہ ہاں، کسی نے کہا تھا، تو بحث ہرگز نہ کریں اور دوبارہ سوچنے کو نہ کہیں: ادائیگی منسوخ ہو چکی ہے، سکون سے بتائیں کہ سکیم بالکل اسی طرح ہوتی ہے، اور بھروسے والے فرد کو ملانے کی پیشکش کریں۔ کہے کہ یہ میرا اپنا فیصلہ ہے تو answer_check_in(action_id, someone_asked=false) چلائیں اور آگے وہی کریں جو نتیجہ کہے۔
 - منظوری کا انتظار: بھیجنے کا کام منظوری پر رکے تو نام لے کر کہیں «<نام> کو پہلے منظوری دینی ہے — میں نے <نام> کے پاس بھیج دیا ہے»۔ نام ہی استعمال کریں؛ بھروسے والا فرد مرد ہے یا عورت، یہ آپ کو معلوم نہیں، اس لیے صنف والے الفاظ نہ لکھیں۔ PIN کی سکرین ابھی نہیں کھلتی؛ منظوری آتے ہی ایپ خود کھول دیتی ہے۔ یاد دہانی کے لیے remind_guardian — ایک منٹ میں ایک بار۔
@@ -216,6 +217,12 @@ Rules:
   a prize / lottery / inaam, sharing an OTP or PIN, or being hurried ("right now", "before it
   closes"), then call send_money with risk_flags=['pressure_language']. Do not accuse anyone
   and do not lecture — just pass the flag and let the check-in do its work.
+- NEVER REFUSE OR LECTURE BEFORE THE CHECK-IN. Pressure language is a reason to FLAG the
+  send, never a reason to withhold it: when the user confirms a recipient you have already
+  resolved, still call send_money WITH risk_flags=['pressure_language']. Saying "this looks
+  like a scam, I cannot send this for you" and calling nothing is WRONG — it leaves the user
+  with no card and no way to decide. The check-in card is where the user decides; your calm
+  explanation belongs AFTER they answer "yes, someone asked me", not before.
 - WHILE A CHECK-IN IS OPEN (a check_in card is the most recent card in [cards]) the ONLY
   tools you may call are answer_check_in — with that card's action_id — and cancel_action.
   Never call send_money again to "retry" the payment: that just creates a second flagged
@@ -427,6 +434,23 @@ class RequestMoneyArgs(BaseModel):
     note: str | None = None
 
 
+# A Pakistani mobile number reaches the gate in whichever shape the turn happened to use:
+# the recipient card shows "03001110004", and the model often hands send_money the E.164
+# "+923001110004" it saw elsewhere. Live smoke (V16): that mismatch made the gate reject a
+# recipient the user had just confirmed, and the flagged send never reached the backend.
+_PK_LOCAL_PREFIXES = (("+92", 3), ("0092", 4), ("92", 2))
+
+
+def normalize_identifier(identifier: str) -> str:
+    """One canonical key per account identifier: whitespace and dashes dropped, and every
+    Pakistani phone form folded to the local 0-prefixed one. IBANs are unaffected."""
+    value = re.sub(r"[\s\-()]", "", (identifier or "").strip().lower())
+    for prefix, cut in _PK_LOCAL_PREFIXES:
+        if value.startswith(prefix) and value[cut:].isdigit() and len(value[cut:]) == 10:
+            return "0" + value[cut:]
+    return value
+
+
 def build_tools(
     client: BackendClient,
     cards_sink: list[dict[str, Any]],
@@ -454,7 +478,9 @@ def build_tools(
     # prior turn of the same conversation (seeded by the caller from chat history; the
     # user already saw and confirmed that recipient card). recipient_id sends are
     # already-resolved saved recipients, so they're exempt.
-    resolved_pairs: set[tuple[str, str]] = set(resolved_pairs or ())
+    # Both sides of the gate are keyed the same way, whether the pair came from this run's
+    # resolve_recipient or from the caller's chat history.
+    resolved_pairs = {(inst, normalize_identifier(ident)) for inst, ident in (resolved_pairs or ())}
 
     # Backstop for the pressure-language rule (spec §1.7): a flag the CONVERSATION has
     # already earned sticks to every later send in the window, whether or not the model
@@ -462,8 +488,6 @@ def build_tools(
     # any check_in card this turn produced.
     sticky_risk_flags: set[str] = set(sticky_risk_flags or ())
 
-    def _norm_identifier(identifier: str) -> str:
-        return identifier.strip().lower()
 
     async def resolve_recipient_runner(institution_id: str, identifier: str) -> str:
         result = await t.resolve_recipient(client, institution_id=institution_id, identifier=identifier)
@@ -473,7 +497,7 @@ def build_tools(
             # Key by the id the card itself carries — t.resolve_recipient may have retried
             # institution_id as a display name and resolved to a different real id.
             real_institution_id = card.get("institution", {}).get("id", institution_id)
-            resolved_pairs.add((real_institution_id, _norm_identifier(identifier)))
+            resolved_pairs.add((real_institution_id, normalize_identifier(identifier)))
         return result["text"]
 
     async def send_money_runner(
@@ -486,7 +510,7 @@ def build_tools(
         if not recipient_id and not institution_id and institution_name:
             institution_id = await t._institution_id_by_name(client, institution_name) or institution_name
         if not recipient_id and institution_id and identifier:
-            key = (institution_id, _norm_identifier(identifier))
+            key = (institution_id, normalize_identifier(identifier))
             if key not in resolved_pairs:
                 # A later turn may only have the institution's display name in its own
                 # history (not the opaque id resolve_recipient returned same-turn) — see if
@@ -507,6 +531,18 @@ def build_tools(
             institution_id=institution_id, identifier=identifier,
             institution_name=institution_name, risk_flags=flags or None,
         )
+        # A recipient_id the backend has never heard of. Live smoke (V16-ur): right after
+        # resolving a recipient the model passed the INSTITUTION's id as recipient_id, the
+        # send died on NOT_FOUND, and the risk-flagged action — and therefore the check-in —
+        # never came into existence. When this conversation resolved exactly one recipient,
+        # that is unambiguously the one meant; retry on it rather than lose the gate.
+        if (recipient_id and result["text"].startswith("ERROR") and "NOT_FOUND" in result["text"]
+                and len(resolved_pairs) == 1):
+            known_institution, known_identifier = next(iter(resolved_pairs))
+            result = await t.send_money(
+                client, amount_paisa=amount_paisa, institution_id=known_institution,
+                identifier=known_identifier, risk_flags=flags or None,
+            )
         card = result.get("card")
         if card:
             cards_sink.append(card)
@@ -686,8 +722,14 @@ async def run_agent(
         it makes the model ACT AGAIN — live regression: "switch to english" called
         update_profile('en'), the reply was (correctly) English, the Urdu-language nudge
         fired anyway, and the second invocation called update_profile('ur'), emitting a
-        second profile card that flipped the app back to Urdu."""
-        return bool(cards) or _called_a_tool(state)
+        second profile card that flipped the app back to Urdu.
+
+        A tool that only returned an ERROR has not acted: nothing changed, no card exists,
+        and the user is left holding a prose question. Live smoke (V15-ur): send_money was
+        called with no institution, failed the gate, and that failure alone suppressed the
+        chips nudge — so the turn ended by asking a voice-first user to type a wallet name.
+        The regression above is still covered, because that turn emitted a card."""
+        return bool(cards) or _called_a_tool(state, successfully=True)
 
     # Pre-route: "cancel that" / «منسوخ کر دو» right after a confirmation card. Live UR:
     # the model routed this to `help`, leaving the pending action alive. There is nothing
@@ -709,6 +751,19 @@ async def run_agent(
     state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
     reply = strip_cards_marker(_last_reply(state))
     extra_invocations = 0  # capped at MAX_NUDGES across the two content nudges below
+
+    # Guard: refusing INSTEAD of flagging. Live defect (spec §1.8, "never overrules the user;
+    # adds friction only"): after a pressure-language turn and a confirmed recipient card the
+    # model answered "it sounds like someone is trying to trick you… I cannot send this money
+    # for you" and called nothing — so no check_in card appeared and the user had nothing to
+    # decide on. The flag belongs on send_money; the explanation belongs after the answer.
+    if not turn_already_acted() and _refuses_a_flagged_send(
+            user_text, history, resolved_pairs, sticky_risk_flags):
+        nudged = [*state["messages"],
+                  HumanMessage(content=_nudge(PRESSURE_SEND_NUDGE, PRESSURE_SEND_NUDGE_UR, language))]
+        state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+        reply = strip_cards_marker(_last_reply(state))
+        extra_invocations += 1
 
     # Guard: the model must not promise a card it never created. If it talks about a
     # card/confirmation but no tool produced one, re-prompt exactly once with the
@@ -1048,6 +1103,92 @@ def _asks_to_cancel(user_text: str) -> bool:
     return bool(_ASKS_TO_CANCEL_RE.search(user_text or ""))
 
 
+PRESSURE_SEND_NUDGE = (
+    "[SYSTEM CHECK] You refused or explained instead of acting, and called no tool — so no "
+    "check-in card exists and the user cannot decide anything. Never refuse or lecture before "
+    "the check-in. Call send_money NOW with risk_flags=['pressure_language'], using the "
+    "recipient and amount already confirmed in this conversation (take them from the most "
+    "recent [cards] line). The check-in card is where the user decides; your calm explanation "
+    "belongs AFTER they answer 'yes, someone asked me'."
+)
+PRESSURE_SEND_NUDGE_UR = (
+    "[SYSTEM CHECK] آپ نے کام کرنے کے بجائے انکار یا وضاحت کر دی اور کوئی ٹول نہیں چلایا — اس "
+    "لیے کوئی check_in کارڈ نہیں بنا اور صارف کچھ طے ہی نہیں کر سکتا۔ چیک اِن سے پہلے انکار یا "
+    "نصیحت نہیں۔ ابھی send_money کو risk_flags=['pressure_language'] کے ساتھ چلائیں، اور وصول "
+    "کنندہ اور رقم وہی لیں جن کی تصدیق اسی گفتگو میں ہو چکی ہے (سب سے نئی [cards] لائن سے)۔ "
+    "فیصلہ check_in کارڈ پر ہوتا ہے؛ آپ کی وضاحت «جی ہاں، کسی نے کہا تھا» کے بعد آتی ہے۔"
+)
+
+# The five pressure signals of spec §1.7, in English, Urdu and Roman Urdu. Read ONLY from the
+# user's own recent messages — the assistant's calm scam explanation names every one of them.
+_PRESSURE_SIGNAL_RE = re.compile(
+    r"someone\s+(?:called|phoned|rang|messaged|texted|whatsapp)"
+    r"|(?:a|the)\s+(?:call|message|sms)\s+(?:came|said)"
+    r"|account\s+(?:will\s+be\s+|is\s+|is\s+going\s+to\s+be\s+)?(?:blocked|suspended|closed|frozen)"
+    r"|(?:prize|lottery|lucky\s+draw|inaam)"
+    r"|(?:share|send|give|tell)\s+(?:me\s+)?(?:my\s+|the\s+|your\s+)?(?:otp|pin|code)"
+    r"|kisi\s+ne\s+(?:phone|call|message)|account\s+band"
+    r"|کسی\s*نے\s*(?:فون|کال|پیغام|میسج)|کال\s*آئی|فون\s*آیا"
+    r"|اکاؤنٹ\s*(?:بند|معطل|منجمد)"
+    r"|انعام|لاٹری|قرعہ"
+    r"|(?:او\s*ٹی\s*پی|OTP)\s*(?:بتا|دے|شیئر|مانگ)",
+    re.IGNORECASE,
+)
+_URGENCY_RE = re.compile(
+    r"right now|immediately|hurry|before it (?:closes|expires)|in (?:five|ten|\d+) minutes"
+    r"|jaldi|abhi|ابھی|جلدی|فوراً|فورا",
+    re.IGNORECASE,
+)
+_SEND_INTENT_RE = re.compile(r"\bsend\b|\bpay\b|\btransfer\b|bhej|بھیج|ادا کر|منتقل", re.IGNORECASE)
+# An amount, in digits or in words, English/Urdu/Roman Urdu.
+_AMOUNT_RE = re.compile(
+    r"\d{3,}|\bhundred\b|\bthousand\b|\blakh\b|hazaar|hazar|lakh"
+    r"|سو\b|ہزار|لاکھ|کروڑ",
+    re.IGNORECASE,
+)
+# A recipient the user has already been shown and can confirm.
+_CARDS_RECIPIENT_RE = re.compile(r"\brecipient(?:_chips)?:")
+# "yes / go ahead / continue" — the confirmation turn itself carries no pressure words.
+_RECENT_USER_TURNS = 3
+
+
+def _recent_user_text(history: Sequence[BaseMessage], user_text: str) -> str:
+    """This message plus the user's own last few messages. Assistant turns are deliberately
+    excluded: SCAM_EXPLANATION mentions calls, blocked accounts, prizes and OTPs, and reading
+    it back would re-flag every turn after a check-in for ever."""
+    said = [_content_text(m.content) for m in history if isinstance(m, HumanMessage)]
+    return " ".join([*said[-_RECENT_USER_TURNS:], user_text or ""])
+
+
+def has_pressure_language(text: str) -> bool:
+    """Spec §1.7's conversation signal: a pressure signal outright, or plain urgency paired
+    with an instruction to send money."""
+    if _PRESSURE_SIGNAL_RE.search(text or ""):
+        return True
+    return bool(_URGENCY_RE.search(text or "") and _SEND_INTENT_RE.search(text or ""))
+
+
+def _has_confirmed_send_context(history: Sequence[BaseMessage], user_text: str,
+                                resolved_pairs: set[tuple[str, str]] | None) -> bool:
+    """Is there a recipient the user has already seen resolved, and an amount to send? Only
+    then is "call send_money now" actionable advice rather than a guess."""
+    if not resolved_pairs and not any(
+            isinstance(m, AIMessage) and _CARDS_RECIPIENT_RE.search(_content_text(m.content))
+            for m in history):
+        return False
+    everything = " ".join([*(_content_text(m.content) for m in history), user_text or ""])
+    return bool(_AMOUNT_RE.search(everything))
+
+
+def _refuses_a_flagged_send(user_text: str, history: Sequence[BaseMessage],
+                            resolved_pairs: set[tuple[str, str]] | None,
+                            sticky_risk_flags: set[str]) -> bool:
+    """A pressured send the model answered with words instead of a flagged send_money."""
+    if not (sticky_risk_flags or has_pressure_language(_recent_user_text(history, user_text))):
+        return False
+    return _has_confirmed_send_context(history, user_text, resolved_pairs)
+
+
 # The risk flags a `check_in` card carried earlier in this conversation, read back out of
 # the `[cards]` facts line that card left in the model-facing history.
 _CARDS_CHECK_IN_FLAGS_RE = re.compile(r"check_in:[^|\n]*?risk_flags=([^\s|]+)")
@@ -1099,9 +1240,14 @@ def _mentions_card(reply: str) -> bool:
     return any(w in low for w in _CARD_WORDS)
 
 
-def _called_a_tool(state: dict[str, Any]) -> bool:
-    """Did any tool actually run this turn? (a ToolMessage in the resulting state)."""
-    return any(isinstance(m, ToolMessage) for m in state.get("messages", []))
+def _called_a_tool(state: dict[str, Any], successfully: bool = False) -> bool:
+    """Did any tool run this turn (a ToolMessage in the resulting state)? With
+    `successfully`, ERROR-only results do not count — they changed nothing."""
+    return any(
+        isinstance(m, ToolMessage)
+        and not (successfully and _content_text(m.content).startswith("ERROR"))
+        for m in state.get("messages", [])
+    )
 
 
 def _prose_ask_nudge(user_text: str, reply: str, language: str = "en") -> str | None:

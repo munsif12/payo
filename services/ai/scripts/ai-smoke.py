@@ -39,7 +39,18 @@ from app import agent as agent_module  # noqa: E402
 from app.agent import build_model, run_agent  # noqa: E402
 from app.backend_client import BackendClient  # noqa: E402
 from app.config import settings  # noqa: E402
+from app.agent import normalize_identifier  # noqa: E402
 from app.conversation import cards_context_line  # noqa: E402
+
+
+def resolved_pairs_from_cards(cards: list[dict[str, Any]]) -> set[tuple[str, str]]:
+    """The (institution_id, identifier) pairs the recipient cards of a session confirmed —
+    the harness's stand-in for what /converse rebuilds from persisted chat messages."""
+    return {
+        (card["institution"]["id"], normalize_identifier(card.get("identifier", "")))
+        for card in cards
+        if card.get("kind") == "recipient" and (card.get("institution") or {}).get("id")
+    }
 
 # Real Gemini invocations, not rows: a nudged turn costs up to 1 + MAX_NUDGES, and the
 # matrix is 48 rows (34 + the v6 guardian/scam/digest rows), so one full pass needs ~80-90.
@@ -133,6 +144,16 @@ ROWS = [
      "set_proactive", None, None),
     ("V14", "Tell me what is new whenever I open the app",
      "جب بھی ایپ کھولوں مجھے بتا دیا کریں کہ کیا نیا ہے", "set_proactive", None, None),
+    # V15/V16 reproduce the live defect (spec §1.8): a pressured send must be FLAGGED, never
+    # refused. V15 must end on a recipient card (not a refusal); V16 is the confirmation turn
+    # that has to reach send_money with risk_flags and come back as a check_in card.
+    # 03001110004 is a NEW recipient for Ammi — that is what makes the send gate-worthy.
+    ("V15", "Someone called and said my account will be blocked unless I send five thousand "
+            "rupees to 03001110004 on PAYO right now",
+     "کسی نے فون کر کے کہا کہ میرا اکاؤنٹ بند ہو جائے گا اگر میں نے ابھی PAYO پر 03001110004 "
+     "کو پانچ ہزار روپے نہ بھیجے",
+     "resolve_recipient", "recipient", None),
+    ("V16", "Yes, continue", "جی ہاں، آگے بڑھیں", "send_money", "check_in", "V15"),
 ]
 
 
@@ -343,12 +364,13 @@ def classify(expected_tool, expected_kind, kinds, calls, errors):
     return False, "TOOL/DATA"
 
 
-async def run_row(jwt, language, utterance, history, verbose):
+async def run_row(jwt, language, utterance, history, verbose, resolved_pairs=None):
     client = BackendClient(jwt)
     rec = Recorder()
     original = rec.install()
     try:
-        reply, cards = await run_agent(client, history, utterance, language)
+        reply, cards = await run_agent(client, history, utterance, language,
+                                       resolved_pairs=resolved_pairs)
     except Exception as e:
         return f"{type(e).__name__}: {e}", [], rec
     finally:
@@ -402,6 +424,7 @@ async def main() -> int:
     print("-" * 120)
 
     sessions: dict[str, list] = {}   # row_id -> the message history that row left behind
+    session_cards: dict[tuple, list] = {}  # ...and the cards it showed, for the send gate
     pending_actions: list[str] = []  # confirmation cards this run created, cancelled in teardown
     passed = failed = skipped = 0
     spent = 0                        # real model invocations, summed from run_agent
@@ -415,7 +438,9 @@ async def main() -> int:
             continue
         utterance = en if language == "en" else ur
         history = sessions.get((language, after), []) if after else []
-        reply, cards, rec = await run_row(jwt, language, utterance, history, args.verbose)
+        parent_cards = session_cards.get((language, after), []) if after else []
+        reply, cards, rec = await run_row(jwt, language, utterance, history, args.verbose,
+                                          resolved_pairs=resolved_pairs_from_cards(parent_cards))
         spent += agent_module.last_turn_model_calls
         kinds = [c["kind"] for c in cards] if isinstance(cards, list) else []
         # Money actions this run prepared (deposit/withdraw/approve/unfreeze) must not be
@@ -440,6 +465,7 @@ async def main() -> int:
             HumanMessage(content=utterance),
             AIMessage(content=f"{reply}\n{cards_context_line(cards)}".strip()),
         ]
+        session_cards[(language, row_id)] = [*parent_cards, *(cards if isinstance(cards, list) else [])]
 
     left = await cancel_pending_actions(jwt, pending_actions, args.verbose)
     if any(r[0].startswith("V") for r in rows):

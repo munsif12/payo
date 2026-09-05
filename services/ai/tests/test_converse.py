@@ -196,7 +196,9 @@ def test_resolved_pairs_from_messages_extracts_recipient_cards_across_full_histo
         },
         {"role": "user", "text": "Yes, continue", "cards": []},
     ]
-    assert _resolved_pairs_from_messages(items) == {("easypaisa", "+923135468810")}
+    # keyed on the canonical local form, so "+92…" on the card and "0300…" from the model
+    # (or the other way round) are the same pair
+    assert _resolved_pairs_from_messages(items) == {("easypaisa", "03135468810")}
 
 
 def test_resolved_pairs_from_messages_ignores_non_recipient_cards():

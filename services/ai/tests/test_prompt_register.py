@@ -136,6 +136,19 @@ def test_pressure_rule_reads_only_the_users_own_messages_in_both_prompts():
     assert "صرف صارف کے اپنے پچھلے تین پیغام" in ur and "اپنے الفاظ ہرگز نہیں" in ur
 
 
+def test_never_refuse_before_the_check_in_rule_is_in_both_prompts():
+    """Live defect: the model refused a pressured send in prose and called nothing, so no
+    check_in card appeared (spec §1.8 — friction only, never overrule)."""
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "NEVER REFUSE OR LECTURE BEFORE THE CHECK-IN" in en
+    assert "still call send_money WITH risk_flags=['pressure_language']" in en
+    assert "The check-in card is where the user decides" in en
+    assert 'AFTER they answer "yes, someone asked me"' in en
+    assert "چیک اِن سے پہلے انکار یا نصیحت ہرگز نہیں" in ur
+    assert "risk_flags=['pressure_language'] کے ساتھ ضرور چلائیں" in ur
+    assert "فیصلہ check_in کارڈ پر ہوتا ہے" in ur
+
+
 def test_only_answer_check_in_or_cancel_while_a_check_in_is_open_in_both_prompts():
     en, ur = system_prompt("en"), system_prompt("ur")
     assert "WHILE A CHECK-IN IS OPEN" in en
