@@ -38,6 +38,9 @@ export interface TextProps {
   style?: StyleProp<TextStyle>;
   center?: boolean;
   numberOfLines?: number;
+  /** Shrink the text (down to `minimumFontScale`) rather than wrap or clip it.
+   *  Only meaningful together with `numberOfLines`. */
+  adjustsFontSizeToFit?: boolean;
   testID?: string;
 }
 
@@ -49,7 +52,7 @@ export interface TextProps {
 // Note: fontFamily and fontWeight are always set together to a matching pair
 // (e.g. PlusJakartaSans_700Bold + '700') — mixing a custom fontFamily with an
 // unrelated fontWeight makes iOS silently substitute a system font.
-export function Text({ variant = 'body', color, weight, children, style, center, numberOfLines, testID }: TextProps) {
+export function Text({ variant = 'body', color, weight, children, style, center, numberOfLines, adjustsFontSizeToFit, testID }: TextProps) {
   const { c } = useTheme();
   const urdu = useIsUrdu();
   const scale = type[variant];
@@ -74,6 +77,8 @@ export function Text({ variant = 'body', color, weight, children, style, center,
       testID={testID}
       style={[textStyle, style]}
       numberOfLines={numberOfLines}
+      adjustsFontSizeToFit={adjustsFontSizeToFit}
+      minimumFontScale={adjustsFontSizeToFit ? 0.8 : undefined}
       allowFontScaling
       maxFontSizeMultiplier={type.maxFontSizeMultiplier}
     >

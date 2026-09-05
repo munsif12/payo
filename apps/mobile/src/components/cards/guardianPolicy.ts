@@ -72,3 +72,19 @@ export function approvalOutcome(action: PendingAction, now: number): ApprovalOut
   if (action.approval?.status === 'declined' || action.status === 'cancelled') return 'declined';
   return 'waiting';
 }
+
+/**
+ * Picks the named or the unnamed variant of a piece of guardian copy.
+ *
+ * Every one of these strings starts a sentence ("Bilal has to approve this…"), so the
+ * no-name case cannot be handled by substituting a lowercase placeholder name — that
+ * produced "your trusted contact has to approve this…" mid-capital. Each key therefore
+ * has a `…Unnamed` sibling written to stand on its own, and this chooses between them.
+ *
+ * Returns the key to translate and the (trimmed) name to interpolate; the name is ''
+ * for the unnamed variant, which does not reference it.
+ */
+export function guardianCopy(base: string, name?: string | null): { key: string; name: string } {
+  const trimmed = (name ?? '').trim();
+  return trimmed ? { key: base, name: trimmed } : { key: `${base}Unnamed`, name: '' };
+}

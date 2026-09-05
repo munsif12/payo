@@ -80,7 +80,16 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
       ) : (
         <>
           {icon}
-          <Text variant="hl" color={textColor} weight={variant === 'primary' ? 700 : 600}>
+          {/* A button is a fixed-height pill, so a label that wraps is a label that
+              gets clipped — and a two-word one ("Approve") was breaking mid-word.
+              Keep it to one line and let it shrink (to 0.8x) instead. */}
+          <Text
+            variant="hl"
+            color={textColor}
+            weight={variant === 'primary' ? 700 : 600}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
             {label}
           </Text>
         </>

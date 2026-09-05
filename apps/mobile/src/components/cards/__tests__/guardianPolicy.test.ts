@@ -1,4 +1,4 @@
-import { guardianPendingLine, approvalOutcome } from '../guardianPolicy';
+import { guardianPendingLine, approvalOutcome, guardianCopy } from '../guardianPolicy';
 import type { PendingAction } from '../../../api/types';
 
 const t = (key: string, opts?: Record<string, unknown>) => (opts ? `${key}:${JSON.stringify(opts)}` : key);
@@ -80,5 +80,22 @@ describe('approvalOutcome', () => {
 
   test('cancelReason "expired" reads as expired even inside the window', () => {
     expect(approvalOutcome({ ...base, status: 'cancelled', cancelReason: 'expired' }, NOW)).toBe('expired');
+  });
+});
+
+describe('guardianCopy', () => {
+  test('uses the named variant when the guardian has a name', () => {
+    expect(guardianCopy('cards.waiting.body', 'Bilal')).toEqual({ key: 'cards.waiting.body', name: 'Bilal' });
+  });
+
+  test('falls back to the standalone Unnamed key rather than a lowercase placeholder', () => {
+    for (const empty of [undefined, null, '', '   ']) {
+      expect(guardianCopy('cards.waiting.approved', empty))
+        .toEqual({ key: 'cards.waiting.approvedUnnamed', name: '' });
+    }
+  });
+
+  test('trims a padded name instead of interpolating the padding', () => {
+    expect(guardianCopy('cards.waiting.remind', '  Bilal  ').name).toBe('Bilal');
   });
 });

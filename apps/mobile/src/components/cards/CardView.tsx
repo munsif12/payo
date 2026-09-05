@@ -30,7 +30,7 @@ import type { ChatCard, ChatMessage } from '../../voice/useConverse';
 import {
   claimAutoOpenPin, releaseAutoOpen, buildResultCards, showConfirmationAmount,
 } from './confirmationPolicy';
-import { guardianPendingLine, approvalOutcome, type ApprovalOutcome } from './guardianPolicy';
+import { guardianPendingLine, approvalOutcome, guardianCopy, type ApprovalOutcome } from './guardianPolicy';
 import type {
   RecipientCard as RecipientCardShape,
   RecipientChip, InstitutionChip, BillerChip, SavePromptCard as SavePromptCardShape,
@@ -1202,7 +1202,7 @@ function CheckInCardView({ card, onAppendLocal, live }: {
         onAppendLocal?.({
           role: 'assistant',
           text: '',
-          cards: [waitingCardFor(action, me?.user.guardian?.name ?? t('cards.waiting.fallbackName'))],
+          cards: [waitingCardFor(action, me?.user.guardian?.name ?? '')],
         });
         return;
       }
@@ -1391,15 +1391,26 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
   };
 
   const statusColor = outcome === 'declined' || outcome === 'expired' ? c.red : c.amberDeep;
+  /** Named copy when the guardian's name travelled with the card, standalone copy
+   *  otherwise — never a lowercase name substituted at the start of a sentence. */
+  const gt = (base: string, opts?: Record<string, unknown>) => {
+    const { key, name } = guardianCopy(base, shape.guardianName);
+    return t(key, { name, ...opts });
+  };
+  // The send finished (the PIN sheet resolved and marked the action done): there is
+  // nothing left to confirm, and the success card below already carries the ref no.
+  const sent = doneApproved || polled?.status === 'completed';
 
   return (
     <NewCard style={{ marginTop: space.s, gap: space.m }}>
       <View testID={`waiting-approval-${shape.actionId}`} />
       <View style={{ alignItems: 'center', gap: space.s }}>
         <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: outcome === 'approved' ? c.greenTint : c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
-          {outcome === 'approved'
-            ? <ShieldCheck size={22} color={c.green} strokeWidth={2.4} />
-            : <Clock size={22} color={statusColor} strokeWidth={2.4} />}
+          {sent
+            ? <Check size={22} color={c.green} strokeWidth={3} />
+            : outcome === 'approved'
+              ? <ShieldCheck size={22} color={c.green} strokeWidth={2.4} />
+              : <Clock size={22} color={statusColor} strokeWidth={2.4} />}
         </View>
         <Text variant="hl" center>{bi(shape.summary)}</Text>
         <Text variant="money" style={{ fontSize: 28, lineHeight: 34 }}>{ltrIsolate(formatPaisa(shape.amountPaisa))}</Text>
@@ -1407,7 +1418,7 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
 
       {outcome === 'waiting' ? (
         <>
-          <Text variant="sub" center>{t('cards.waiting.body', { name: shape.guardianName })}</Text>
+          <Text variant="sub" center>{gt('cards.waiting.body')}</Text>
           <Text testID="waiting-countdown" variant="foot" center>
             {left === null ? t('cards.waiting.expired') : t('cards.waiting.expiresIn', { time: ltrIsolate(formatCountdown(left)) })}
           </Text>
@@ -1417,7 +1428,7 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
             variant="secondary"
             label={cooldownLeft > 0
               ? t('cards.waiting.remindWait', { seconds: Math.ceil(cooldownLeft / 1000) })
-              : t('cards.waiting.remind', { name: shape.guardianName })}
+              : gt('cards.waiting.remind')}
             icon={<BellRing size={20} color={c.ink} strokeWidth={2} />}
             onPress={onRemind}
             disabled={cooldownLeft > 0}
@@ -1427,24 +1438,32 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
         </>
       ) : (
         <>
-          <Text testID="waiting-outcome" variant="sub" center color={outcome === 'approved' ? c.green : c.red}>
-            {outcome === 'approved'
-              ? t('cards.waiting.approved', { name: shape.guardianName })
-              : outcome === 'expired'
-                ? t('cards.waiting.expiredBody')
-                : reason
-                  ? t('cards.waiting.declinedReason', { name: shape.guardianName, reason })
-                  : t('cards.waiting.declined', { name: shape.guardianName })}
+          <Text
+            testID="waiting-outcome"
+            variant="sub"
+            center
+            color={outcome === 'approved' ? c.green : c.red}
+          >
+            {sent
+              ? t('cards.waiting.sent')
+              : outcome === 'approved'
+                ? gt('cards.waiting.approved')
+                : outcome === 'expired'
+                  ? t('cards.waiting.expiredBody')
+                  : reason
+                    ? gt('cards.waiting.declinedReason', { reason })
+                    : gt('cards.waiting.declined')}
           </Text>
           {/* Dismissing the auto-opened sheet (or a restored card, which never
               auto-opens at all) must not strand an approved send with no way to
-              finish it — the same openPinSheet call, on a button. */}
-          {outcome === 'approved' && approved ? (
+              finish it — the same openPinSheet call, on a button. Once the send has
+              actually gone through there is nothing left to confirm, so the button
+              disappears rather than sitting there dimmed. */}
+          {outcome === 'approved' && approved && !sent ? (
             <Button
               testID="waiting-confirm"
               label={t('confirm.confirmWithPin')}
               onPress={() => openSheet(approved)}
-              disabled={doneApproved}
               style={{ alignSelf: 'stretch' }}
             />
           ) : null}
@@ -1539,39 +1558,42 @@ function ApprovalRow({ item, separator }: { item: ApprovalItemShape; separator: 
             value={reason}
             onChangeText={setReason}
           />
-          <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s }}>
-            <Button
-              testID={`approval-decline-confirm-${item.actionId}`}
-              variant="danger"
-              label={t('cards.approvals.decline')}
-              onPress={onDecline}
-              loading={declining}
-              style={{ flex: 1, minHeight: touch.min }}
-            />
-            <Button
-              testID={`approval-decline-cancel-${item.actionId}`}
-              variant="ghost"
-              label={t('common.cancel')}
-              onPress={() => { setReasonOpen(false); setReason(''); }}
-              style={{ flex: 1, minHeight: touch.min }}
-            />
-          </View>
+          <Button
+            testID={`approval-decline-confirm-${item.actionId}`}
+            variant="danger"
+            label={t('cards.approvals.decline')}
+            onPress={onDecline}
+            loading={declining}
+            style={{ alignSelf: 'stretch', minHeight: touch.min }}
+          />
+          <Button
+            testID={`approval-decline-cancel-${item.actionId}`}
+            variant="ghost"
+            label={t('common.cancel')}
+            onPress={() => { setReasonOpen(false); setReason(''); }}
+            style={{ alignSelf: 'stretch', minHeight: touch.min }}
+          />
         </View>
       ) : (
-        <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s }}>
+        // Stacked, not side by side: two half-width buttons inside a chat bubble
+        // (itself capped at 86% of the screen) left "Approve"/"Decline" too little
+        // room and the label wrapped mid-word ("Appro/ve"). Full width also suits
+        // the longer Urdu labels, and this is a money decision — not a place to
+        // make the two choices harder to hit.
+        <View style={{ gap: space.s }}>
           <Button
             testID={`approval-approve-${item.actionId}`}
             label={t('cards.approvals.approve')}
             onPress={onApprove}
             loading={busy}
-            style={{ flex: 1, minHeight: touch.min }}
+            style={{ alignSelf: 'stretch', minHeight: touch.min }}
           />
           <Button
             testID={`approval-decline-${item.actionId}`}
             variant="secondary"
             label={t('cards.approvals.decline')}
             onPress={() => setReasonOpen(true)}
-            style={{ flex: 1, minHeight: touch.min }}
+            style={{ alignSelf: 'stretch', minHeight: touch.min }}
           />
         </View>
       )}

@@ -11,7 +11,7 @@ import { usePinSheet } from '../../src/pin/usePinSheet';
 import { useActionQuery, useRemindGuardianMutation, useMeQuery, apiErr } from '../../src/api/client';
 import type { PendingAction } from '../../src/api/types';
 import { claimAutoOpenPin, releaseAutoOpen } from '../../src/components/cards/confirmationPolicy';
-import { approvalOutcome, type ApprovalOutcome } from '../../src/components/cards/guardianPolicy';
+import { approvalOutcome, guardianCopy, type ApprovalOutcome } from '../../src/components/cards/guardianPolicy';
 import { formatPaisa } from '../../src/lib/money';
 import { ltrIsolate } from '../../src/lib/bidi';
 
@@ -107,7 +107,12 @@ export default function SendWaiting() {
     return null;
   }
 
-  const guardianName = me?.user.guardian?.name ?? t('cards.waiting.fallbackName');
+  const guardianName = me?.user.guardian?.name ?? '';
+  /** Named copy when we know who the guardian is, standalone copy otherwise. */
+  const gt = (base: string, opts?: Record<string, unknown>) => {
+    const { key, name } = guardianCopy(base, guardianName);
+    return t(key, { name, ...opts });
+  };
   const cooldownLeft = remindedAt ? Math.max(0, REMIND_COOLDOWN_MS - (now - remindedAt)) : 0;
 
   const onRemind = async () => {
@@ -123,12 +128,12 @@ export default function SendWaiting() {
   };
 
   const settledText = outcome === 'approved'
-    ? t('cards.waiting.approved', { name: guardianName })
+    ? gt('cards.waiting.approved')
     : outcome === 'expired'
       ? t('cards.waiting.expiredBody')
       : reason
-        ? t('cards.waiting.declinedReason', { name: guardianName, reason })
-        : t('cards.waiting.declined', { name: guardianName });
+        ? gt('cards.waiting.declinedReason', { reason })
+        : gt('cards.waiting.declined');
 
   return (
     <Screen>
@@ -143,7 +148,7 @@ export default function SendWaiting() {
           <Text variant="money" style={{ fontSize: 32, lineHeight: 38 }}>{ltrIsolate(formatPaisa(action.amountPaisa))}</Text>
           {outcome === 'waiting' ? (
             <>
-              <Text variant="sub" center>{t('cards.waiting.body', { name: guardianName })}</Text>
+              <Text variant="sub" center>{gt('cards.waiting.body')}</Text>
               <Text testID="send-waiting-countdown" variant="foot" center>
                 {t('cards.waiting.expiresIn', { time: ltrIsolate(countdown(Math.max(0, leftMs))) })}
               </Text>
@@ -163,7 +168,7 @@ export default function SendWaiting() {
             variant="secondary"
             label={cooldownLeft > 0
               ? t('cards.waiting.remindWait', { seconds: Math.ceil(cooldownLeft / 1000) })
-              : t('cards.waiting.remind', { name: guardianName })}
+              : gt('cards.waiting.remind')}
             icon={<BellRing size={20} color={c.ink} strokeWidth={2} />}
             onPress={onRemind}
             disabled={cooldownLeft > 0}
