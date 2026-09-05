@@ -43,7 +43,7 @@ export async function depositPocket(req: Request, res: Response) {
   const action = await createPendingAction({
     userId: req.userId, kind: 'pocket_deposit',
     payload: { pocketId: String(p._id), pocketName: p.name, pocketUrduName: p.urduName ?? undefined },
-    amountPaisa, feePaisa: 0, requiresPin: false,
+    amountPaisa, feePaisa: 0, requiresPin: true,
     summary: {
       en: `Add ${fmtRs(amountPaisa)} to ${p.name}`,
       ur: `${p.urduName ?? p.name} میں ${fmtRs(amountPaisa)} ڈالیں`,
@@ -59,7 +59,7 @@ export async function withdrawPocket(req: Request, res: Response) {
   const action = await createPendingAction({
     userId: req.userId, kind: 'pocket_withdraw',
     payload: { pocketId: String(p._id), pocketName: p.name, pocketUrduName: p.urduName ?? undefined },
-    amountPaisa, feePaisa: 0, requiresPin: false,
+    amountPaisa, feePaisa: 0, requiresPin: true,
     summary: {
       en: `Withdraw ${fmtRs(amountPaisa)} from ${p.name}`,
       ur: `${p.urduName ?? p.name} سے ${fmtRs(amountPaisa)} نکالیں`,

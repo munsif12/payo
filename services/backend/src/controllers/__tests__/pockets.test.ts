@@ -12,16 +12,16 @@ async function makePocket(token: string) {
   return res.body.data;
 }
 
-test('deposit executes WITHOUT pin — main debited, pocket credited', async () => {
+test('deposit requires PIN (v5) — executes with the PIN: main debited, pocket credited', async () => {
   const { userId, token } = await createVerifiedUser(app);
   const pocket = await makePocket(token);
   const dep = await request(app).post(`/api/v1/pockets/${pocket.id}/deposit`)
     .set('Authorization', `Bearer ${token}`).send({ amountPaisa: 200_000 });
   expect(dep.status).toBe(201);
-  expect(dep.body.data.requiresPin).toBe(false);
+  expect(dep.body.data.requiresPin).toBe(true);
 
   const exec = await request(app).post(`/api/v1/actions/${dep.body.data.id}/execute`)
-    .set('Authorization', `Bearer ${token}`).send({});
+    .set('Authorization', `Bearer ${token}`).send({ pin: '1234' });
   expect(exec.status).toBe(200);
   expect((await Account.findOne({ userId }))!.balancePaisa).toBe(800_000);
   expect((await Pocket.findById(pocket.id))!.balancePaisa).toBe(200_000);
@@ -33,7 +33,7 @@ test('withdraw more than pocket holds → 400 INSUFFICIENT_POCKET_FUNDS', async 
   const wd = await request(app).post(`/api/v1/pockets/${pocket.id}/withdraw`)
     .set('Authorization', `Bearer ${token}`).send({ amountPaisa: 100_000 });
   const exec = await request(app).post(`/api/v1/actions/${wd.body.data.id}/execute`)
-    .set('Authorization', `Bearer ${token}`).send({});
+    .set('Authorization', `Bearer ${token}`).send({ pin: '1234' });
   expect(exec.status).toBe(400);
   expect(exec.body.code).toBe('INSUFFICIENT_POCKET_FUNDS');
   expect((await Account.findOne({ userId }))!.balancePaisa).toBe(1_000_000);
@@ -45,11 +45,11 @@ test('withdraw round-trips money back to main', async () => {
   const dep = await request(app).post(`/api/v1/pockets/${pocket.id}/deposit`)
     .set('Authorization', `Bearer ${token}`).send({ amountPaisa: 300_000 });
   await request(app).post(`/api/v1/actions/${dep.body.data.id}/execute`)
-    .set('Authorization', `Bearer ${token}`).send({});
+    .set('Authorization', `Bearer ${token}`).send({ pin: '1234' });
   const wd = await request(app).post(`/api/v1/pockets/${pocket.id}/withdraw`)
     .set('Authorization', `Bearer ${token}`).send({ amountPaisa: 100_000 });
   await request(app).post(`/api/v1/actions/${wd.body.data.id}/execute`)
-    .set('Authorization', `Bearer ${token}`).send({});
+    .set('Authorization', `Bearer ${token}`).send({ pin: '1234' });
   expect((await Account.findOne({ userId }))!.balancePaisa).toBe(800_000);
   expect((await Pocket.findById(pocket.id))!.balancePaisa).toBe(200_000);
 });
