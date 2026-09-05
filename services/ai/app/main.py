@@ -6,7 +6,7 @@ from sse_starlette.sse import EventSourceResponse
 from .backend_client import BackendClient
 from .conversation import converse_turn
 from .stt import build_transcriber
-from .tts import AUDIO_STORE, build_tts
+from .tts import AUDIO_STORE, build_tts, trim_for_tts
 
 app = FastAPI(title="payo-ai")
 
@@ -63,6 +63,29 @@ async def converse(
             await client.aclose()
 
     return EventSourceResponse(stream())
+
+
+# Home's proactive digest is spoken without running a conversational turn (spec §4): the
+# app posts the sentence it already rendered and plays the audio back. TTS only — no model,
+# no backend, no chat history. Capped hard at 200 characters because Cartesia bills per
+# character, and any provider failure degrades to the silent stub inside the provider.
+SPEAK_MAX_CHARS = 200
+
+
+@app.post("/speak")
+async def speak(request: Request, authorization: Annotated[str | None, Header()] = None):
+    # Same session bearer as /converse: this endpoint spends Cartesia credit, so it is not
+    # open to anyone who can reach the service. The token is only checked, never forwarded —
+    # /speak talks to no backend.
+    _jwt_from(authorization)
+    body = await request.json()
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(400, "text is required")
+    language = body.get("language", "ur")
+    language = language if language in ("ur", "en") else "ur"
+    audio_id = await app.state.tts.synthesize(trim_for_tts(text, SPEAK_MAX_CHARS, language), language)
+    return {"url": f"/tts/{audio_id}"}
 
 
 @app.get("/tts/{audio_id}")

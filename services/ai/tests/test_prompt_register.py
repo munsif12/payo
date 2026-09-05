@@ -102,3 +102,87 @@ def test_urdu_prompt_maps_urdu_wordings_to_the_read_tools():
     ]:
         assert phrase in ur, phrase
         assert tool in ur, tool
+
+
+# ---- v6 policy parity: every rule below must exist in BOTH prompts (spec §3) ----
+
+
+def test_intent_table_names_a_tool_for_every_v6_action():
+    for tool in ("get_guardian", "set_guardian", "remove_guardian", "list_approvals",
+                 "approve_action", "decline_action", "remind_guardian", "answer_check_in",
+                 "set_proactive", "get_digest"):
+        assert tool in INTENT_TABLE, f"{tool} missing from the intent table"
+    assert "risk_flags=['pressure_language']" in INTENT_TABLE
+
+
+def test_pressure_language_rule_is_in_both_prompts():
+    en, ur = system_prompt("en"), system_prompt("ur")
+    # the classifier's five signals, in both languages
+    assert "PRESSURE LANGUAGE" in en
+    for signal in ("called or messaged", "blocked or", "prize", "OTP", "hurried"):
+        assert signal in en, signal
+    assert "risk_flags=['pressure_language']" in en and "risk_flags=['pressure_language']" in ur
+    assert "دباؤ والی بات" in ur
+    for signal in ("فون یا پیغام", "بند یا معطل", "انعام", "OTP", "جلدی"):
+        assert signal in ur, signal
+
+
+def test_pressure_rule_reads_only_the_users_own_messages_in_both_prompts():
+    """The assistant's own calm explanation names every signal, so the classifier must be
+    scoped to the USER's turns or it re-triggers on its own wording."""
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "Read ONLY the USER's own last" in en and "never your own wording" in en
+    assert "must never re-trigger" in en
+    assert "صرف صارف کے اپنے پچھلے تین پیغام" in ur and "اپنے الفاظ ہرگز نہیں" in ur
+
+
+def test_only_answer_check_in_or_cancel_while_a_check_in_is_open_in_both_prompts():
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "WHILE A CHECK-IN IS OPEN" in en
+    assert "answer_check_in" in en and "cancel_action" in en
+    assert 'Never call send_money again to "retry"' in en
+    assert "جب تک check_in کارڈ کھلا ہے" in ur
+    assert "send_money ہرگز نہ چلائیں" in ur
+
+
+def test_the_guardian_is_named_never_gendered_in_both_prompts():
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "I've sent it to <name>" in en
+    assert 'never say "him" or "her"' in en
+    assert "میں نے <نام> کے پاس بھیج دیا ہے" in ur
+    assert "صنف والے الفاظ نہ لکھیں" in ur
+
+
+def test_check_in_rule_never_argues_on_yes_in_both_prompts():
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "NEVER argue" in en and "never ask them to reconsider" in en
+    assert "how scams work" in en and "trusted contact" in en
+    assert "answer_check_in(action_id, someone_asked=false)" in en
+    assert "بحث ہرگز نہ کریں" in ur and "سکیم" in ur
+    assert "answer_check_in(action_id, someone_asked=false)" in ur
+
+
+def test_no_pin_is_ever_collected_in_chat_rule_is_in_both_prompts():
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "Never ask the user to say a PIN in chat" in en
+    assert "only PROPOSE the change" in en and "only SHOWS the payment" in en
+    assert "More -> Settings -> Trusted contact" in en
+    assert "چیٹ میں PIN کبھی نہ پوچھیں" in ur
+    assert "صرف تجویز کرتے ہیں" in ur and "Settings" in ur
+
+
+def test_guardian_is_explained_in_one_sentence_in_both_prompts():
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "explain it in ONE sentence" in en
+    assert "above the ceiling" in en
+    assert "ایک ہی جملے میں سمجھا دیں" in ur
+    assert "حد سے بڑی رقم" in ur
+
+
+def test_waiting_approval_and_proactive_rules_are_in_both_prompts():
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "needs to approve this" in en and "PIN sheet does NOT open yet" in en
+    assert "remind_guardian" in en and "once a minute" in en
+    assert "set_proactive(false)" in en and "get_digest" in en
+    assert "منظوری دینی ہے" in ur and "remind_guardian" in ur
+    assert "set_proactive(false)" in ur and "get_digest" in ur

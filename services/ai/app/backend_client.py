@@ -104,10 +104,13 @@ class BackendClient:
     async def pay_bill(self, bill_id: str) -> Any:
         return await self.post("/bills/pay", {"billId": bill_id})
 
-    async def create_transfer(self, to: dict[str, Any], amount_paisa: int, note: str | None = None) -> Any:
+    async def create_transfer(self, to: dict[str, Any], amount_paisa: int, note: str | None = None,
+                              risk_flags: list[str] | None = None) -> Any:
         body: dict[str, Any] = {"to": to, "amountPaisa": amount_paisa}
         if note:
             body["note"] = note
+        if risk_flags:
+            body["riskFlags"] = risk_flags
         return await self.post("/transfers", body)
 
     async def create_recharge(self, telco_id: str, phone: str, amount_paisa: int) -> Any:
@@ -173,6 +176,32 @@ class BackendClient:
         if month:
             body["month"] = month
         return await self.post("/statements", body)
+
+    # -- v6: trusted contact, scam interruption, proactive greeting (spec §2) --
+    async def guardian(self) -> Any:
+        return await self.get("/guardian")
+
+    async def action(self, action_id: str) -> Any:
+        return await self.get(f"/actions/{action_id}")
+
+    async def answer_check_in(self, action_id: str, someone_asked: bool) -> Any:
+        return await self.post(f"/actions/{action_id}/check-in", {"someoneAsked": someone_asked})
+
+    async def remind_guardian(self, action_id: str) -> Any:
+        return await self.post(f"/actions/{action_id}/remind")
+
+    async def approvals(self) -> Any:
+        return await self.get("/approvals")
+
+    async def decline_approval(self, action_id: str, reason: str | None = None) -> Any:
+        return await self.post(f"/approvals/{action_id}/decline", {"reason": reason} if reason else {})
+
+    async def digest(self, ack: bool = True) -> Any:
+        return await self.get("/me/digest", params={"ack": 1} if ack else None)
+
+    # NOTE: PUT/DELETE /guardian, PATCH /guardian/ceiling and POST /approvals/:id/approve
+    # all take a PIN and are therefore driven by the app's PIN sheet, never from chat
+    # (see app/tools.set_guardian / approve_action) — deliberately not wrapped here.
 
     # -- chat persistence --
     async def create_session(self) -> Any:

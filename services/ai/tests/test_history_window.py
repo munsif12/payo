@@ -64,3 +64,33 @@ def test_cards_context_line_joins_multiple_cards():
     line = cards_context_line([{"kind": "balance", "balancePaisa": 5},
                                {"kind": "confirmation", "actionId": "act1", "amountPaisa": 5}])
     assert line.startswith("[cards] ") and "|" in line
+
+
+def test_every_v6_card_kind_keeps_its_ids_in_history():
+    """Each new kind needs a facts line, or a follow-up turn ("approve that", "yes someone
+    asked me", "remind him") has no action_id to work from."""
+    cases = {
+        "check_in": ({"kind": "check_in", "actionId": "act_flag",
+                      "prompt": {"en": "?", "ur": "؟"}, "riskFlags": ["pressure_language"]},
+                     ["action_id=act_flag", "pressure_language"]),
+        "waiting_approval": ({"kind": "waiting_approval", "actionId": "act_flag",
+                              "guardianName": "Bilal Ahmed", "expiresAt": "2026-09-06T09:30:00.000Z",
+                              "amountPaisa": 3_000_000, "summary": {"en": "x", "ur": "x"}},
+                             ["action_id=act_flag", "guardian_name=Bilal Ahmed"]),
+        "approvals": ({"kind": "approvals", "items": [{"actionId": "act_wait", "payerName": "Ammi",
+                                                       "amountPaisa": 10, "riskFlags": ["x"]}]},
+                      ["act_wait", "Ammi"]),
+        "digest": ({"kind": "digest", "items": [{"kind": "bill_due",
+                                                 "title": {"en": "A bill is due", "ur": "بل"},
+                                                 "refId": "b1"}]},
+                   ["bill_due", "ref_id=b1"]),
+        "guardian": ({"kind": "guardian", "name": "Bilal Ahmed", "phone": "+923001110002",
+                      "ceilingPaisa": 10, "coolingMs": 0,
+                      "pendingChange": {"change": "set", "phone": "+923009990000"}},
+                     ["phone=+923001110002", "pending_change=set", "pending_phone=+923009990000"]),
+    }
+    for kind, (card, needles) in cases.items():
+        line = _card_facts(card)
+        assert line, f"{kind} card has no facts line"
+        for needle in needles:
+            assert needle in line, f"{kind} lost {needle} in history: {line}"

@@ -1055,3 +1055,71 @@ def test_echo_detection_never_compares_a_reply_with_itself():
     assert not _echoes_history(reply, [])
     assert not _echoes_history(reply, [AIMessage(content="Your balance is 84,500 rupees.")])
     assert _echoes_history(reply, [AIMessage(content=reply)])
+
+
+# ---- v6: the pressure-language flag is sticky, not left to the model's memory ----
+
+
+async def test_a_flagged_conversation_reflags_a_later_send_the_model_forgot(fake_backend):
+    """Once a check_in card has been shown for `pressure_language`, every later send in the
+    window carries the flag — even when the model omits risk_flags entirely. Otherwise a
+    scam turn silently un-flags itself on the retry and the check-in is skipped."""
+    from langchain_core.messages import AIMessage as _AIMessage, HumanMessage
+
+    from tests.conftest import body_of
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    history = [
+        HumanMessage(content="someone called and said my account will be blocked"),
+        _AIMessage(content="Did someone ask you to send this?\n"
+                           "[cards] check_in: action_id=act_flag risk_flags=pressure_language"),
+    ]
+    model = scripted([
+        # no risk_flags at all — the model forgot
+        AIMessage(content="", tool_calls=[{"name": "send_money",
+                                           "args": {"amount_paisa": 500000, "recipient_id": "rec1"},
+                                           "id": "t1"}]),
+        AIMessage(content="Just one question first."),
+    ])
+    _reply, cards = await run_agent(client, history, "send it anyway", "en", model=model)
+    transfer = next(r for r in fake_backend.requests if r.url.path == "/api/v1/transfers")
+    assert body_of(transfer)["riskFlags"] == ["pressure_language"]
+    assert [c["kind"] for c in cards] == ["check_in"]
+    await client.aclose()
+
+
+async def test_an_unflagged_conversation_does_not_invent_risk_flags(fake_backend):
+    from tests.conftest import body_of
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "send_money",
+                                           "args": {"amount_paisa": 500000, "recipient_id": "rec1"},
+                                           "id": "t1"}]),
+        AIMessage(content="Please confirm on the card."),
+    ])
+    _reply, cards = await run_agent(client, [], "send 5000 to Bilal", "en", model=model)
+    transfer = next(r for r in fake_backend.requests if r.url.path == "/api/v1/transfers")
+    assert "riskFlags" not in body_of(transfer)
+    assert [c["kind"] for c in cards] == ["confirmation"]
+    await client.aclose()
+
+
+def test_risk_flags_in_history_reads_only_check_in_facts():
+    """The assistant's own calm scam explanation names every signal — it must never be read
+    back as evidence that the conversation is flagged."""
+    from langchain_core.messages import AIMessage as _AIMessage, HumanMessage
+
+    from app.agent import risk_flags_in_history
+    from app.tools import SCAM_EXPLANATION
+
+    assert risk_flags_in_history([
+        _AIMessage(content="ok\n[cards] check_in: action_id=a1 risk_flags=pressure_language,new_recipient_large"),
+    ]) == {"pressure_language", "new_recipient_large"}
+    assert risk_flags_in_history([_AIMessage(content=SCAM_EXPLANATION["en"])]) == set()
+    assert risk_flags_in_history([_AIMessage(content=SCAM_EXPLANATION["ur"])]) == set()
+    assert risk_flags_in_history([HumanMessage(content="risk_flags=pressure_language")]) == set()

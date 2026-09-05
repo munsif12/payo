@@ -335,6 +335,87 @@ class QrCard(BaseModel):
     phone: str
 
 
+# ---- v6 card kinds (guardian, scam interruption, proactive greeting — spec §3) ----
+
+
+class CheckInCard(BaseModel):
+    """The calm, one-question interruption shown BEFORE a risk-flagged action proceeds.
+
+    Two answers only ("Yes, someone asked me" / "No, this is my own idea"); the app sends
+    them back through `answer_check_in`. A "yes" cancels the action — it never argues.
+    """
+    kind: Literal["check_in"] = "check_in"
+    actionId: str
+    prompt: Bilingual
+    riskFlags: list[str] = []
+
+
+class WaitingApprovalCard(BaseModel):
+    """A send parked until the trusted contact approves it. The PIN sheet does NOT open;
+    the app polls GET /actions/:id every 3 s and opens it when `approved` comes back."""
+    kind: Literal["waiting_approval"] = "waiting_approval"
+    actionId: str
+    guardianName: str
+    expiresAt: str
+    amountPaisa: int
+    summary: Bilingual
+
+
+class ApprovalItem(BaseModel):
+    actionId: str
+    payerName: str
+    payerPhone: str
+    summary: Bilingual
+    amountPaisa: int
+    riskFlags: list[str] = []
+    createdAt: str
+    expiresAt: str
+
+
+class ApprovalsCard(BaseModel):
+    """What is waiting for the GUARDIAN to decide. Approve opens the PIN sheet in the app
+    (the guardian's own PIN) — the assistant only ever shows and explains."""
+    kind: Literal["approvals"] = "approvals"
+    items: list[ApprovalItem]
+
+
+class DigestItem(BaseModel):
+    kind: str  # received | bill_due | approval_waiting | request | anomaly | guardian_notice
+    title: Bilingual
+    subtitle: Bilingual | None = None
+    amountPaisa: int | None = None
+    intent: Bilingual | None = None  # the one-tap follow-up utterance for this row
+    refId: str | None = None
+
+
+class DigestCard(BaseModel):
+    kind: Literal["digest"] = "digest"
+    items: list[DigestItem]
+
+
+class GuardianPendingChange(BaseModel):
+    """A loosening that has not taken effect yet (removal, or a raised ceiling), or — when
+    the assistant proposes a change in chat — the change the user still has to confirm with
+    their PIN in Settings.
+
+    `change` is the enum only; the person a 'set' names travels in `phone`, never glued into
+    the enum value. `effectiveAt` is absent for a proposal, since nothing is scheduled yet.
+    """
+    change: Literal["set", "remove", "raise"]
+    phone: str | None = None  # 'set' only: who the trusted contact would become
+    ceilingPaisa: int | None = None  # 'raise' only: the ceiling being raised to
+    effectiveAt: str | None = None
+
+
+class GuardianCard(BaseModel):
+    kind: Literal["guardian"] = "guardian"
+    name: str | None = None
+    phone: str | None = None
+    ceilingPaisa: int
+    pendingChange: GuardianPendingChange | None = None
+    coolingMs: int
+
+
 Card = Annotated[
     Union[
         ConfirmationCard, SuccessCard, TransactionsCard, StatementCard,
@@ -343,6 +424,7 @@ Card = Annotated[
         ReceiptCard, SpendingCard, AccountCard, ProfileCard, HelpCard, CardCard,
         StatementsCard, RecipientsCard, BillsCard, BillersCard, TelcoChipsCard,
         PocketsCard, RequestCard, RequestsCard, QrCard,
+        CheckInCard, WaitingApprovalCard, ApprovalsCard, DigestCard, GuardianCard,
     ],
     Field(discriminator="kind"),
 ]

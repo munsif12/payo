@@ -477,3 +477,182 @@ async def test_list_requests_include_history_shows_everything(fake_backend):
     ]})
     r = await tools.list_requests(await client_for(fake_backend), include_history=True)
     assert [i["requestId"] for i in r["card"]["items"]] == ["req9", "req1"]
+
+
+# ---- v6: trusted contact, scam interruption, proactive greeting (spec §1, §3) ----
+
+from tests.conftest import err  # noqa: E402
+from tests.fixtures_backend import (  # noqa: E402
+    APPROVAL_DTO, FLAGGED_ACTION, FLAGGED_ACTION_CHECKED_IN, GUARDIAN_DTO, wire_all,
+)
+
+
+async def test_send_money_passes_risk_flags_and_shows_the_check_in_first(fake_backend):
+    """A risk-flagged send asks its one question BEFORE anything else — no confirmation card,
+    so the PIN sheet cannot open (spec §1.8)."""
+    wire_all(fake_backend)
+    r = await tools.send_money(await client_for(fake_backend), amount_paisa=500000,
+                               recipient_id="rec1", risk_flags=["pressure_language"])
+    assert body_of(fake_backend.requests[0])["riskFlags"] == ["pressure_language"]
+    assert r["card"]["kind"] == "check_in"
+    assert r["card"]["actionId"] == "act_flag"
+    assert r["card"]["riskFlags"] == ["pressure_language"]
+    assert r["card"]["prompt"]["ur"] and r["card"]["prompt"]["en"]
+    # the model is told to ask the one question and say nothing about PINs or approval yet
+    assert "CHECK-IN card was shown first" in r["text"]
+    assert "say nothing about PINs or approval yet" in r["text"]
+
+
+async def test_send_money_waiting_for_approval_shows_waiting_card_not_confirmation(fake_backend):
+    fake_backend.route("POST", "/api/v1/transfers", {
+        **PENDING, "approval": {"required": True, "guardianId": "u2", "status": "waiting",
+                                "guardianName": "Bilal Ahmed"},
+    })
+    r = await tools.send_money(await client_for(fake_backend), amount_paisa=150000,
+                               recipient_id="rec1")
+    assert r["card"]["kind"] == "waiting_approval"
+    assert r["card"]["guardianName"] == "Bilal Ahmed"
+    assert r["card"]["amountPaisa"] == 150000
+    assert "needs to approve this first" in r["text"]
+    # the guardian is named, never "him"/"her" (the assistant does not know their gender)
+    assert "I've sent it to Bilal Ahmed" in r["text"]
+    assert " him" not in r["text"] and " her" not in r["text"]
+
+
+async def test_send_money_without_flags_or_guardian_is_unchanged(fake_backend):
+    fake_backend.route("POST", "/api/v1/transfers", PENDING)
+    r = await tools.send_money(await client_for(fake_backend), amount_paisa=150000,
+                               recipient_id="rec1")
+    assert r["card"]["kind"] == "confirmation"
+    assert "riskFlags" not in body_of(fake_backend.requests[0])
+
+
+async def test_get_guardian_returns_guardian_card(fake_backend):
+    wire_all(fake_backend)
+    r = await tools.get_guardian(await client_for(fake_backend))
+    assert r["card"] == {"kind": "guardian", "name": "Bilal Ahmed", "phone": "+923001110002",
+                         "ceilingPaisa": 10_000_000, "coolingMs": 0}
+    assert "Bilal Ahmed" in r["text"]
+    # NIT: the cooling period is spoken in words, never raw milliseconds
+    assert "immediately" in r["text"] and " ms" not in r["text"]
+
+
+async def test_set_guardian_never_writes_and_sends_the_user_to_settings(fake_backend):
+    """PUT /guardian needs the payer's PIN, and a PIN is only entered in the app — so the
+    tool proposes the change on the card and never calls the write route."""
+    wire_all(fake_backend)
+    r = await tools.set_guardian(await client_for(fake_backend), phone="+923001110002")
+    assert [req.method for req in fake_backend.requests] == ["GET"]
+    assert r["card"]["pendingChange"] == {"change": "set", "phone": "+923001110002"}
+    assert "Settings" in r["text"] and "NOT done yet" in r["text"]
+
+
+async def test_remove_guardian_proposes_and_explains_the_cooling_period(fake_backend):
+    fake_backend.route("GET", "/api/v1/guardian", {**GUARDIAN_DTO, "coolingMs": 86_400_000})
+    r = await tools.remove_guardian(await client_for(fake_backend))
+    assert [req.method for req in fake_backend.requests] == ["GET"]
+    assert r["card"]["pendingChange"] == {"change": "remove"}
+    assert "after about 24 hour(s)" in r["text"] and "Settings" in r["text"]
+    assert "86400000" not in r["text"] and " ms" not in r["text"]
+
+
+async def test_list_approvals_returns_approvals_card(fake_backend):
+    wire_all(fake_backend)
+    r = await tools.list_approvals(await client_for(fake_backend))
+    assert r["card"]["kind"] == "approvals"
+    assert r["card"]["items"][0]["actionId"] == APPROVAL_DTO["actionId"]
+    assert r["card"]["items"][0]["payerName"] == "Ammi Jaan"
+    assert r["card"]["items"][0]["riskFlags"] == ["new_recipient_large"]
+
+
+async def test_approve_action_shows_the_card_but_never_posts_a_pin(fake_backend):
+    wire_all(fake_backend)
+    r = await tools.approve_action(await client_for(fake_backend), action_id="act_wait")
+    assert [(req.method, req.url.path) for req in fake_backend.requests] == [("GET", "/api/v1/approvals")]
+    assert r["card"]["kind"] == "approvals" and len(r["card"]["items"]) == 1
+    assert "NOT approved yet" in r["text"]
+
+
+async def test_approve_action_says_so_plainly_when_nothing_is_waiting(fake_backend):
+    wire_all(fake_backend)
+    r = await tools.approve_action(await client_for(fake_backend), action_id="gone")
+    assert r["card"] is None
+    assert "gone" in r["text"]
+
+
+async def test_decline_action_calls_the_backend_with_the_reason(fake_backend):
+    wire_all(fake_backend)
+    r = await tools.decline_action(await client_for(fake_backend), action_id="act_wait",
+                                   reason="Not my payment")
+    assert body_of(fake_backend.requests[0]) == {"reason": "Not my payment"}
+    assert r["card"] is None and "Declined" in r["text"]
+
+
+async def test_remind_guardian_handles_the_once_a_minute_limit(fake_backend):
+    fake_backend.route("POST", "/api/v1/actions/act_wait/remind",
+                       responder=lambda req: err(429, "REMIND_TOO_SOON", "Too soon"))
+    r = await tools.remind_guardian(await client_for(fake_backend), action_id="act_wait")
+    assert not r["text"].startswith("ERROR")
+    assert "once a minute" in r["text"]
+
+
+async def test_answer_check_in_yes_cancels_and_offers_the_guardian_in_both_languages(fake_backend):
+    wire_all(fake_backend)
+    r = await tools.answer_check_in(await client_for(fake_backend), action_id="act_flag",
+                                    someone_asked=True)
+    assert body_of(fake_backend.requests[0]) == {"someoneAsked": True}
+    assert r["card"] is None
+    assert "CANCELLED" in r["text"] and "Do NOT argue" in r["text"]
+    assert tools.SCAM_EXPLANATION["en"] in r["text"]
+    assert tools.SCAM_EXPLANATION["ur"] in r["text"]
+
+
+async def test_answer_check_in_no_continues_to_the_approval_gate(fake_backend):
+    wire_all(fake_backend)
+    r = await tools.answer_check_in(await client_for(fake_backend), action_id="act_flag",
+                                    someone_asked=False)
+    assert [req.url.path for req in fake_backend.requests] == [
+        "/api/v1/actions/act_flag/check-in", "/api/v1/actions/act_flag"]
+    assert r["card"]["kind"] == "waiting_approval"
+    assert r["card"]["guardianName"] == "Bilal Ahmed"
+
+
+async def test_answer_check_in_no_falls_through_to_the_pin_when_no_guardian_applies(fake_backend):
+    fake_backend.route("POST", "/api/v1/actions/act_flag/check-in", {"answered": True})
+    fake_backend.route("GET", "/api/v1/actions/act_flag",
+                       {**FLAGGED_ACTION_CHECKED_IN, "approval": None})
+    r = await tools.answer_check_in(await client_for(fake_backend), action_id="act_flag",
+                                    someone_asked=False)
+    assert r["card"]["kind"] == "confirmation"
+    assert "PIN" in r["text"]
+
+
+async def test_set_proactive_patches_the_preference(fake_backend):
+    wire_all(fake_backend)
+    r = await tools.set_proactive(await client_for(fake_backend), enabled=False)
+    assert body_of(fake_backend.requests[0]) == {"preferences": {"proactiveGreeting": False}}
+    assert r["card"] is None and "stay quiet" in r["text"]
+
+
+async def test_get_digest_acks_and_returns_a_digest_card(fake_backend):
+    wire_all(fake_backend)
+    r = await tools.get_digest(await client_for(fake_backend))
+    assert fake_backend.requests[0].url.params.get("ack") == "1"
+    kinds = [i["kind"] for i in r["card"]["items"]]
+    assert kinds == ["received", "bill_due", "approval_waiting"]
+    first = r["card"]["items"][0]
+    assert first["title"]["ur"] and first["intent"]["ur"] and first["refId"] == "txn1"
+
+
+async def test_get_digest_says_nothing_financial_when_empty(fake_backend):
+    fake_backend.route("GET", "/api/v1/me/digest", {"items": [], "since": None})
+    r = await tools.get_digest(await client_for(fake_backend))
+    assert r["card"] is None
+    assert "do not volunteer" in r["text"].lower()
+
+
+def test_flagged_action_fixture_keeps_the_check_in_ahead_of_the_approval():
+    """Order matters: the check-in is asked before the approval card (spec §1.8)."""
+    assert tools._needs_check_in(FLAGGED_ACTION) is True
+    assert tools._waiting_for_approval(FLAGGED_ACTION) is True
+    assert tools._needs_check_in(FLAGGED_ACTION_CHECKED_IN) is False

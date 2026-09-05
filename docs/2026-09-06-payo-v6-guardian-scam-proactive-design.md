@@ -11,8 +11,10 @@ Everything not mentioned here stays as built. Demo config: `GUARDIAN_COOLING_MS 
 2. **Approval is needed only for a send to a NEW recipient** (no completed send to that
    institution+identifier before) **or above the hard ceiling** (default Rs 1,00,000). Saved
    recipients the user has paid before never need approval.
-3. **Tightening is instant; loosening cools.** Setting a guardian, lowering the ceiling: PIN,
-   immediate. Removing the guardian or raising the ceiling: PIN, then takes effect after
+3. **Tightening is instant; loosening cools.** Setting a FIRST guardian, lowering the ceiling:
+   PIN, immediate. Removing the guardian, **replacing an existing guardian** (review finding:
+   an instant swap to a colluding account would defeat the feature), or raising the ceiling:
+   PIN, then takes effect after
    `GUARDIAN_COOLING_MS` (24 h in production, **0 in the demo**); the guardian is informed
    (a card in their app). While cooling, the old rule still applies.
 4. A send that needs approval becomes a pending action **waiting for the guardian**; the PIN
@@ -21,6 +23,9 @@ Everything not mentioned here stays as built. Demo config: `GUARDIAN_COOLING_MS 
 5. The guardian sees it on their Home (card, spoken) and in Requests → Approvals, and
    **approves with their own PIN** or declines with an optional reason. The AI only shows and
    explains; it never approves.
+6a. **Every outgoing money path is gated the same way** — transfers AND settling a money
+   request (`request_settlement`) run the same rule evaluation; approval authority is checked
+   against the payer's CURRENT guardian at approval time, not a snapshot.
 6. Approved → the payer's app (polling the action every 3 s while waiting; no push in the demo)
    opens the PIN sheet and the assistant says "Bilal approved — enter your PIN". Declined or
    expired → cancelled, explained. No skip path exists.

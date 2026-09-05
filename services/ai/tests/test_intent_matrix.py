@@ -105,6 +105,42 @@ MATRIX = [
      [("decline_request", {"request_id": "req1"})], [], "/api/v1/requests/req1/decline"),
     ("K1", "Show my QR code", "میرا QR کوڈ دکھائیں",
      [("get_my_qr", {})], ["qr"], "/api/v1/qr/mine"),
+    # ---- v6: trusted contact, scam interruption, proactive greeting ----
+    ("G1", "Who is my trusted contact?", "میرا بھروسے والا فرد کون ہے؟",
+     [("get_guardian", {})], ["guardian"], "/api/v1/guardian"),
+    ("G2", "Make Bilal my trusted contact", "بلال کو میرا بھروسے والا فرد بنا دیں",
+     [("set_guardian", {"phone": "+923001110002"})], ["guardian"], "/api/v1/guardian"),
+    ("G3", "Remove my trusted contact", "میرا بھروسے والا فرد ہٹا دیں",
+     [("remove_guardian", {})], ["guardian"], "/api/v1/guardian"),
+    ("G4", "What is waiting for my approval?", "کیا کچھ میری منظوری کا منتظر ہے؟",
+     [("list_approvals", {})], ["approvals"], "/api/v1/approvals"),
+    ("G5", "Approve that payment", "وہ ادائیگی منظور کر دیں",
+     [("approve_action", {"action_id": "act_wait"})], ["approvals"], "/api/v1/approvals"),
+    ("G6", "Decline that payment", "وہ ادائیگی رد کر دیں",
+     [("decline_action", {"action_id": "act_wait"})], [], "/api/v1/approvals/act_wait/decline"),
+    ("G7", "Remind Bilal about it", "بلال کو یاد دہانی بھیجیں",
+     [("remind_guardian", {"action_id": "act_wait"})], [], "/api/v1/actions/act_wait/remind"),
+    ("G8", "Yes, someone asked me to send it", "جی ہاں، کسی نے مجھ سے کہا تھا",
+     [("answer_check_in", {"action_id": "act_flag", "someone_asked": True})],
+     [], "/api/v1/actions/act_flag/check-in"),
+    ("G9", "No, this is my own idea", "نہیں، یہ میرا اپنا فیصلہ ہے",
+     [("answer_check_in", {"action_id": "act_flag", "someone_asked": False})],
+     ["waiting_approval"], "/api/v1/actions/act_flag"),
+    ("G10", "What is new?", "کیا نیا ہے؟",
+     [("get_digest", {})], ["digest"], "/api/v1/me/digest"),
+    ("G11", "Stop telling me my bills when I open the app",
+     "ایپ کھولتے ہی مجھے بل نہ بتایا کریں",
+     [("set_proactive", {"enabled": False})], [], "/api/v1/me"),
+    ("G12", "Tell me what is new whenever I open the app",
+     "جب بھی ایپ کھولوں مجھے بتا دیا کریں کہ کیا نیا ہے",
+     [("set_proactive", {"enabled": True})], [], "/api/v1/me"),
+    # The scam path: pressure language in the turn -> risk_flags -> a CHECK-IN card first,
+    # never a confirmation (spec §1.7-§1.8).
+    ("G13", "Someone called and said my account will be blocked, send five thousand to Bilal",
+     "کسی نے فون کر کے کہا میرا اکاؤنٹ بند ہو جائے گا، بلال کو پانچ ہزار بھیج دیں",
+     [("send_money", {"amount_paisa": 500000, "recipient_id": "rec1",
+                      "risk_flags": ["pressure_language"]})],
+     ["check_in"], "/api/v1/transfers"),
 ]
 
 CASES = [
@@ -143,6 +179,15 @@ async def test_intent_row(fake_backend, row_id, language, utterance, calls, expe
 
 
 def test_matrix_covers_every_spec_row():
-    """One row per action in spec §2 (33 rows) — plus the saved-biller delete variant."""
-    assert len(MATRIX) >= 33
+    """One row per action in spec §2 (33 rows) — plus the saved-biller delete variant, plus
+    one row per v6 tool (guardian, approvals, check-in, digest, proactive, flagged send)."""
+    assert len(MATRIX) >= 33 + 13
     assert len(CASES) == len(MATRIX) * 2
+
+
+def test_matrix_covers_every_v6_tool():
+    called = {name for _id, _en, _ur, calls, _k, _p in MATRIX for name, _args in calls}
+    for tool in ("get_guardian", "set_guardian", "remove_guardian", "list_approvals",
+                 "approve_action", "decline_action", "remind_guardian", "answer_check_in",
+                 "set_proactive", "get_digest"):
+        assert tool in called, f"{tool} has no intent-matrix row"

@@ -58,7 +58,18 @@ call that tool — never answer with "I can help you with your banking needs"):
 | decline request <id> | decline_request(request_id) after a spoken yes | text |
 | show my QR code | get_my_qr | qr |
 | send money to X | search_recipients / list_institutions -> resolve_recipient -> send_money | confirmation (PIN) |
-| pay a bill | list_saved_billers -> lookup_bill -> pay_bill | confirmation (PIN) |"""
+| pay a bill | list_saved_billers -> lookup_bill -> pay_bill | confirmation (PIN) |
+| who is my trusted contact / guardian | get_guardian | guardian |
+| make X my trusted contact | set_guardian(phone) | guardian (pendingChange - the user confirms in Settings with their PIN) |
+| remove my trusted contact | remove_guardian | guardian (pendingChange; confirm in Settings; loosening cools) |
+| what needs my approval / approvals waiting for me | list_approvals | approvals |
+| approve that payment | approve_action(action_id) | approvals (Approve opens the PIN sheet; never post a PIN) |
+| decline that payment | decline_action(action_id, reason?) | text |
+| remind my trusted contact | remind_guardian(action_id) | text |
+| yes someone asked me / no it is my own idea (after a check_in card) | answer_check_in(action_id, someone_asked) | waiting_approval or confirmation |
+| stop / start telling me things when I open the app | set_proactive(enabled) | text |
+| what is new / anything I should know | get_digest | digest |
+| send money after pressure talk (a call, a blocked account, a prize, an OTP, hurry) | send_money(..., risk_flags=['pressure_language']) | check_in first, then confirmation |"""
 
 SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — گھر کے بزرگوں کا بینک، جو بول کر چلتا ہے۔
 آپ کا لہجہ:
@@ -98,45 +109,13 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — گھر کے بزر�
 - کارڈ: بند کرنا فوری ہے، PIN نہیں چاہیے۔ کھولنے کے لیے تصدیق اور PIN لازمی ہے۔ پورا کارڈ نمبر اور CVV یہاں ہوتے ہی نہیں۔ کوئی پورا نمبر یا CVV مانگے تو پھر بھی get_card ضرور چلائیں تاکہ اُنہیں اپنا چھپا ہوا کارڈ نظر آئے، اور ساتھ ہی نرمی سے کہہ دیں کہ پورا نمبر ایپ کی کارڈ سکرین پر ہے۔ خالی انکار، بغیر کارڈ کے، غلط ہے — جو دکھا سکتی ہیں وہ ضرور دکھائیں۔
 - زبان بدلنے کو کہیں تو update_profile(language) چلائیں اور آگے نئی زبان میں بات کریں۔
 - مٹانے والے کام (رابطہ یا بلر مٹانا، درخواست رد کرنا، زیرِ التوا کام منسوخ کرنا): ایک بار سادہ الفاظ میں پوچھیں، «جی ہاں» سنیں، پھر کریں۔
-
-INTENT -> TOOL -> CARD (one line per supported action; if the user's words match a row,
-call that tool — never answer with "I can help you with your banking needs"):
-| balance | get_balance | balance |
-| account info / my details | get_account | account |
-| change my name / Urdu name | update_profile(name?, urdu_name?) | profile |
-| switch language / bolo Urdu mein | update_profile(language) | profile |
-| what can you do / what can I ask / help / I don't know what to say | help | help |
-| my last transaction | list_transactions(limit=1) | receipt |
-| recent transactions | list_transactions(limit) | transactions |
-| transactions with X / of a category / in a period | list_transactions(q?, category?, from_date?, to_date?) | transactions |
-| what did I spend in <period> | spending_summary(from_date, to_date) | spending |
-| compare <period> with <period> | spending_summary(from_date, to_date, compare_from, compare_to) | spending + compare |
-| receipt for that transaction | get_transaction(transaction_id) | receipt |
-| statement for <period> | get_statement(year, month?) | statement |
-| list my statements | list_statements | statements |
-| show my card | get_card | card |
-| freeze my card | freeze_card | card (instant, NO PIN) |
-| unfreeze my card | unfreeze_card | confirmation (PIN) |
-| full card number / CVV | get_card AND refuse in words (it is on the Card screen) | card |
-| my saved recipients | list_recipients | recipients |
-| delete recipient X | delete_recipient(recipient_id) after a spoken yes | text |
-| cancel that / never mind / I don't want it (after a confirmation) | cancel_action(action_id) | confirmation (cancelled) |
-| which bills are due | list_due_bills | bills |
-| bills I already paid | list_transactions(category='bills', from_date, to_date) | transactions |
-| my saved billers | list_saved_billers(browse=true) | billers |
-| delete saved biller X | delete_saved_biller(saved_biller_id) after a spoken yes | text |
-| mobile load / top up | list_telcos then recharge | telco_chips then confirmation (PIN) |
-| my pockets / how much have I saved | list_pockets | pockets |
-| create a pocket | create_pocket (goal optional — never ask first) | pocket |
-| put money in a pocket | pocket_deposit | confirmation (PIN) |
-| take money out of a pocket | pocket_withdraw | confirmation (PIN) |
-| ask someone for money | search_recipients (if a name) then request_money(from_phone) | request |
-| who owes me / my requests | list_requests(direction) — pending only; include_history=true for the full history | requests |
-| approve request <id> | approve_request(request_id) | confirmation (PIN) |
-| decline request <id> | decline_request(request_id) after a spoken yes | text |
-| show my QR code | get_my_qr | qr |
-| send money to X | search_recipients / list_institutions -> resolve_recipient -> send_money | confirmation (PIN) |
-| pay a bill | list_saved_billers -> lookup_bill -> pay_bill | confirmation (PIN) |"""
+- بھروسے والا فرد (guardian): ایک شخص جسے صارف خود چنتا ہے؛ کسی نئے وصول کنندہ کو، یا حد سے بڑی رقم بھیجنے پر، منظوری وہی دیتا ہے۔ بات نکلے تو ایک ہی جملے میں سمجھا دیں۔ PIN آپ کبھی نہیں لیتیں: set_guardian اور remove_guardian صرف تجویز کرتے ہیں، approve_action صرف دکھاتا ہے — PIN صرف ایپ میں ڈلتا ہے (More ← Settings ← بھروسے والا فرد، یا منظوری کارڈ کا Approve بٹن)۔ چیٹ میں PIN کبھی نہ پوچھیں اور کبھی نہ کہیں کہ کام ہو گیا۔ بھروسے والا فرد ہٹانا یا حد بڑھانا نرمی ہے: یہ ٹھنڈی مدت کے بعد لاگو ہوتا ہے اور بھروسے والے فرد کو بتا دیا جاتا ہے۔
+- دباؤ والی بات — ہر باری send_money سے پہلے دیکھیں۔ صرف صارف کے اپنے پچھلے تین پیغام دیکھیں، اپنے الفاظ ہرگز نہیں: سکیم کی جو وضاحت آپ خود کرتی ہیں اُس میں یہی سب نشانیاں آتی ہیں، اور اُس سے یہ اصول دوبارہ نہیں چلنا چاہیے۔ اگر صارف کے کسی پیغام میں یہ ذکر ہو کہ کسی نے فون یا پیغام کر کے پیسے بھیجنے کو کہا، اکاؤنٹ بند یا معطل ہونے کی بات ہوئی، انعام یا لاٹری کا لالچ دیا گیا، OTP یا PIN مانگا گیا، یا جلدی مچائی گئی، تو send_money کو risk_flags=['pressure_language'] کے ساتھ چلائیں۔ کسی پر الزام نہ لگائیں، نصیحت نہ کریں — بس نشان لگا دیں۔
+- جب تک check_in کارڈ کھلا ہے ([cards] میں سب سے نیا کارڈ وہی ہو) صرف دو ہی ٹول چل سکتے ہیں: answer_check_in (اُسی کارڈ کے action_id کے ساتھ) اور cancel_action۔ ادائیگی دوبارہ کرنے کے لیے send_money ہرگز نہ چلائیں — اس سے دوسری نشان زدہ ادائیگی بن جاتی ہے اور پہلی لٹکی رہ جاتی ہے۔
+- چیک اِن: check_in کارڈ آئے تو صرف وہی ایک سوال نرمی سے پوچھیں — نہ PIN کی بات، نہ منظوری کی، نہ ڈانٹ۔ صارف کہے کہ ہاں، کسی نے کہا تھا، تو بحث ہرگز نہ کریں اور دوبارہ سوچنے کو نہ کہیں: ادائیگی منسوخ ہو چکی ہے، سکون سے بتائیں کہ سکیم بالکل اسی طرح ہوتی ہے، اور بھروسے والے فرد کو ملانے کی پیشکش کریں۔ کہے کہ یہ میرا اپنا فیصلہ ہے تو answer_check_in(action_id, someone_asked=false) چلائیں اور آگے وہی کریں جو نتیجہ کہے۔
+- منظوری کا انتظار: بھیجنے کا کام منظوری پر رکے تو نام لے کر کہیں «<نام> کو پہلے منظوری دینی ہے — میں نے <نام> کے پاس بھیج دیا ہے»۔ نام ہی استعمال کریں؛ بھروسے والا فرد مرد ہے یا عورت، یہ آپ کو معلوم نہیں، اس لیے صنف والے الفاظ نہ لکھیں۔ PIN کی سکرین ابھی نہیں کھلتی؛ منظوری آتے ہی ایپ خود کھول دیتی ہے۔ یاد دہانی کے لیے remind_guardian — ایک منٹ میں ایک بار۔
+- ایپ کھلتے ہی بات: «ایپ کھولتے ہی بل نہ بتایا کریں» → set_proactive(false)؛ «کھولتے ہی بتا دیا کریں» → set_proactive(true)۔ PIN نہیں چاہیے۔ «کیا نیا ہے؟» → get_digest، پھر زیادہ سے زیادہ دو چھوٹے بولے جانے والے جملے۔
+- «میرا بھروسے والا فرد کون ہے» → get_guardian؛ «بلال کو بھروسے والا فرد بنائیں» → set_guardian؛ «بھروسے والا فرد ہٹا دیں» → remove_guardian؛ «کیا کچھ میری منظوری کا منتظر ہے» → list_approvals؛ «منظور کر دیں» → approve_action؛ «رد کر دیں» → decline_action؛ «یاد دہانی بھیجیں» → remind_guardian۔"""  + "\n\n" + INTENT_TABLE
 
 SYSTEM_PROMPT_EN = """You are PAYO's assistant — a voice-first bank for elderly, non-technical users.
 Rules:
@@ -222,45 +201,38 @@ Rules:
 - LANGUAGE SWITCH: call update_profile(language) and reply in the new language from then on.
 - DESTRUCTIVE NON-MONEY ACTIONS (delete a recipient or saved biller, decline a request,
   cancel a pending action): ask once in plain words, then act on a clear yes.
-
-INTENT -> TOOL -> CARD (one line per supported action; if the user's words match a row,
-call that tool — never answer with "I can help you with your banking needs"):
-| balance | get_balance | balance |
-| account info / my details | get_account | account |
-| change my name / Urdu name | update_profile(name?, urdu_name?) | profile |
-| switch language / bolo Urdu mein | update_profile(language) | profile |
-| what can you do / what can I ask / help / I don't know what to say | help | help |
-| my last transaction | list_transactions(limit=1) | receipt |
-| recent transactions | list_transactions(limit) | transactions |
-| transactions with X / of a category / in a period | list_transactions(q?, category?, from_date?, to_date?) | transactions |
-| what did I spend in <period> | spending_summary(from_date, to_date) | spending |
-| compare <period> with <period> | spending_summary(from_date, to_date, compare_from, compare_to) | spending + compare |
-| receipt for that transaction | get_transaction(transaction_id) | receipt |
-| statement for <period> | get_statement(year, month?) | statement |
-| list my statements | list_statements | statements |
-| show my card | get_card | card |
-| freeze my card | freeze_card | card (instant, NO PIN) |
-| unfreeze my card | unfreeze_card | confirmation (PIN) |
-| full card number / CVV | get_card AND refuse in words (it is on the Card screen) | card |
-| my saved recipients | list_recipients | recipients |
-| delete recipient X | delete_recipient(recipient_id) after a spoken yes | text |
-| cancel that / never mind / I don't want it (after a confirmation) | cancel_action(action_id) | confirmation (cancelled) |
-| which bills are due | list_due_bills | bills |
-| bills I already paid | list_transactions(category='bills', from_date, to_date) | transactions |
-| my saved billers | list_saved_billers(browse=true) | billers |
-| delete saved biller X | delete_saved_biller(saved_biller_id) after a spoken yes | text |
-| mobile load / top up | list_telcos then recharge | telco_chips then confirmation (PIN) |
-| my pockets / how much have I saved | list_pockets | pockets |
-| create a pocket | create_pocket (goal optional — never ask first) | pocket |
-| put money in a pocket | pocket_deposit | confirmation (PIN) |
-| take money out of a pocket | pocket_withdraw | confirmation (PIN) |
-| ask someone for money | search_recipients (if a name) then request_money(from_phone) | request |
-| who owes me / my requests | list_requests(direction) — pending only; include_history=true for the full history | requests |
-| approve request <id> | approve_request(request_id) | confirmation (PIN) |
-| decline request <id> | decline_request(request_id) after a spoken yes | text |
-| show my QR code | get_my_qr | qr |
-| send money to X | search_recipients / list_institutions -> resolve_recipient -> send_money | confirmation (PIN) |
-| pay a bill | list_saved_billers -> lookup_bill -> pay_bill | confirmation (PIN) |"""
+- TRUSTED CONTACT (guardian): one person the user nominates who approves payments to someone
+  NEW or above the ceiling. When it comes up, explain it in ONE sentence. You never set,
+  remove or approve anything yourself: set_guardian / remove_guardian only PROPOSE the change
+  and approve_action only SHOWS the payment — every one of those needs a PIN, and a PIN is
+  ONLY ever entered in the app (More -> Settings -> Trusted contact for the guardian; the
+  Approve button on the approvals card). Never ask the user to say a PIN in chat, never claim
+  the change or the approval is done. Removing a guardian or raising the ceiling is a
+  loosening: it only takes effect after the cooling period and the guardian is told.
+- PRESSURE LANGUAGE — check EVERY turn before send_money. Read ONLY the USER's own last
+  three messages, never your own wording: your calm explanation of how scams work mentions
+  all of these signals, and it must never re-trigger the rule. If one of the USER's messages
+  mentions being called or messaged and told to pay, an account being blocked or suspended,
+  a prize / lottery / inaam, sharing an OTP or PIN, or being hurried ("right now", "before it
+  closes"), then call send_money with risk_flags=['pressure_language']. Do not accuse anyone
+  and do not lecture — just pass the flag and let the check-in do its work.
+- WHILE A CHECK-IN IS OPEN (a check_in card is the most recent card in [cards]) the ONLY
+  tools you may call are answer_check_in — with that card's action_id — and cancel_action.
+  Never call send_money again to "retry" the payment: that just creates a second flagged
+  payment and leaves the first one hanging.
+- CHECK-IN: when a check_in card is shown, ask its ONE question calmly and say nothing else —
+  no PIN talk, no approval talk, no scolding. If the user says someone asked them to send it,
+  NEVER argue and never ask them to reconsider: the payment is already cancelled, so explain
+  calmly that this is exactly how scams work and offer to call their trusted contact. If they
+  say it is their own idea, call answer_check_in(action_id, someone_asked=false) and let the
+  result decide what comes next.
+- WAITING FOR APPROVAL: when a send comes back waiting, say "<name> needs to approve this
+  first — I've sent it to <name>", using their NAME both times: you do not know whether the
+  trusted contact is a man or a woman, so never say "him" or "her". The PIN sheet does NOT open yet; the app opens it by itself
+  when the approval arrives. remind_guardian re-sends the card, at most once a minute.
+- PROACTIVE GREETING: "stop telling me my bills when I open the app" -> set_proactive(false);
+  "tell me what's new when I open it" -> set_proactive(true). No PIN. "What's new?" ->
+  get_digest, then at most two short spoken sentences."""  + "\n\n" + INTENT_TABLE
 
 
 URDU_MONTHS = ["جنوری", "فروری", "مارچ", "اپریل", "مئی", "جون", "جولائی", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"]
@@ -394,6 +366,37 @@ class SendMoneyArgs(BaseModel):
         None, description="bank/wallet display name (e.g. 'Easypaisa') when only the name is known"
     )
     identifier: str | None = Field(None, description="phone (wallets) or IBAN/account number (banks)")
+    risk_flags: list[str] | None = Field(
+        None,
+        description="pass ['pressure_language'] when this message or the last three turns mention "
+                    "being called/messaged and told to pay, a blocked or suspended account, a "
+                    "prize/lottery/inaam, sharing an OTP or PIN, or being hurried",
+    )
+
+
+class GuardianPhoneArgs(BaseModel):
+    phone: str = Field(description="+92XXXXXXXXXX of the PAYO user to make the trusted contact")
+
+
+class ApprovalIdArgs(BaseModel):
+    action_id: str = Field(description="id of the payment waiting for approval (from a [cards] line)")
+
+
+class DeclineActionArgs(BaseModel):
+    action_id: str
+    reason: str | None = Field(None, description="optional short reason to send to the payer")
+
+
+class CheckInAnswerArgs(BaseModel):
+    action_id: str
+    someone_asked: bool = Field(
+        description="true = 'yes, someone asked me to send this' (cancels the payment); "
+                    "false = 'no, this is my own idea'"
+    )
+
+
+class SetProactiveArgs(BaseModel):
+    enabled: bool = Field(description="true = greet with the digest on opening; false = stay quiet")
 
 
 class PayBillArgs(BaseModel):
@@ -428,6 +431,7 @@ def build_tools(
     client: BackendClient,
     cards_sink: list[dict[str, Any]],
     resolved_pairs: set[tuple[str, str]] | None = None,
+    sticky_risk_flags: set[str] | None = None,
 ) -> list[StructuredTool]:
     """Wrap app.tools as LangChain tools; text goes to the model, cards to the sink."""
 
@@ -452,6 +456,12 @@ def build_tools(
     # already-resolved saved recipients, so they're exempt.
     resolved_pairs: set[tuple[str, str]] = set(resolved_pairs or ())
 
+    # Backstop for the pressure-language rule (spec §1.7): a flag the CONVERSATION has
+    # already earned sticks to every later send in the window, whether or not the model
+    # remembers to pass it. Seeded from history by run_agent, and topped up in-turn from
+    # any check_in card this turn produced.
+    sticky_risk_flags: set[str] = set(sticky_risk_flags or ())
+
     def _norm_identifier(identifier: str) -> str:
         return identifier.strip().lower()
 
@@ -469,7 +479,7 @@ def build_tools(
     async def send_money_runner(
         amount_paisa: int, recipient_id: str | None = None,
         institution_id: str | None = None, identifier: str | None = None,
-        institution_name: str | None = None,
+        institution_name: str | None = None, risk_flags: list[str] | None = None,
     ) -> str:
         # The model often only carries the institution's display name across turns (that is
         # what the recipient card shows) — map it to the real id before the gate runs.
@@ -491,14 +501,17 @@ def build_tools(
                         "resolve_recipient(institution_id, identifier) first, show the recipient card, "
                         "and get the user's confirmation before trying send_money again."
                     )
+        flags = sorted(set(risk_flags or ()) | sticky_risk_flags)
         result = await t.send_money(
             client, amount_paisa=amount_paisa, recipient_id=recipient_id,
             institution_id=institution_id, identifier=identifier,
-            institution_name=institution_name,
+            institution_name=institution_name, risk_flags=flags or None,
         )
         card = result.get("card")
         if card:
             cards_sink.append(card)
+            if card.get("kind") == "check_in":
+                sticky_risk_flags.update(card.get("riskFlags") or ())
         return result["text"]
 
     resolve_recipient_tool = StructuredTool.from_function(
@@ -522,7 +535,10 @@ def build_tools(
             "you (or an earlier turn of this same conversation) already showed for that "
             "institution_id+identifier — do NOT call resolve_recipient again first just because "
             "its own tool call isn't visible in this turn; the confirmation itself is the signal "
-            "to proceed straight to send_money."
+            "to proceed straight to send_money. Pass risk_flags=['pressure_language'] when the "
+            "user has been pressured (a call/message telling them to pay, a blocked account, a "
+            "prize, an OTP request, or being hurried) — the reply then shows a check-in card "
+            "first, or a waiting-approval card when their trusted contact must approve."
         ),
         args_schema=SendMoneyArgs,
     )
@@ -612,6 +628,38 @@ def build_tools(
         wrap(t.unfreeze_card, "unfreeze_card",
              "Prepare UNfreezing the card - security-sensitive, so it makes a confirmation card "
              "the user must confirm with their PIN.", NoArgs),
+        # -- v6: trusted contact, scam interruption, proactive greeting --
+        wrap(t.get_guardian, "get_guardian",
+             "Who the user's trusted contact is, the approval ceiling and any pending change.",
+             NoArgs),
+        wrap(t.set_guardian, "set_guardian",
+             "PROPOSE making a phone number the user's trusted contact. This does NOT write: the "
+             "change needs the user's PIN, which is only entered in the app (More -> Settings -> "
+             "Trusted contact). Shows a guardian card with the pending change; never ask for a PIN.",
+             GuardianPhoneArgs),
+        wrap(t.remove_guardian, "remove_guardian",
+             "PROPOSE removing the trusted contact. Does NOT write - it needs the user's PIN in "
+             "Settings, and removal only takes effect after the cooling period.", NoArgs),
+        wrap(t.list_approvals, "list_approvals",
+             "Payments waiting for THIS user to approve as someone's trusted contact.", NoArgs),
+        wrap(t.approve_action, "approve_action",
+             "SHOW one payment waiting for the user's approval so they can tap Approve, which "
+             "opens the PIN sheet. This tool never approves and never posts a PIN.", ApprovalIdArgs),
+        wrap(t.decline_action, "decline_action",
+             "Decline a payment waiting for the user's approval (no PIN needed). Ask once in "
+             "prose and act on a clear yes.", DeclineActionArgs),
+        wrap(t.remind_guardian, "remind_guardian",
+             "Re-send the approval card to the trusted contact - at most once a minute.",
+             ApprovalIdArgs),
+        wrap(t.answer_check_in, "answer_check_in",
+             "Record the user's answer to a check_in card. someone_asked=true cancels the payment "
+             "- never argue, explain calmly and offer to call the trusted contact; false lets it "
+             "continue to approval or to the PIN.", CheckInAnswerArgs),
+        wrap(t.set_proactive, "set_proactive",
+             "Turn the 'PAYO speaks first' greeting on or off. No PIN.", SetProactiveArgs),
+        wrap(t.get_digest, "get_digest",
+             "What has happened since the user last looked: money in, bills due, approvals "
+             "waiting, requests, one spending anomaly, trusted-contact notices.", NoArgs),
     ]
 
 
@@ -631,6 +679,7 @@ async def run_agent(
     reject a same-turn confirmation because its own bookkeeping is per-call.
     """
     cards: list[dict[str, Any]] = []
+    sticky_risk_flags = risk_flags_in_history(history)
 
     def turn_already_acted() -> bool:
         """A tool ran or a card was emitted this turn, so the turn is finished. Re-invoking
@@ -654,7 +703,8 @@ async def run_agent(
                 return CANCELLED_REPLY.get(language, CANCELLED_REPLY["en"]), cards
 
     model = model or build_model()
-    agent = create_react_agent(model, build_tools(client, cards, resolved_pairs))
+    agent = create_react_agent(
+        model, build_tools(client, cards, resolved_pairs, sticky_risk_flags))
     messages: list[BaseMessage] = [SystemMessage(content=system_prompt(language)), *history, HumanMessage(content=user_text)]
     state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
     reply = strip_cards_marker(_last_reply(state))
@@ -996,6 +1046,24 @@ _CARDS_ACTION_ID_RE = re.compile(r"confirmation:[^|\n]*?action_id=(\S+)")
 
 def _asks_to_cancel(user_text: str) -> bool:
     return bool(_ASKS_TO_CANCEL_RE.search(user_text or ""))
+
+
+# The risk flags a `check_in` card carried earlier in this conversation, read back out of
+# the `[cards]` facts line that card left in the model-facing history.
+_CARDS_CHECK_IN_FLAGS_RE = re.compile(r"check_in:[^|\n]*?risk_flags=([^\s|]+)")
+
+
+def risk_flags_in_history(history: Sequence[BaseMessage]) -> set[str]:
+    """Risk flags this conversation has already earned, from every check_in card in the
+    window. The model is asked to pass `pressure_language` itself, but a scam turn must not
+    become un-flagged just because a later turn's model call forgot it — so send_money
+    re-applies whatever is found here (see build_tools)."""
+    flags: set[str] = set()
+    for message in history:
+        if isinstance(message, AIMessage):
+            for found in _CARDS_CHECK_IN_FLAGS_RE.finditer(_content_text(message.content)):
+                flags.update(f for f in found.group(1).split(",") if f)
+    return flags
 
 
 def _pending_action_id(history: Sequence[BaseMessage]) -> str | None:

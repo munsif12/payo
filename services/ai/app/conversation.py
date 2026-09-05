@@ -192,6 +192,44 @@ def _card_facts(card: dict[str, Any]) -> str | None:
         return "pocket: " + kv([("pocket_id", card.get("pocketId")), ("name", card.get("name"))])
     if kind == "balance":
         return "balance: " + kv([("balance_paisa", card.get("balancePaisa"))])
+    # -- v6 kinds: the ids a follow-up turn acts on (action_id, guardian name, refIds) --
+    if kind == "check_in":
+        return "check_in: " + kv([
+            ("action_id", card.get("actionId")),
+            ("risk_flags", ",".join(card.get("riskFlags") or []) or None),
+        ])
+    if kind == "waiting_approval":
+        return "waiting_approval: " + kv([
+            ("action_id", card.get("actionId")),
+            ("guardian_name", card.get("guardianName")),
+            ("amount_paisa", card.get("amountPaisa")),
+            ("expires_at", card.get("expiresAt")),
+        ])
+    if kind == "approvals":
+        items = card.get("items") or []
+        return "approvals: " + ", ".join(
+            f"{a.get('actionId')}:{a.get('payerName')}({a.get('amountPaisa')})"
+            + (f"[{','.join(a.get('riskFlags') or [])}]" if a.get("riskFlags") else "")
+            for a in items
+        )
+    if kind == "digest":
+        items = card.get("items") or []
+        return "digest: " + ", ".join(
+            f"{d.get('kind')}:{(d.get('title') or {}).get('en')}"
+            + (f"(ref_id={d.get('refId')})" if d.get("refId") else "")
+            for d in items
+        )
+    if kind == "guardian":
+        pending = card.get("pendingChange") or {}
+        return "guardian: " + kv([
+            ("name", card.get("name")), ("phone", card.get("phone")),
+            ("ceiling_paisa", card.get("ceilingPaisa")),
+            ("pending_change", pending.get("change")),
+            ("pending_phone", pending.get("phone")),
+            ("pending_ceiling_paisa", pending.get("ceilingPaisa")),
+            ("effective_at", pending.get("effectiveAt")),
+            ("cooling_ms", card.get("coolingMs")),
+        ])
     return None
 
 

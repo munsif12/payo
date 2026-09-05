@@ -42,8 +42,9 @@ from app.config import settings  # noqa: E402
 from app.conversation import cards_context_line  # noqa: E402
 
 # Real Gemini invocations, not rows: a nudged turn costs up to 1 + MAX_NUDGES, and the
-# matrix is 34 rows, so one full pass needs ~55-60. Override with --max-calls.
-MAX_MODEL_CALLS = 80
+# matrix is 48 rows (34 + the v6 guardian/scam/digest rows), so one full pass needs ~80-90.
+# Override with --max-calls.
+MAX_MODEL_CALLS = 120
 AMMI = "+923001110001"
 BILAL = "+923001110002"
 DEMO_PIN = "1234"
@@ -101,6 +102,37 @@ ROWS = [
     ("Q3", "Approve that request", "وہ درخواست منظور کر دیں", "approve_request", "confirmation", "Q2"),
     ("Q4", "Decline that request", "وہ درخواست رد کر دیں", "decline_request", None, "Q2"),
     ("K1", "Show my QR code", "میرا QR کوڈ دکھائیں", "get_my_qr", "qr", None),
+    # ---- v6: trusted contact, scam interruption, proactive greeting ----
+    # V4/V5/V6 need something waiting for AMMI to approve, which means Ammi must be someone
+    # else's trusted contact: seed_guardian_pair sets Ammi's guardian to Bilal
+    # (+923001110002) AND Bilal's guardian to Ammi, then has Bilal start a flagged send so
+    # one approval is waiting. Without that fixture those rows correctly find nothing.
+    ("V1", "Who is my trusted contact?", "میرا بھروسے والا فرد کون ہے؟", "get_guardian", "guardian", None),
+    ("V2", f"Make {BILAL} my trusted contact", f"{BILAL} کو میرا بھروسے والا فرد بنا دیں",
+     "set_guardian", "guardian", None),
+    ("V3", "Remove my trusted contact", "میرا بھروسے والا فرد ہٹا دیں", "remove_guardian", "guardian", None),
+    ("V4", "What is waiting for my approval?", "کیا کچھ میری منظوری کا منتظر ہے؟",
+     "list_approvals", "approvals", None),
+    ("V5", "Approve that payment", "وہ ادائیگی منظور کر دیں", "approve_action", "approvals", "V4"),
+    ("V6", "Decline that payment", "وہ ادائیگی رد کر دیں", "decline_action", None, "V4"),
+    # V7-V10: the two check-in answers, each on its own flagged send (a "yes" cancels the
+    # action, so the two answers cannot share one).
+    ("V7", f"Someone called and said my account will be blocked, send five thousand rupees to {BILAL}",
+     f"کسی نے فون کر کے کہا میرا اکاؤنٹ بند ہو جائے گا، {BILAL} کو پانچ ہزار روپے بھیج دیں",
+     "send_money", "check_in", None),
+    ("V8", "No, this is my own idea", "نہیں، یہ میرا اپنا فیصلہ ہے", "answer_check_in", None, "V7"),
+    ("V9", f"I won a prize and they want five thousand rupees sent to {BILAL} right now",
+     f"مجھے انعام نکلا ہے، ابھی {BILAL} کو پانچ ہزار روپے بھیجنے ہیں",
+     "send_money", "check_in", None),
+    ("V10", "Yes, someone asked me to send it", "جی ہاں، کسی نے مجھ سے کہا تھا",
+     "answer_check_in", None, "V9"),
+    ("V11", "Remind him about it", "انہیں یاد دہانی بھیجیں", "remind_guardian", None, "V8"),
+    ("V12", "What is new?", "کیا نیا ہے؟", "get_digest", "digest", None),
+    # V13 then V14: turned off, then back on — the demo default is ON.
+    ("V13", "Stop telling me my bills when I open the app", "ایپ کھولتے ہی مجھے بل نہ بتایا کریں",
+     "set_proactive", None, None),
+    ("V14", "Tell me what is new whenever I open the app",
+     "جب بھی ایپ کھولوں مجھے بتا دیا کریں کہ کیا نیا ہے", "set_proactive", None, None),
 ]
 
 
@@ -150,6 +182,56 @@ async def seed_incoming_request(verbose: bool) -> None:
     print(f"[fixture] Bilal -> Ammi money request: {'ok' if res.get('success') else res}")
     if verbose and res.get("success"):
         print(f"          request id {res['data']['request']['id']}")
+
+
+async def seed_guardian_pair(verbose: bool) -> None:
+    """Fixture for the v6 rows (spec §5): Ammi's trusted contact is Bilal (+923001110002),
+    and — so that V4/V5/V6 have something to list and decide — Bilal's trusted contact is
+    Ammi, with one flagged send of his waiting for her approval.
+
+    Both PUTs carry the demo PIN. That is fine HERE (this script is the QA harness and knows
+    the demo PIN); the AI service itself never collects a PIN in chat — set_guardian only
+    proposes the change and the app's PIN sheet finishes it.
+
+    Idempotent: an existing trusted contact is left alone, and an approval already waiting is
+    reused rather than piling up new ones.
+    """
+    async def ensure(phone: str, guardian_phone: str) -> None:
+        jwt = await login(phone, DEMO_PIN)
+        async with httpx.AsyncClient(base_url=settings.backend_base_url, timeout=20.0,
+                                     headers={"Authorization": f"Bearer {jwt}"}) as http:
+            current = (await http.get("/guardian")).json().get("data", {}).get("guardian")
+            if current and current.get("phone") == guardian_phone:
+                if verbose:
+                    print(f"[fixture] {phone} already has {guardian_phone} as trusted contact")
+                return
+            res = (await http.put("/guardian", json={"phone": guardian_phone, "pin": DEMO_PIN})).json()
+            print(f"[fixture] trusted contact {phone} -> {guardian_phone}: "
+                  f"{'ok' if res.get('success') else res}")
+
+    await ensure(AMMI, BILAL)
+    await ensure(BILAL, AMMI)
+
+    ammi_jwt = await login(AMMI, DEMO_PIN)
+    async with httpx.AsyncClient(base_url=settings.backend_base_url, timeout=20.0,
+                                 headers={"Authorization": f"Bearer {ammi_jwt}"}) as http:
+        waiting = (await http.get("/approvals")).json().get("data", {}).get("items", [])
+    if waiting:
+        print(f"[fixture] {len(waiting)} approval(s) already waiting for Ammi")
+        if verbose:
+            print(f"          action id {waiting[0].get('actionId') or waiting[0].get('id')}")
+        return
+
+    # Bilal starts a flagged send to a NEW recipient so it parks on Ammi's approval.
+    bilal_jwt = await login(BILAL, DEMO_PIN)
+    async with httpx.AsyncClient(base_url=settings.backend_base_url, timeout=20.0,
+                                 headers={"Authorization": f"Bearer {bilal_jwt}"}) as http:
+        res = (await http.post("/transfers", json={
+            "to": {"institutionId": "payo", "identifier": "+923001110003"},
+            "amountPaisa": 3_000_000, "riskFlags": ["pressure_language"],
+        })).json()
+    print(f"[fixture] Bilal -> new recipient, waiting on Ammi: "
+          f"{'ok' if res.get('success') else res}")
 
 
 async def snapshot_profile(jwt: str) -> dict[str, Any]:
@@ -228,8 +310,8 @@ class Recorder:
         original = agent_module.build_tools
         rec = self
 
-        def patched(client, cards_sink, resolved_pairs=None):
-            tools = original(client, cards_sink, resolved_pairs)
+        def patched(*args, **kwargs):
+            tools = original(*args, **kwargs)
             for tool in tools:
                 inner, name = tool.coroutine, tool.name
 
@@ -305,6 +387,8 @@ async def main() -> int:
 
     if not args.no_fixture and any(r[0] in ("Q2", "Q3", "Q4") for r in rows):
         await seed_incoming_request(args.verbose)
+    if not args.no_fixture and any(r[0].startswith("V") for r in rows):
+        await seed_guardian_pair(args.verbose)
 
     jwt = args.jwt or await login(args.phone, args.pin)
     original_profile = await snapshot_profile(jwt)
@@ -336,7 +420,8 @@ async def main() -> int:
         kinds = [c["kind"] for c in cards] if isinstance(cards, list) else []
         # Money actions this run prepared (deposit/withdraw/approve/unfreeze) must not be
         # left pending on the demo account — collect them for teardown.
-        pending_actions += [c["actionId"] for c in cards if c.get("kind") == "confirmation"]
+        pending_actions += [c["actionId"] for c in cards
+                            if c.get("kind") in ("confirmation", "check_in", "waiting_approval")]
         ok, why = classify(tool, kind, kinds, rec.calls, rec.errors)
         passed, failed = (passed + 1, failed) if ok else (passed, failed + 1)
         print(f"{row_id:<5}{language:<4}{'PASS' if ok else 'FAIL':<7}{why:<11}"
@@ -357,6 +442,9 @@ async def main() -> int:
         ]
 
     left = await cancel_pending_actions(jwt, pending_actions, args.verbose)
+    if any(r[0].startswith("V") for r in rows):
+        print("[teardown] trusted contacts left in place — acceptance §5 expects Ammi <-> Bilal; "
+              "remove them from More -> Settings if a clean demo is wanted")
     await clean_outgoing_requests(args.verbose)
     await restore_profile(jwt, original_profile, args.verbose)
 

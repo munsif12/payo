@@ -9,13 +9,15 @@ from typing import Any
 
 from .backend_client import BackendClient, BackendError
 from .cards import (
-    AccountCard, BalanceCard, BillCard, BillItem, BillerChip, BillerChipsCard, BillersCard,
-    BillsCard, Bilingual, CardCard, HelpCard, HelpIntent, InstitutionChip,
+    AccountCard, ApprovalItem, ApprovalsCard, BalanceCard, BillCard, BillItem, BillerChip,
+    BillerChipsCard, BillersCard, BillsCard, Bilingual, CardCard, CheckInCard, DigestCard,
+    DigestItem, GuardianCard, GuardianPendingChange, HelpCard, HelpIntent, InstitutionChip,
     InstitutionChipsCard, InstitutionRef, PocketCard, PocketItem, PocketsCard, ProfileCard,
     QrCard, ReceiptCard, RecipientCard, RecipientChip, RecipientChipsCard, RecipientsCard,
     RequestCard, RequestCounterparty, RequestItem, RequestsCard, SpendingCard,
     SpendingCategory, SpendingCompare, StatementCard, StatementSummary, StatementsCard,
-    TelcoChip, TelcoChipsCard, TransactionsCard, Txn, confirmation_from_action,
+    TelcoChip, TelcoChipsCard, TransactionsCard, Txn, WaitingApprovalCard,
+    confirmation_from_action,
 )
 from .config import settings
 
@@ -906,7 +908,17 @@ async def pocket_withdraw(client: BackendClient, pocket_id: str, amount_paisa: i
 
 async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str | None = None,
                      institution_id: str | None = None, identifier: str | None = None,
-                     institution_name: str | None = None) -> Result:
+                     institution_name: str | None = None,
+                     risk_flags: list[str] | None = None) -> Result:
+    """Prepare a transfer.
+
+    `risk_flags` carries the AI service's own per-turn signal (`pressure_language`, see the
+    prompt rule) to the backend, which adds its money-pattern flags on top. What comes back
+    decides the card, in this order (spec §1.7-§1.9):
+      risk-flagged and not yet answered -> `check_in` (asked before anything else);
+      approval waiting                  -> `waiting_approval` (the PIN sheet does NOT open);
+      otherwise                         -> the usual `confirmation`.
+    """
     to: dict[str, Any]
     if not recipient_id and not institution_id and institution_name:
         institution_id = await _institution_id_by_name(client, institution_name) or institution_name
@@ -917,19 +929,17 @@ async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str
     else:
         return _ok("ERROR: need a recipient_id, or institution_id+identifier, to send money.")
     try:
-        action = await client.create_transfer(to, amount_paisa)
+        action = await client.create_transfer(to, amount_paisa, risk_flags=risk_flags)
     except BackendError as e:
         # Same fallback as resolve_recipient: a later turn may only have the institution's
         # display name to offer as institution_id, not its id — retry once by name.
         if e.code == "NOT_FOUND" and institution_id and identifier:
             by_name = await _institution_id_by_name(client, institution_id)
             if by_name and by_name != institution_id:
-                return await send_money(client, amount_paisa, institution_id=by_name, identifier=identifier)
+                return await send_money(client, amount_paisa, institution_id=by_name,
+                                        identifier=identifier, risk_flags=risk_flags)
         return _fail(e)
-    return _ok(
-        _confirm_text(f"Prepared transfer of {_rs(amount_paisa)}", action),
-        confirmation_from_action(action),
-    )
+    return await _action_gate_result(client, action, f"Prepared transfer of {_rs(amount_paisa)}")
 
 
 async def pay_bill(client: BackendClient, bill_id: str) -> Result:
@@ -988,4 +998,368 @@ async def request_money(client: BackendClient, from_phone: str, amount_paisa: in
         f"Money request of {_rs(r['amountPaisa'])} sent to {r['counterparty']['name']} - "
         "they approve it in their own app.",
         RequestCard(**_request_fields(r)),
+    )
+
+
+# ---- v6: trusted contact, scam interruption, proactive greeting (spec §1, §3) ----
+
+CHECK_IN_PROMPT = Bilingual(
+    en="Did someone call or message you and ask you to send this?",
+    ur="\u06a9\u06cc\u0627 \u06a9\u0633\u06cc \u0646\u06d2 \u0641\u0648\u0646 \u06cc\u0627 \u067e\u06cc\u063a\u0627\u0645 \u06a9\u0631 \u06a9\u06d2 \u0622\u067e \u0633\u06d2 \u06cc\u06c1 \u0631\u0642\u0645 \u0628\u06be\u06cc\u062c\u0646\u06d2 \u06a9\u0648 \u06a9\u06c1\u0627\u061f",
+)
+
+# What the assistant says, in the user's own words, when a check-in comes back "yes".
+# Both languages travel in the tool text so the model can speak whichever the turn is in
+# instead of inventing an argument — on "yes" it never argues, it cancels and offers help.
+SCAM_EXPLANATION = {
+    "en": "That is exactly how a scam works: a stranger calls, makes it urgent, and asks you "
+          "to send money. I have stopped this payment; nothing has left your account. Shall I "
+          "call your trusted contact so you can talk it over with them?",
+    "ur": "\u0633\u06a9\u06cc\u0645 \u0627\u0633\u06cc \u0637\u0631\u062d \u0686\u0644\u062a\u06cc \u06c1\u06d2: \u06a9\u0648\u0626\u06cc \u0627\u062c\u0646\u0628\u06cc \u0641\u0648\u0646 \u06a9\u0631\u062a\u0627 \u06c1\u06d2\u060c \u062c\u0644\u062f\u06cc \u0645\u0686\u0627\u062a\u0627 \u06c1\u06d2 \u0627\u0648\u0631 \u067e\u06cc\u0633\u06d2 \u0645\u0646\u06af\u0648\u0627\u062a\u0627 \u06c1\u06d2\u06d4 \u0645\u06cc\u06ba \u0646\u06d2 \u06cc\u06c1 \u0627\u062f\u0627\u0626\u06cc\u06af\u06cc \u0631\u0648\u06a9 \u062f\u06cc \u06c1\u06d2\u060c \u0622\u067e \u06a9\u06d2 \u0627\u06a9\u0627\u0624\u0646\u0679 \u0633\u06d2 \u06a9\u0686\u06be \u0646\u06c1\u06cc\u06ba \u06af\u06cc\u0627\u06d4 \u06a9\u06cc\u0627 \u0645\u06cc\u06ba \u0622\u067e \u06a9\u06d2 \u0628\u06be\u0631\u0648\u0633\u06d2 \u0648\u0627\u0644\u06d2 \u0641\u0631\u062f \u06a9\u0648 \u0645\u0644\u0627 \u062f\u0648\u06ba\u061f",
+}
+
+DIGEST_TITLES: dict[str, Bilingual] = {
+    "received": Bilingual(en="Money received", ur="\u0631\u0642\u0645 \u0645\u0648\u0635\u0648\u0644 \u06c1\u0648\u0626\u06cc"),
+    "bill_due": Bilingual(en="A bill is due", ur="\u0627\u06cc\u06a9 \u0628\u0644 \u0648\u0627\u062c\u0628 \u0627\u0644\u0627\u062f\u0627 \u06c1\u06d2"),
+    "approval_waiting": Bilingual(en="Waiting for your approval", ur="\u0622\u067e \u06a9\u06cc \u0645\u0646\u0638\u0648\u0631\u06cc \u06a9\u0627 \u0645\u0646\u062a\u0638\u0631"),
+    "request": Bilingual(en="Someone asked you for money", ur="\u06a9\u0633\u06cc \u0646\u06d2 \u0622\u067e \u0633\u06d2 \u067e\u06cc\u0633\u06d2 \u0645\u0627\u0646\u06af\u06d2"),
+    "anomaly": Bilingual(en="Spending is higher than usual", ur="\u062e\u0631\u0686 \u0645\u0639\u0645\u0648\u0644 \u0633\u06d2 \u0632\u06cc\u0627\u062f\u06c1 \u06c1\u06d2"),
+    "guardian_notice": Bilingual(en="Trusted-contact change", ur="\u0628\u06be\u0631\u0648\u0633\u06d2 \u0648\u0627\u0644\u06d2 \u0641\u0631\u062f \u0645\u06cc\u06ba \u062a\u0628\u062f\u06cc\u0644\u06cc"),
+}
+
+DIGEST_INTENTS: dict[str, Bilingual] = {
+    "bill_due": Bilingual(en="Pay that bill", ur="\u0648\u06c1 \u0628\u0644 \u0627\u062f\u0627 \u06a9\u0631\u06cc\u06ba"),
+    "approval_waiting": Bilingual(en="Show the approvals waiting for me", ur="\u062c\u0648 \u0645\u0646\u0638\u0648\u0631\u06cc\u0627\u06ba \u0645\u06cc\u0631\u06d2 \u0645\u0646\u062a\u0638\u0631 \u06c1\u06cc\u06ba \u062f\u06a9\u06be\u0627\u0626\u06cc\u06ba"),
+    "request": Bilingual(en="Show my money requests", ur="\u0645\u06cc\u0631\u06cc \u062f\u0631\u062e\u0648\u0627\u0633\u062a\u06cc\u06ba \u062f\u06a9\u06be\u0627\u0626\u06cc\u06ba"),
+    "received": Bilingual(en="Show that transaction", ur="\u0648\u06c1 \u0644\u06cc\u0646 \u062f\u06cc\u0646 \u062f\u06a9\u06be\u0627\u0626\u06cc\u06ba"),
+    "anomaly": Bilingual(en="What did I spend this month?", ur="\u0627\u0633 \u0645\u06c1\u06cc\u0646\u06d2 \u06a9\u062a\u0646\u0627 \u062e\u0631\u0686 \u06c1\u0648\u0627\u061f"),
+    "guardian_notice": Bilingual(en="Who is my trusted contact?", ur="\u0645\u06cc\u0631\u0627 \u0628\u06be\u0631\u0648\u0633\u06d2 \u0648\u0627\u0644\u0627 \u0641\u0631\u062f \u06a9\u0648\u0646 \u06c1\u06d2\u061f"),
+}
+
+SETTINGS_PATH = "More -> Settings -> Trusted contact"
+
+
+def _bilingual(value: Any, fallback: Bilingual) -> Bilingual:
+    """A backend-supplied {en, ur} pair, or the fallback when it sent something else."""
+    return _optional_bilingual(value) or fallback
+
+
+def _optional_bilingual(value: Any) -> Bilingual | None:
+    """A backend-supplied {en, ur} pair, or None when the field was absent or partial."""
+    if isinstance(value, dict) and value.get("en") and value.get("ur"):
+        return Bilingual(en=value["en"], ur=value["ur"])
+    return None
+
+
+def _guardian_card(data: dict[str, Any],
+                   pending_change: GuardianPendingChange | None = None) -> GuardianCard:
+    guardian = data.get("guardian") or {}
+    pending = data.get("pending")
+    if pending_change is None and isinstance(pending, dict) and pending.get("change") in (
+            "set", "remove", "raise"):
+        pending_change = GuardianPendingChange(
+            change=pending["change"], phone=pending.get("phone"),
+            ceilingPaisa=pending.get("ceilingPaisa"), effectiveAt=pending.get("effectiveAt"),
+        )
+    return GuardianCard(
+        name=guardian.get("name"), phone=guardian.get("phone"),
+        ceilingPaisa=data.get("ceilingPaisa") or guardian.get("ceilingPaisa") or 0,
+        pendingChange=pending_change, coolingMs=data.get("coolingMs") or 0,
+    )
+
+
+def _cooling_phrase(cooling_ms: int) -> str:
+    """The cooling period in words. Never milliseconds — the model repeats this to a user
+    who is being told when their protection changes."""
+    if cooling_ms <= 0:
+        return "immediately"
+    hours = cooling_ms / 3_600_000
+    if hours < 1:
+        return f"after about {max(1, round(cooling_ms / 60_000))} minute(s)"
+    return f"after about {round(hours)} hour(s)"
+
+
+def _guardian_text(card: GuardianCard) -> str:
+    who = (f"{card.name} ({card.phone})" if card.name else "nobody yet")
+    change = card.pendingChange
+    pending = ""
+    if change:
+        target = (f" to {change.phone}" if change.phone else
+                  f" to {_rs(change.ceilingPaisa)}" if change.ceilingPaisa else "")
+        pending = (f" A '{change.change}'{target} is pending"
+                   + (f", effective {change.effectiveAt}." if change.effectiveAt else "."))
+    return (
+        f"Trusted contact: {who}. Approval ceiling {_rs(card.ceilingPaisa)}; a loosening takes "
+        f"effect {_cooling_phrase(card.coolingMs)}.{pending}"
+    )
+
+
+def _check_in_card(action: dict[str, Any]) -> CheckInCard:
+    return CheckInCard(
+        actionId=action["id"], prompt=CHECK_IN_PROMPT,
+        riskFlags=list(action.get("riskFlags") or []),
+    )
+
+
+def _waiting_card(action: dict[str, Any]) -> WaitingApprovalCard:
+    approval = action.get("approval") or {}
+    return WaitingApprovalCard(
+        actionId=action["id"],
+        guardianName=approval.get("guardianName") or "your trusted contact",
+        expiresAt=action.get("expiresAt", ""),
+        amountPaisa=action.get("amountPaisa", 0),
+        summary=_bilingual(action.get("summary"),
+                           Bilingual(en="Waiting for approval", ur="\u0645\u0646\u0638\u0648\u0631\u06cc \u06a9\u0627 \u0627\u0646\u062a\u0638\u0627\u0631")),
+    )
+
+
+def _needs_check_in(action: dict[str, Any]) -> bool:
+    """Risk-flagged and the one question has not been answered yet (spec §1.8)."""
+    return bool(action.get("riskFlags")) and not (action.get("checkIn") or {}).get("answered")
+
+
+def _waiting_for_approval(action: dict[str, Any]) -> bool:
+    return (action.get("approval") or {}).get("status") == "waiting"
+
+
+async def _action_gate_result(client: BackendClient, action: dict[str, Any], prefix: str) -> Result:
+    """The card a freshly created action deserves, given its gates. Shared by send_money and
+    the "no, my own idea" branch of answer_check_in so both read the DTO the same way."""
+    if _needs_check_in(action):
+        return _ok(
+            f"{prefix} - but it is risk-flagged ({', '.join(action.get('riskFlags') or [])}), so a "
+            "CHECK-IN card was shown first and nothing else happens yet. Ask the one question "
+            "calmly, in the user's language, and say nothing about PINs or approval yet: "
+            f"\"{CHECK_IN_PROMPT.en}\" / \"{CHECK_IN_PROMPT.ur}\". Their answer goes to "
+            "answer_check_in(action_id, someone_asked).",
+            _check_in_card(action),
+        )
+    if _waiting_for_approval(action):
+        card = _waiting_card(action)
+        return _ok(
+            f"{prefix} - it needs approval first, so the PIN sheet did NOT open. Say exactly this, "
+            f"in the user's language: \"{card.guardianName} needs to approve this first - I've sent "
+            f"it to {card.guardianName}\" - use the NAME, never 'him' or 'her'. A waiting_approval "
+            "card is shown; the app opens the PIN sheet by itself "
+            "once the approval comes back. Do NOT claim the money was sent.",
+            card,
+        )
+    return _ok(_confirm_text(prefix, action), confirmation_from_action(action))
+
+
+async def get_guardian(client: BackendClient) -> Result:
+    """Who the user's trusted contact is, the approval ceiling, and any pending change."""
+    try:
+        data = await client.guardian()
+    except BackendError as e:
+        return _fail(e)
+    card = _guardian_card(data)
+    return _ok(
+        _guardian_text(card)
+        + " A guardian card was shown. Explain in ONE sentence what a trusted contact does: "
+        "they approve payments to someone new or above the ceiling, so nobody can rush the "
+        "user into sending money.",
+        card,
+    )
+
+
+async def set_guardian(client: BackendClient, phone: str) -> Result:
+    """PROPOSE making the person at `phone` the user's trusted contact.
+
+    This tool NEVER writes: PUT /guardian takes the payer's PIN, and a PIN is only ever
+    entered in the app's own PIN sheet — never collected in chat, never spoken aloud. So the
+    card carries `pendingChange` describing the intended change and the user finishes it in
+    Settings, where that sheet lives.
+    """
+    try:
+        data = await client.guardian()
+    except BackendError as e:
+        return _fail(e)
+    card = _guardian_card(data, GuardianPendingChange(change="set", phone=phone))
+    return _ok(
+        f"Ready to make {phone} the trusted contact - NOT done yet. This change needs the "
+        f"user's PIN, which is only entered in the app: tell them warmly to open "
+        f"{SETTINGS_PATH} and confirm it there with their PIN. Never ask for the PIN here.",
+        card,
+    )
+
+
+async def remove_guardian(client: BackendClient) -> Result:
+    """PROPOSE removing the trusted contact. Like set_guardian this never writes — removal
+    needs the user's PIN in the app — and removal is a LOOSENING, so it only takes effect
+    after the cooling period, and the guardian is told."""
+    try:
+        data = await client.guardian()
+    except BackendError as e:
+        return _fail(e)
+    card = _guardian_card(data, GuardianPendingChange(change="remove"))
+    when = _cooling_phrase(data.get("coolingMs") or 0)
+    return _ok(
+        f"Ready to remove the trusted contact - NOT done yet. It needs the user's PIN in the "
+        f"app: ask them to open {SETTINGS_PATH} and confirm there. Explain gently that removing "
+        f"protection takes effect {when}, the old rule applies until then, and the trusted "
+        f"contact is told. Never ask for the PIN here.",
+        card,
+    )
+
+
+def _approval_item(item: dict[str, Any]) -> ApprovalItem:
+    payer = item.get("payer") or {}
+    return ApprovalItem(
+        actionId=item.get("actionId") or item["id"],
+        payerName=item.get("payerName") or payer.get("name") or "",
+        payerPhone=item.get("payerPhone") or payer.get("phone") or "",
+        summary=_bilingual(item.get("summary"),
+                           Bilingual(en="Payment", ur="\u0627\u062f\u0627\u0626\u06cc\u06af\u06cc")),
+        amountPaisa=item.get("amountPaisa", 0),
+        riskFlags=list(item.get("riskFlags") or []),
+        createdAt=item.get("createdAt", ""),
+        expiresAt=item.get("expiresAt", ""),
+    )
+
+
+async def list_approvals(client: BackendClient) -> Result:
+    """Payments waiting for THIS user to approve, as the other person's trusted contact."""
+    try:
+        data = await client.approvals()
+    except BackendError as e:
+        return _fail(e)
+    items = [_approval_item(i) for i in data.get("items", [])]
+    if not items:
+        return _ok("Nothing is waiting for the user's approval. Say so plainly.")
+    lines = [
+        f"{i.payerName} ({i.payerPhone}): {_rs(i.amountPaisa)} - {i.summary.en}, action id "
+        f"{i.actionId}" + (f", flagged {', '.join(i.riskFlags)}" if i.riskFlags else "")
+        for i in items
+    ]
+    return _ok(
+        "Waiting for approval:\n" + "\n".join(lines)
+        + "\nAn approvals card was shown. The user approves with THEIR OWN PIN by tapping "
+        "Approve on the card - never ask for a PIN here and never say it is approved.",
+        ApprovalsCard(items=items),
+    )
+
+
+async def approve_action(client: BackendClient, action_id: str) -> Result:
+    """SHOW the payment to approve. Approving needs the guardian's own PIN, so this tool
+    never posts it: the card's Approve button opens the app's PIN sheet."""
+    try:
+        data = await client.approvals()
+    except BackendError as e:
+        return _fail(e)
+    items = [_approval_item(i) for i in data.get("items", [])]
+    match = [i for i in items if i.actionId == action_id]
+    if not match:
+        return _ok(
+            f"No approval with id {action_id} is waiting any more - it may already be approved, "
+            "declined or expired. Say so plainly and offer to list what is waiting."
+        )
+    item = match[0]
+    return _ok(
+        f"Ready to approve {item.payerName}'s payment of {_rs(item.amountPaisa)} - NOT approved "
+        "yet. Approving needs the user's OWN PIN, which is only entered in the app: tell them to "
+        "tap Approve on the card and enter their PIN. Never ask for the PIN here, never claim it "
+        "is approved.",
+        ApprovalsCard(items=match),
+    )
+
+
+async def decline_action(client: BackendClient, action_id: str, reason: str | None = None) -> Result:
+    """Decline a payment waiting for the user's approval. No PIN is needed to say no."""
+    try:
+        await client.decline_approval(action_id, reason)
+    except BackendError as e:
+        return _fail(e)
+    return _ok(
+        "Declined - the payment is cancelled and the other person is told"
+        + (f" (reason: {reason})." if reason else ".")
+    )
+
+
+async def remind_guardian(client: BackendClient, action_id: str) -> Result:
+    """Re-send the approval card to the trusted contact. At most once a minute."""
+    try:
+        await client.remind_guardian(action_id)
+    except BackendError as e:
+        if e.code == "REMIND_TOO_SOON":
+            return _ok(
+                "A reminder was sent moments ago - the trusted contact can only be reminded once "
+                "a minute. Say kindly that they have just been reminded and it is still waiting."
+            )
+        return _fail(e)
+    return _ok("Reminded the trusted contact. The payment is still waiting for their approval.")
+
+
+async def answer_check_in(client: BackendClient, action_id: str, someone_asked: bool) -> Result:
+    """Record the user's answer to the check-in question (spec §1.8).
+
+    'Yes, someone asked me' cancels the payment - never argue with that answer, explain
+    calmly and offer to call the trusted contact. 'No, my own idea' lets it continue, to
+    approval or to the PIN, whichever the returned action says.
+    """
+    try:
+        await client.answer_check_in(action_id, someone_asked)
+    except BackendError as e:
+        return _fail(e)
+    if someone_asked:
+        return _ok(
+            "The user said someone asked them to send this, so the payment is CANCELLED - "
+            "nothing left the account. Do NOT argue, do NOT ask them to reconsider. Say this "
+            f"calmly in their language: EN: \"{SCAM_EXPLANATION['en']}\" UR: \"{SCAM_EXPLANATION['ur']}\""
+        )
+    try:
+        action = await client.action(action_id)
+    except BackendError as e:
+        return _fail(e)
+    return await _action_gate_result(client, action, "The user said it is their own idea, so the payment continues")
+
+
+async def set_proactive(client: BackendClient, enabled: bool) -> Result:
+    """Turn the "PAYO speaks first" greeting on or off. No PIN - it moves no money."""
+    try:
+        await client.update_me({"preferences": {"proactiveGreeting": enabled}})
+    except BackendError as e:
+        return _fail(e)
+    return _ok(
+        "PAYO will now greet the user with their money news when they open the app."
+        if enabled else
+        "PAYO will stay quiet when the user opens the app - just a plain greeting, nothing "
+        "financial unless they ask."
+    )
+
+
+def _digest_item(item: dict[str, Any]) -> DigestItem:
+    kind = item.get("kind", "")
+    return DigestItem(
+        kind=kind,
+        title=_bilingual(item.get("title"), DIGEST_TITLES.get(kind, Bilingual(en=kind, ur=kind))),
+        subtitle=_optional_bilingual(item.get("subtitle")),
+        amountPaisa=item.get("amountPaisa"),
+        intent=_optional_bilingual(item.get("intent")) or DIGEST_INTENTS.get(kind),
+        refId=item.get("refId") or item.get("id") or item.get("actionId") or item.get("billId"),
+    )
+
+
+async def get_digest(client: BackendClient, ack: bool = True) -> Result:
+    """What has happened since the user last looked: money in, bills due, approvals waiting,
+    requests, one spending anomaly, trusted-contact notices. Empty when they turned the
+    proactive greeting off - say nothing financial then."""
+    try:
+        data = await client.digest(ack)
+    except BackendError as e:
+        return _fail(e)
+    items = [_digest_item(i) for i in data.get("items", [])]
+    if not items:
+        return _ok("Nothing new since the user last looked. Just greet them warmly - do not "
+                   "volunteer any account facts.")
+    lines = [
+        f"{i.kind}: {i.title.en}" + (f" {_rs(i.amountPaisa)}" if i.amountPaisa else "")
+        + (f" (ref {i.refId})" if i.refId else "")
+        for i in items
+    ]
+    return _ok(
+        "Since last time:\n" + "\n".join(lines)
+        + "\nA digest card was shown. Say the gist in AT MOST TWO short sentences - it is "
+        "spoken aloud; do not read every row.",
+        DigestCard(items=items),
     )

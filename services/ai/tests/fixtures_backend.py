@@ -71,6 +71,40 @@ PREV_SPENDING = {
 }
 
 
+# ---- v6 fixtures: trusted contact, approvals, check-in, digest ----
+
+GUARDIAN_DTO = {
+    "guardian": {"userId": "u2", "phone": "+923001110002", "name": "Bilal Ahmed",
+                 "ceilingPaisa": 10_000_000, "since": "2026-09-01T00:00:00.000Z"},
+    "ceilingPaisa": 10_000_000, "coolingMs": 0,
+}
+APPROVAL_DTO = {
+    "actionId": "act_wait", "payerName": "Ammi Jaan", "payerPhone": "+923001110001",
+    "summary": {"en": "Send ₨30,000 to 03001110003", "ur": "03001110003 کو ₨30,000 بھیجیں"},
+    "amountPaisa": 3_000_000, "riskFlags": ["new_recipient_large"],
+    "createdAt": "2026-09-06T09:00:00.000Z", "expiresAt": "2026-09-06T09:30:00.000Z",
+}
+# The action a risk-flagged send creates: check-in first, approval behind it.
+FLAGGED_ACTION = {
+    **pending("act_flag", "send_money", 500000),
+    "riskFlags": ["pressure_language"],
+    "approval": {"required": True, "guardianId": "u2", "status": "waiting",
+                 "guardianName": "Bilal Ahmed"},
+}
+# The same action once the user answered "no, my own idea" — now only approval is left.
+FLAGGED_ACTION_CHECKED_IN = {
+    **FLAGGED_ACTION, "checkIn": {"answered": True, "someoneAsked": False},
+}
+DIGEST_DTO = {
+    "since": "2026-09-06T05:00:00.000Z",
+    "items": [
+        {"kind": "received", "amountPaisa": 500000, "refId": "txn1"},
+        {"kind": "bill_due", "amountPaisa": 432000, "refId": "b1"},
+        {"kind": "approval_waiting", "amountPaisa": 3_000_000, "refId": "act_wait"},
+    ],
+}
+
+
 def wire_all(fake, api="/api/v1"):
     """Wire every route the v5 tools can call onto a FakeBackend."""
     r = fake.route
@@ -107,6 +141,24 @@ def wire_all(fake, api="/api/v1"):
     r("POST", f"{api}/requests/req1/decline", {"declined": True})
     r("POST", f"{api}/actions/act1/cancel", {**pending(), "status": "cancelled"})
     r("GET", f"{api}/qr/mine", {"payload": "payo://pay?phone=%2B923001110001"})
+    # v6
+    r("POST", f"{api}/transfers", responder=_transfer_responder)
+    r("GET", f"{api}/guardian", GUARDIAN_DTO)
+    r("GET", f"{api}/approvals", {"items": [APPROVAL_DTO]})
+    r("POST", f"{api}/approvals/act_wait/decline", {"declined": True})
+    r("POST", f"{api}/actions/act_wait/remind", {"reminded": True})
+    r("POST", f"{api}/actions/act_flag/check-in", {"answered": True})
+    r("GET", f"{api}/actions/act_flag", FLAGGED_ACTION_CHECKED_IN)
+    r("GET", f"{api}/me/digest", DIGEST_DTO)
+
+
+def _transfer_responder(request):
+    """A send carrying riskFlags comes back flagged (check-in first); a plain one does not."""
+    import json
+
+    from tests.conftest import ok
+    body = json.loads(request.content.decode() or "{}")
+    return ok(FLAGGED_ACTION if body.get("riskFlags") else pending("act1", "send_money", 150000))
 
 
 def _spending_responder(request):
