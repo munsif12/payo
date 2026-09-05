@@ -36,6 +36,23 @@ export interface RequestDto {
   amountPaisa: number; note?: string; status: 'pending' | 'approved' | 'declined'; createdAt: string;
 }
 
+/** POST /actions/:id/execute. `transaction` is null for a PIN-gated action that
+ *  moves no money (`card_unfreeze`), which returns the new `card` state instead. */
+export interface ExecuteActionResult {
+  transaction: Txn | null;
+  card?: CardSummary;
+  recipientSuggestion?: RecipientSuggestion;
+  billerSuggestion?: BillerSuggestion;
+}
+
+/** The masked card state returned alongside a PIN-gated card action
+ *  (POST /actions/:id/execute for `card_unfreeze`). Never carries pan/cvv. */
+export interface CardSummary {
+  id: string; last4: string; maskedPan: string; expiry: string; frozen: boolean;
+  /** Absent on older backends — the card card falls back to an empty holder line. */
+  holder?: string;
+}
+
 export interface CardDto { id: string; pan: string; cvv: string; expiry: string; frozen: boolean }
 
 export interface StatementMeta {

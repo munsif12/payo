@@ -9,7 +9,7 @@ import { useTheme } from '../src/theme/useTheme';
 import { space, radius } from '../src/theme/tokens';
 import type { RootState } from '../src/store';
 import { ltrIsolate } from '../src/lib/bidi';
-import i18n from '../src/i18n';
+import i18n, { applyLanguage } from '../src/i18n';
 
 export default function Profile() {
   const { t } = useTranslation();
@@ -42,7 +42,7 @@ export default function Profile() {
           <Pressable
             key={l}
             testID={`lang-${l}`}
-            onPress={() => i18n.changeLanguage(l)}
+            onPress={() => { applyLanguage(l); }}
             style={{
               flex: 1, borderRadius: radius.button, paddingVertical: space.m, alignItems: 'center',
               backgroundColor: lang === l ? c.amber : c.surface,

@@ -8,6 +8,7 @@ import { space, radius } from '../../src/theme/tokens';
 import { Rise, TypingDots, WaveBars } from '../../src/motion';
 import { CardView } from '../../src/components/cards/CardView';
 import { useConverse, type ChatMessage } from '../../src/voice/useConverse';
+import { showBubbleText } from '../../src/voice/bubbleText';
 import { useRecorder } from '../../src/voice/useRecorder';
 import { useVoiceLoop, type VoiceLoopHandlers } from '../../src/voice/useVoiceLoop';
 import { usePinSheet } from '../../src/pin/usePinSheet';
@@ -244,13 +245,20 @@ function Bubble({ message, onChipTap, onAppendLocal }: {
         }}
       >
         {isError && <Text variant="sub" weight={700} color={c.red}>{t('voice.errorPrefix')}</Text>}
-        {message.text ? (
+        {/* A card-carrying assistant turn renders its cards only — see showBubbleText. */}
+        {message.text && showBubbleText(message) ? (
           <Text style={{ fontSize: 16, lineHeight: 22 }} color={isError ? c.red : isUser ? c.white : c.ink}>
             {message.text}
           </Text>
         ) : null}
         {message.cards.map((card, i) => (
-          <CardView key={i} card={card} onChipTap={onChipTap} onAppendLocal={onAppendLocal} />
+          <CardView
+            key={i}
+            card={card}
+            onChipTap={onChipTap}
+            onAppendLocal={onAppendLocal}
+            live={!message.restored}
+          />
         ))}
       </View>
     </View>

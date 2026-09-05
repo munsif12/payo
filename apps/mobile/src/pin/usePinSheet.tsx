@@ -4,17 +4,22 @@ import { PinSheet } from '../ui/PinSheet';
 import { useExecuteActionMutation, apiErr } from '../api/client';
 import { markActionDone } from '../store/pendingActionHolder';
 import { pinReducer, initialPinState, PIN_LENGTH } from './pinReducer';
-import type { PendingAction, Txn, RecipientSuggestion, BillerSuggestion } from '../api/types';
+import type { PendingAction, Txn, CardSummary, RecipientSuggestion, BillerSuggestion } from '../api/types';
 
 export interface PinSheetResolution {
-  transaction: Txn;
+  /** null for a PIN-gated action that moves no money — `card_unfreeze` (F1.2)
+   *  answers `{ transaction: null, card }`. Every consumer must be null-safe. */
+  transaction: Txn | null;
+  /** Present only for card actions (`card_unfreeze`): the card's new state. */
+  card?: CardSummary;
   recipientSuggestion?: RecipientSuggestion;
   billerSuggestion?: BillerSuggestion;
 }
 
 interface PinSheetContextValue {
   /** Opens the sheet for the given pending action; resolves with the executed
-   *  transaction (+ optional save suggestions), or rejects with an Error whose
+   *  transaction (null for a non-money action such as card_unfreeze, which
+   *  resolves with `card` instead) + optional save suggestions, or rejects with an Error whose
    *  message is 'cancelled' if the user swipes down / taps Cancel / the backdrop. */
   openPinSheet: (action: PendingAction) => Promise<PinSheetResolution>;
   /** True while the sheet is showing. The voice loop pauses listening on this so

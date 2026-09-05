@@ -1,0 +1,1690 @@
+{
+  "$defs": {
+    "AccountCard": {
+      "properties": {
+        "balancePaisa": {
+          "title": "Balancepaisa",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "account",
+          "default": "account",
+          "title": "Kind",
+          "type": "string"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        },
+        "memberSince": {
+          "title": "Membersince",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "phone": {
+          "title": "Phone",
+          "type": "string"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "name",
+        "phone",
+        "memberSince",
+        "balancePaisa",
+        "language"
+      ],
+      "title": "AccountCard",
+      "type": "object"
+    },
+    "BalanceCard": {
+      "properties": {
+        "balancePaisa": {
+          "title": "Balancepaisa",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "balance",
+          "default": "balance",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "balancePaisa"
+      ],
+      "title": "BalanceCard",
+      "type": "object"
+    },
+    "Bilingual": {
+      "properties": {
+        "en": {
+          "title": "En",
+          "type": "string"
+        },
+        "ur": {
+          "title": "Ur",
+          "type": "string"
+        }
+      },
+      "required": [
+        "en",
+        "ur"
+      ],
+      "title": "Bilingual",
+      "type": "object"
+    },
+    "BillCard": {
+      "properties": {
+        "amountPaisa": {
+          "title": "Amountpaisa",
+          "type": "integer"
+        },
+        "billId": {
+          "title": "Billid",
+          "type": "string"
+        },
+        "biller": {
+          "title": "Biller",
+          "type": "string"
+        },
+        "consumerName": {
+          "title": "Consumername",
+          "type": "string"
+        },
+        "dueDate": {
+          "title": "Duedate",
+          "type": "string"
+        },
+        "kind": {
+          "const": "bill",
+          "default": "bill",
+          "title": "Kind",
+          "type": "string"
+        },
+        "month": {
+          "title": "Month",
+          "type": "string"
+        }
+      },
+      "required": [
+        "billId",
+        "biller",
+        "consumerName",
+        "amountPaisa",
+        "dueDate",
+        "month"
+      ],
+      "title": "BillCard",
+      "type": "object"
+    },
+    "BillItem": {
+      "properties": {
+        "amountPaisa": {
+          "title": "Amountpaisa",
+          "type": "integer"
+        },
+        "billId": {
+          "title": "Billid",
+          "type": "string"
+        },
+        "biller": {
+          "title": "Biller",
+          "type": "string"
+        },
+        "consumerName": {
+          "title": "Consumername",
+          "type": "string"
+        },
+        "dueDate": {
+          "title": "Duedate",
+          "type": "string"
+        },
+        "month": {
+          "title": "Month",
+          "type": "string"
+        }
+      },
+      "required": [
+        "billId",
+        "biller",
+        "consumerName",
+        "amountPaisa",
+        "dueDate",
+        "month"
+      ],
+      "title": "BillItem",
+      "type": "object"
+    },
+    "BillerChip": {
+      "properties": {
+        "billerId": {
+          "title": "Billerid",
+          "type": "string"
+        },
+        "consumerNo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consumerno"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "savedBillerId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Savedbillerid"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "billerId",
+        "name"
+      ],
+      "title": "BillerChip",
+      "type": "object"
+    },
+    "BillerChipsCard": {
+      "properties": {
+        "billers": {
+          "items": {
+            "$ref": "#/$defs/BillerChip"
+          },
+          "title": "Billers",
+          "type": "array"
+        },
+        "kind": {
+          "const": "biller_chips",
+          "default": "biller_chips",
+          "title": "Kind",
+          "type": "string"
+        },
+        "prompt": {
+          "$ref": "#/$defs/Bilingual"
+        }
+      },
+      "required": [
+        "prompt",
+        "billers"
+      ],
+      "title": "BillerChipsCard",
+      "type": "object"
+    },
+    "BillersCard": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/BillerChip"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "billers",
+          "default": "billers",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "BillersCard",
+      "type": "object"
+    },
+    "BillsCard": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/BillItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "bills",
+          "default": "bills",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "BillsCard",
+      "type": "object"
+    },
+    "CardCard": {
+      "description": "The user's virtual debit card — last-4 only. `pan`/`cvv` never appear here.",
+      "properties": {
+        "expiry": {
+          "title": "Expiry",
+          "type": "string"
+        },
+        "frozen": {
+          "title": "Frozen",
+          "type": "boolean"
+        },
+        "holder": {
+          "title": "Holder",
+          "type": "string"
+        },
+        "kind": {
+          "const": "card",
+          "default": "card",
+          "title": "Kind",
+          "type": "string"
+        },
+        "last4": {
+          "title": "Last4",
+          "type": "string"
+        },
+        "maskedPan": {
+          "title": "Maskedpan",
+          "type": "string"
+        }
+      },
+      "required": [
+        "last4",
+        "maskedPan",
+        "expiry",
+        "frozen",
+        "holder"
+      ],
+      "title": "CardCard",
+      "type": "object"
+    },
+    "ConfirmationCard": {
+      "properties": {
+        "actionId": {
+          "title": "Actionid",
+          "type": "string"
+        },
+        "amountPaisa": {
+          "title": "Amountpaisa",
+          "type": "integer"
+        },
+        "autoOpenPin": {
+          "default": true,
+          "title": "Autoopenpin",
+          "type": "boolean"
+        },
+        "expiresAt": {
+          "title": "Expiresat",
+          "type": "string"
+        },
+        "feePaisa": {
+          "title": "Feepaisa",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "confirmation",
+          "default": "confirmation",
+          "title": "Kind",
+          "type": "string"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/ConfirmationLine"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "requiresPin": {
+          "title": "Requirespin",
+          "type": "boolean"
+        },
+        "summary": {
+          "$ref": "#/$defs/Bilingual"
+        }
+      },
+      "required": [
+        "actionId",
+        "summary",
+        "lines",
+        "amountPaisa",
+        "feePaisa",
+        "requiresPin",
+        "expiresAt"
+      ],
+      "title": "ConfirmationCard",
+      "type": "object"
+    },
+    "ConfirmationLine": {
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "value"
+      ],
+      "title": "ConfirmationLine",
+      "type": "object"
+    },
+    "HelpCard": {
+      "properties": {
+        "intents": {
+          "items": {
+            "$ref": "#/$defs/HelpIntent"
+          },
+          "title": "Intents",
+          "type": "array"
+        },
+        "kind": {
+          "const": "help",
+          "default": "help",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "intents"
+      ],
+      "title": "HelpCard",
+      "type": "object"
+    },
+    "HelpIntent": {
+      "properties": {
+        "intent": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "label": {
+          "$ref": "#/$defs/Bilingual"
+        }
+      },
+      "required": [
+        "label",
+        "intent"
+      ],
+      "title": "HelpIntent",
+      "type": "object"
+    },
+    "InstitutionChip": {
+      "properties": {
+        "institutionId": {
+          "title": "Institutionid",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "wallet",
+            "bank"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "institutionId",
+        "name",
+        "kind"
+      ],
+      "title": "InstitutionChip",
+      "type": "object"
+    },
+    "InstitutionChipsCard": {
+      "properties": {
+        "institutions": {
+          "items": {
+            "$ref": "#/$defs/InstitutionChip"
+          },
+          "title": "Institutions",
+          "type": "array"
+        },
+        "kind": {
+          "const": "institution_chips",
+          "default": "institution_chips",
+          "title": "Kind",
+          "type": "string"
+        },
+        "prompt": {
+          "$ref": "#/$defs/Bilingual"
+        }
+      },
+      "required": [
+        "prompt",
+        "institutions"
+      ],
+      "title": "InstitutionChipsCard",
+      "type": "object"
+    },
+    "InstitutionRef": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "wallet",
+            "bank"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind"
+      ],
+      "title": "InstitutionRef",
+      "type": "object"
+    },
+    "PocketCard": {
+      "properties": {
+        "balancePaisa": {
+          "title": "Balancepaisa",
+          "type": "integer"
+        },
+        "emoji": {
+          "title": "Emoji",
+          "type": "string"
+        },
+        "goalPaisa": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goalpaisa"
+        },
+        "kind": {
+          "const": "pocket",
+          "default": "pocket",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "pocketId": {
+          "title": "Pocketid",
+          "type": "string"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "pocketId",
+        "name",
+        "emoji",
+        "balancePaisa"
+      ],
+      "title": "PocketCard",
+      "type": "object"
+    },
+    "PocketItem": {
+      "properties": {
+        "balancePaisa": {
+          "title": "Balancepaisa",
+          "type": "integer"
+        },
+        "emoji": {
+          "title": "Emoji",
+          "type": "string"
+        },
+        "goalPaisa": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goalpaisa"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "pocketId": {
+          "title": "Pocketid",
+          "type": "string"
+        },
+        "progress": {
+          "title": "Progress",
+          "type": "number"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "pocketId",
+        "name",
+        "emoji",
+        "balancePaisa",
+        "progress"
+      ],
+      "title": "PocketItem",
+      "type": "object"
+    },
+    "PocketsCard": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/PocketItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "pockets",
+          "default": "pockets",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "PocketsCard",
+      "type": "object"
+    },
+    "ProfileCard": {
+      "properties": {
+        "applied": {
+          "items": {
+            "enum": [
+              "name",
+              "urduName",
+              "language"
+            ],
+            "type": "string"
+          },
+          "title": "Applied",
+          "type": "array"
+        },
+        "kind": {
+          "const": "profile",
+          "default": "profile",
+          "title": "Kind",
+          "type": "string"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "name",
+        "language",
+        "applied"
+      ],
+      "title": "ProfileCard",
+      "type": "object"
+    },
+    "QrCard": {
+      "properties": {
+        "kind": {
+          "const": "qr",
+          "default": "qr",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "payload": {
+          "title": "Payload",
+          "type": "string"
+        },
+        "phone": {
+          "title": "Phone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "payload",
+        "name",
+        "phone"
+      ],
+      "title": "QrCard",
+      "type": "object"
+    },
+    "ReceiptCard": {
+      "properties": {
+        "kind": {
+          "const": "receipt",
+          "default": "receipt",
+          "title": "Kind",
+          "type": "string"
+        },
+        "shareText": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "txn": {
+          "$ref": "#/$defs/Txn"
+        }
+      },
+      "required": [
+        "txn",
+        "shareText"
+      ],
+      "title": "ReceiptCard",
+      "type": "object"
+    },
+    "RecipientCard": {
+      "properties": {
+        "identifier": {
+          "title": "Identifier",
+          "type": "string"
+        },
+        "institution": {
+          "$ref": "#/$defs/InstitutionRef"
+        },
+        "kind": {
+          "const": "recipient",
+          "default": "recipient",
+          "title": "Kind",
+          "type": "string"
+        },
+        "linkedUserId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Linkeduserid"
+        },
+        "prompt": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "institution",
+        "identifier",
+        "prompt"
+      ],
+      "title": "RecipientCard",
+      "type": "object"
+    },
+    "RecipientChip": {
+      "properties": {
+        "identifier": {
+          "title": "Identifier",
+          "type": "string"
+        },
+        "institutionId": {
+          "title": "Institutionid",
+          "type": "string"
+        },
+        "institutionName": {
+          "title": "Institutionname",
+          "type": "string"
+        },
+        "nickname": {
+          "title": "Nickname",
+          "type": "string"
+        },
+        "recipientId": {
+          "title": "Recipientid",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "recipientId",
+        "nickname",
+        "title",
+        "institutionId",
+        "institutionName",
+        "identifier"
+      ],
+      "title": "RecipientChip",
+      "type": "object"
+    },
+    "RecipientChipsCard": {
+      "properties": {
+        "kind": {
+          "const": "recipient_chips",
+          "default": "recipient_chips",
+          "title": "Kind",
+          "type": "string"
+        },
+        "prompt": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "recipients": {
+          "items": {
+            "$ref": "#/$defs/RecipientChip"
+          },
+          "title": "Recipients",
+          "type": "array"
+        }
+      },
+      "required": [
+        "prompt",
+        "recipients"
+      ],
+      "title": "RecipientChipsCard",
+      "type": "object"
+    },
+    "RecipientsCard": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/RecipientChip"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "recipients",
+          "default": "recipients",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "RecipientsCard",
+      "type": "object"
+    },
+    "RequestCard": {
+      "properties": {
+        "amountPaisa": {
+          "title": "Amountpaisa",
+          "type": "integer"
+        },
+        "counterparty": {
+          "$ref": "#/$defs/RequestCounterparty"
+        },
+        "direction": {
+          "enum": [
+            "in",
+            "out"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "kind": {
+          "const": "request",
+          "default": "request",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "requestId": {
+          "title": "Requestid",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId",
+        "direction",
+        "counterparty",
+        "amountPaisa",
+        "status"
+      ],
+      "title": "RequestCard",
+      "type": "object"
+    },
+    "RequestCounterparty": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "phone": {
+          "title": "Phone",
+          "type": "string"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "name",
+        "phone"
+      ],
+      "title": "RequestCounterparty",
+      "type": "object"
+    },
+    "RequestItem": {
+      "properties": {
+        "amountPaisa": {
+          "title": "Amountpaisa",
+          "type": "integer"
+        },
+        "counterparty": {
+          "$ref": "#/$defs/RequestCounterparty"
+        },
+        "direction": {
+          "enum": [
+            "in",
+            "out"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "requestId": {
+          "title": "Requestid",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId",
+        "direction",
+        "counterparty",
+        "amountPaisa",
+        "status"
+      ],
+      "title": "RequestItem",
+      "type": "object"
+    },
+    "RequestsCard": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/RequestItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "requests",
+          "default": "requests",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "RequestsCard",
+      "type": "object"
+    },
+    "SavePromptCard": {
+      "properties": {
+        "billerId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Billerid"
+        },
+        "consumerName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consumername"
+        },
+        "consumerNo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consumerno"
+        },
+        "identifier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Identifier"
+        },
+        "institutionId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Institutionid"
+        },
+        "kind": {
+          "const": "save_prompt",
+          "default": "save_prompt",
+          "title": "Kind",
+          "type": "string"
+        },
+        "prompt": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "target": {
+          "enum": [
+            "recipient",
+            "biller"
+          ],
+          "title": "Target",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "target",
+        "prompt"
+      ],
+      "title": "SavePromptCard",
+      "type": "object"
+    },
+    "SpendingCard": {
+      "properties": {
+        "byCategory": {
+          "items": {
+            "$ref": "#/$defs/SpendingCategory"
+          },
+          "title": "Bycategory",
+          "type": "array"
+        },
+        "compare": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpendingCompare"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "const": "spending",
+          "default": "spending",
+          "title": "Kind",
+          "type": "string"
+        },
+        "period": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "totalInPaisa": {
+          "title": "Totalinpaisa",
+          "type": "integer"
+        },
+        "totalOutPaisa": {
+          "title": "Totaloutpaisa",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "period",
+        "totalOutPaisa",
+        "totalInPaisa",
+        "byCategory"
+      ],
+      "title": "SpendingCard",
+      "type": "object"
+    },
+    "SpendingCategory": {
+      "properties": {
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "count": {
+          "title": "Count",
+          "type": "integer"
+        },
+        "label": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "share": {
+          "title": "Share",
+          "type": "number"
+        },
+        "totalPaisa": {
+          "title": "Totalpaisa",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "category",
+        "label",
+        "totalPaisa",
+        "count",
+        "share"
+      ],
+      "title": "SpendingCategory",
+      "type": "object"
+    },
+    "SpendingCompare": {
+      "properties": {
+        "deltaPaisa": {
+          "title": "Deltapaisa",
+          "type": "integer"
+        },
+        "deltaPct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deltapct"
+        },
+        "period": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "totalOutPaisa": {
+          "title": "Totaloutpaisa",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "period",
+        "totalOutPaisa",
+        "deltaPaisa"
+      ],
+      "title": "SpendingCompare",
+      "type": "object"
+    },
+    "StatementCard": {
+      "properties": {
+        "downloadUrl": {
+          "title": "Downloadurl",
+          "type": "string"
+        },
+        "kind": {
+          "const": "statement",
+          "default": "statement",
+          "title": "Kind",
+          "type": "string"
+        },
+        "period": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "statementId": {
+          "title": "Statementid",
+          "type": "string"
+        },
+        "totalInPaisa": {
+          "title": "Totalinpaisa",
+          "type": "integer"
+        },
+        "totalOutPaisa": {
+          "title": "Totaloutpaisa",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "statementId",
+        "period",
+        "totalInPaisa",
+        "totalOutPaisa",
+        "downloadUrl"
+      ],
+      "title": "StatementCard",
+      "type": "object"
+    },
+    "StatementSummary": {
+      "properties": {
+        "downloadUrl": {
+          "title": "Downloadurl",
+          "type": "string"
+        },
+        "period": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "statementId": {
+          "title": "Statementid",
+          "type": "string"
+        },
+        "totalInPaisa": {
+          "title": "Totalinpaisa",
+          "type": "integer"
+        },
+        "totalOutPaisa": {
+          "title": "Totaloutpaisa",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "statementId",
+        "period",
+        "totalInPaisa",
+        "totalOutPaisa",
+        "downloadUrl"
+      ],
+      "title": "StatementSummary",
+      "type": "object"
+    },
+    "StatementsCard": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/StatementSummary"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "statements",
+          "default": "statements",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "StatementsCard",
+      "type": "object"
+    },
+    "SuccessCard": {
+      "properties": {
+        "amountPaisa": {
+          "title": "Amountpaisa",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "success",
+          "default": "success",
+          "title": "Kind",
+          "type": "string"
+        },
+        "refNo": {
+          "title": "Refno",
+          "type": "string"
+        },
+        "title": {
+          "$ref": "#/$defs/Bilingual"
+        }
+      },
+      "required": [
+        "title",
+        "refNo",
+        "amountPaisa"
+      ],
+      "title": "SuccessCard",
+      "type": "object"
+    },
+    "TelcoChip": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "telcoId": {
+          "title": "Telcoid",
+          "type": "string"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "telcoId",
+        "name"
+      ],
+      "title": "TelcoChip",
+      "type": "object"
+    },
+    "TelcoChipsCard": {
+      "properties": {
+        "kind": {
+          "const": "telco_chips",
+          "default": "telco_chips",
+          "title": "Kind",
+          "type": "string"
+        },
+        "prompt": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "telcos": {
+          "items": {
+            "$ref": "#/$defs/TelcoChip"
+          },
+          "title": "Telcos",
+          "type": "array"
+        }
+      },
+      "required": [
+        "prompt",
+        "telcos"
+      ],
+      "title": "TelcoChipsCard",
+      "type": "object"
+    },
+    "TransactionsCard": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Txn"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "transactions",
+          "default": "transactions",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "TransactionsCard",
+      "type": "object"
+    },
+    "Txn": {
+      "properties": {
+        "amountPaisa": {
+          "title": "Amountpaisa",
+          "type": "integer"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "counterparty": {
+          "$ref": "#/$defs/TxnCounterparty"
+        },
+        "createdAt": {
+          "title": "Createdat",
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "in",
+            "out"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "feePaisa": {
+          "title": "Feepaisa",
+          "type": "integer"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "refNo": {
+          "title": "Refno",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "direction",
+        "amountPaisa",
+        "feePaisa",
+        "counterparty",
+        "category",
+        "status",
+        "refNo",
+        "createdAt"
+      ],
+      "title": "Txn",
+      "type": "object"
+    },
+    "TxnCounterparty": {
+      "properties": {
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "urduName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Urduname"
+        }
+      },
+      "required": [
+        "name",
+        "detail"
+      ],
+      "title": "TxnCounterparty",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "account": "#/$defs/AccountCard",
+      "balance": "#/$defs/BalanceCard",
+      "bill": "#/$defs/BillCard",
+      "biller_chips": "#/$defs/BillerChipsCard",
+      "billers": "#/$defs/BillersCard",
+      "bills": "#/$defs/BillsCard",
+      "card": "#/$defs/CardCard",
+      "confirmation": "#/$defs/ConfirmationCard",
+      "help": "#/$defs/HelpCard",
+      "institution_chips": "#/$defs/InstitutionChipsCard",
+      "pocket": "#/$defs/PocketCard",
+      "pockets": "#/$defs/PocketsCard",
+      "profile": "#/$defs/ProfileCard",
+      "qr": "#/$defs/QrCard",
+      "receipt": "#/$defs/ReceiptCard",
+      "recipient": "#/$defs/RecipientCard",
+      "recipient_chips": "#/$defs/RecipientChipsCard",
+      "recipients": "#/$defs/RecipientsCard",
+      "request": "#/$defs/RequestCard",
+      "requests": "#/$defs/RequestsCard",
+      "save_prompt": "#/$defs/SavePromptCard",
+      "spending": "#/$defs/SpendingCard",
+      "statement": "#/$defs/StatementCard",
+      "statements": "#/$defs/StatementsCard",
+      "success": "#/$defs/SuccessCard",
+      "telco_chips": "#/$defs/TelcoChipsCard",
+      "transactions": "#/$defs/TransactionsCard"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ConfirmationCard"
+    },
+    {
+      "$ref": "#/$defs/SuccessCard"
+    },
+    {
+      "$ref": "#/$defs/TransactionsCard"
+    },
+    {
+      "$ref": "#/$defs/StatementCard"
+    },
+    {
+      "$ref": "#/$defs/InstitutionChipsCard"
+    },
+    {
+      "$ref": "#/$defs/RecipientCard"
+    },
+    {
+      "$ref": "#/$defs/RecipientChipsCard"
+    },
+    {
+      "$ref": "#/$defs/BillerChipsCard"
+    },
+    {
+      "$ref": "#/$defs/SavePromptCard"
+    },
+    {
+      "$ref": "#/$defs/BillCard"
+    },
+    {
+      "$ref": "#/$defs/PocketCard"
+    },
+    {
+      "$ref": "#/$defs/BalanceCard"
+    },
+    {
+      "$ref": "#/$defs/ReceiptCard"
+    },
+    {
+      "$ref": "#/$defs/SpendingCard"
+    },
+    {
+      "$ref": "#/$defs/AccountCard"
+    },
+    {
+      "$ref": "#/$defs/ProfileCard"
+    },
+    {
+      "$ref": "#/$defs/HelpCard"
+    },
+    {
+      "$ref": "#/$defs/CardCard"
+    },
+    {
+      "$ref": "#/$defs/StatementsCard"
+    },
+    {
+      "$ref": "#/$defs/RecipientsCard"
+    },
+    {
+      "$ref": "#/$defs/BillsCard"
+    },
+    {
+      "$ref": "#/$defs/BillersCard"
+    },
+    {
+      "$ref": "#/$defs/TelcoChipsCard"
+    },
+    {
+      "$ref": "#/$defs/PocketsCard"
+    },
+    {
+      "$ref": "#/$defs/RequestCard"
+    },
+    {
+      "$ref": "#/$defs/RequestsCard"
+    },
+    {
+      "$ref": "#/$defs/QrCard"
+    }
+  ]
+}

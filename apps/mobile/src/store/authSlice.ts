@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { PublicUser } from '../api/types';
+import { AUTH_STORAGE_KEY, NAME_CACHE_STORAGE_KEY } from './storageKeys';
 
 export interface AuthState {
   token: string | null;
@@ -25,8 +26,8 @@ const initialState: AuthState = {
   otpToken: null, pendingPhone: null, isNewUser: false, pendingName: null,
 };
 
-const KEY = 'payo.auth';
-const NAME_CACHE_KEY = 'payo.nameCache';
+const KEY = AUTH_STORAGE_KEY;
+const NAME_CACHE_KEY = NAME_CACHE_STORAGE_KEY;
 
 export const authSlice = createSlice({
   name: 'auth',

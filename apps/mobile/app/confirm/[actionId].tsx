@@ -31,10 +31,20 @@ export default function ConfirmAction() {
 
   const summaryText = urdu ? action.summary.ur : action.summary.en;
 
-  const goToSuccess = (transaction: { refNo: string; amountPaisa: number }, extras?: {
+  // `transaction` is null for a PIN-gated action that moves no money
+  // (card_unfreeze — see PinSheetResolution). The success screen is built
+  // around a ref no. and an amount, so there is nothing to show: the action
+  // already executed, so just return to where the user came from. In practice
+  // card actions are only ever created from chat, which renders a `card` card
+  // instead of routing here.
+  const goToSuccess = (transaction: { refNo: string; amountPaisa: number } | null, extras?: {
     recipientSuggestion?: unknown;
     billerSuggestion?: unknown;
   }) => {
+    if (!transaction) {
+      router.back();
+      return;
+    }
     router.replace({
       pathname: '/success',
       params: {

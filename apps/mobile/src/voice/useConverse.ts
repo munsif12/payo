@@ -15,6 +15,12 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'error';
   text: string;
   cards: ChatCard[];
+  /** True for a message rehydrated from persisted history rather than produced
+   *  by this session's live SSE stream. A restored `confirmation` must never
+   *  auto-open the PIN sheet (see CardView's autoOpenPin guard). Nothing in
+   *  useConverse sets it — every message here is live — but the flag is part of
+   *  the message contract so a future history loader cannot forget it. */
+  restored?: boolean;
 }
 
 export type ConverseStatus = 'idle' | 'thinking' | 'speaking';
@@ -243,7 +249,7 @@ export function useConverse(opts?: ConverseOptions) {
   // locally right after a PinSheet execute). Not gated by inFlightGate —
   // it isn't a request/response turn.
   const appendLocal = (message: Omit<ChatMessage, 'id'> & { id?: string }) =>
-    append({ id: message.id ?? mid(), role: message.role, text: message.text, cards: message.cards });
+    append({ id: message.id ?? mid(), role: message.role, text: message.text, cards: message.cards, restored: message.restored });
 
   return { messages, status, sendText, sendAudio, appendLocal, interrupt };
 }

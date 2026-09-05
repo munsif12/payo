@@ -7,7 +7,7 @@ import type {
   Me, Txn, PendingAction, PocketDto, RequestDto, CardDto,
   StatementMeta, BillLookup, NamedItem, PublicUser, DueBill,
   RecipientSuggestion, BillerSuggestion, RecipientDto, SavedBillerDto,
-  InstitutionDto, ResolvedRecipient,
+  InstitutionDto, ResolvedRecipient, ExecuteActionResult,
 } from './types';
 
 interface Ok<T> { success: true; data: T }
@@ -204,12 +204,12 @@ export const payoApi = createApi({
       invalidatesTags: ['Statements'],
     }),
     executeAction: b.mutation<
-      { transaction: Txn; recipientSuggestion?: RecipientSuggestion; billerSuggestion?: BillerSuggestion },
+      ExecuteActionResult,
       { id: string; pin?: string }
     >({
       query: ({ id, pin }) => ({ url: `/actions/${id}/execute`, method: 'POST', body: pin ? { pin } : {} }),
-      transformResponse: (r: Ok<{ transaction: Txn; recipientSuggestion?: RecipientSuggestion; billerSuggestion?: BillerSuggestion }>) => r.data,
-      invalidatesTags: ['Me', 'Txns', 'Pockets', 'Requests', 'DueBills'],
+      transformResponse: (r: Ok<ExecuteActionResult>) => r.data,
+      invalidatesTags: ['Me', 'Txns', 'Pockets', 'Requests', 'DueBills', 'Card'],
     }),
     cancelAction: b.mutation<{ cancelled: true }, string>({
       query: (id) => ({ url: `/actions/${id}/cancel`, method: 'POST' }),

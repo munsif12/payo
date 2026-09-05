@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Pressable, Share, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Check, Download, FileText } from 'lucide-react-native';
-import { Text, Card as NewCard, Button, Input, Pill, Avatar, useIsUrdu } from '../../ui';
+import {
+  ArrowDownRight, ArrowUpRight, Check, Download, FileText, HelpCircle, QrCode as QrIcon, Share2,
+} from 'lucide-react-native';
+import QRCode from 'react-native-qrcode-svg';
+import { Text, Card as NewCard, Button, Input, Pill, Avatar, ListRow, useIsUrdu } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
-import { space, radius } from '../../theme/tokens';
+import { space, radius, touch } from '../../theme/tokens';
 import { usePressScale } from '../../motion/usePressScale';
 import { useActionDone, markActionDone } from '../../store/pendingActionHolder';
 import { usePinSheet } from '../../pin/usePinSheet';
@@ -15,12 +18,21 @@ import { useCreateRecipientMutation, useCreateSavedBillerMutation, useExecuteAct
 import { formatPaisa } from '../../lib/money';
 import { ltrIsolate } from '../../lib/bidi';
 import { maskIdentifier } from '../../lib/mask';
-import i18n from '../../i18n';
-import type { PendingAction, RecipientSuggestion, BillerSuggestion } from '../../api/types';
+import i18n, { applyLanguage } from '../../i18n';
+import type { PendingAction, CardSummary, RecipientSuggestion, BillerSuggestion } from '../../api/types';
 import type { ChatCard, ChatMessage } from '../../voice/useConverse';
+import { claimAutoOpenPin, releaseAutoOpen, buildResultCards } from './confirmationPolicy';
 import type {
   RecipientCard as RecipientCardShape,
   RecipientChip, InstitutionChip, BillerChip, SavePromptCard as SavePromptCardShape,
+  ReceiptCard as ReceiptCardShape, SpendingCard as SpendingCardShape,
+  AccountCard as AccountCardShape, ProfileCard as ProfileCardShape,
+  HelpCard as HelpCardShape, CardCard as CardCardShape,
+  StatementsCard as StatementsCardShape, RecipientsCard as RecipientsCardShape,
+  BillsCard as BillsCardShape, BillersCard as BillersCardShape,
+  TelcoChipsCard as TelcoChipsCardShape, PocketsCard as PocketsCardShape,
+  RequestCard as RequestCardShape, RequestsCard as RequestsCardShape,
+  QrCard as QrCardShape, RequestItem, Bilingual,
 } from './cardShapes';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -29,11 +41,15 @@ interface Props {
   card: ChatCard;
   onChipTap?: (text: string) => void;
   onAppendLocal?: (m: Omit<ChatMessage, 'id'> & { id?: string }) => void;
+  /** False for a message restored from persisted history — a `confirmation`
+   *  with autoOpenPin must NOT re-open the PIN sheet for an action the user
+   *  saw in an earlier session. Live SSE messages leave it undefined (= live). */
+  live?: boolean;
 }
 
-export function CardView({ card, onChipTap, onAppendLocal }: Props) {
+export function CardView({ card, onChipTap, onAppendLocal, live }: Props) {
   switch (card.kind) {
-    case 'confirmation': return <ConfirmationCardView card={card} onAppendLocal={onAppendLocal} />;
+    case 'confirmation': return <ConfirmationCardView card={card} onAppendLocal={onAppendLocal} live={live} />;
     case 'balance': return <BalanceCardView card={card} />;
     case 'bill': return <BillCardView card={card} />;
     case 'pocket': return <PocketCardView card={card} />;
@@ -45,56 +61,29 @@ export function CardView({ card, onChipTap, onAppendLocal }: Props) {
     case 'recipient_chips': return <RecipientChipsCardView card={card} onChipTap={onChipTap} />;
     case 'institution_chips': return <InstitutionChipsCardView card={card} onChipTap={onChipTap} />;
     case 'biller_chips': return <BillerChipsCardView card={card} onChipTap={onChipTap} />;
+    case 'receipt': return <ReceiptCardView card={card} />;
+    case 'spending': return <SpendingCardView card={card} />;
+    case 'account': return <AccountCardView card={card} />;
+    case 'profile': return <ProfileCardView card={card} />;
+    case 'help': return <HelpCardView card={card} onChipTap={onChipTap} />;
+    case 'card': return <CardCardView card={card} />;
+    case 'statements': return <StatementsCardView card={card} />;
+    case 'recipients': return <RecipientsCardView card={card} onChipTap={onChipTap} />;
+    case 'bills': return <BillsCardView card={card} onChipTap={onChipTap} />;
+    case 'billers': return <BillersCardView card={card} onChipTap={onChipTap} />;
+    case 'telco_chips': return <TelcoChipsCardView card={card} onChipTap={onChipTap} />;
+    case 'pockets': return <PocketsCardView card={card} onChipTap={onChipTap} />;
+    case 'request': return <RequestCardView card={card} onChipTap={onChipTap} />;
+    case 'requests': return <RequestsCardView card={card} onChipTap={onChipTap} />;
+    case 'qr': return <QrCardView card={card} />;
     default: return null;
   }
 }
 
-// Builds the local success + (optional) save_prompt cards appended after a
-// chat confirmation executes — shared by the PIN-sheet and no-PIN paths.
-// save_prompt's `prompt` is required by the cards.py contract, so it's built
-// here in both languages regardless of the current UI language.
-function buildResultCards(
-  summary: { en: string; ur: string },
-  transaction: { refNo: string; amountPaisa: number },
-  recipientSuggestion?: RecipientSuggestion,
-  billerSuggestion?: BillerSuggestion,
-): ChatCard[] {
-  const cards: ChatCard[] = [
-    { kind: 'success', title: summary, refNo: transaction.refNo, amountPaisa: transaction.amountPaisa },
-  ];
-  if (recipientSuggestion && !recipientSuggestion.alreadySaved) {
-    const savePrompt: SavePromptCardShape = {
-      kind: 'save_prompt',
-      target: 'recipient',
-      institutionId: recipientSuggestion.institutionId,
-      identifier: recipientSuggestion.identifier,
-      title: recipientSuggestion.title,
-      prompt: {
-        en: i18n.t('save.recipientPrompt', { lng: 'en', name: recipientSuggestion.title }),
-        ur: i18n.t('save.recipientPrompt', { lng: 'ur', name: recipientSuggestion.title }),
-      },
-    };
-    cards.push(savePrompt as unknown as ChatCard);
-  } else if (billerSuggestion && !billerSuggestion.alreadySaved) {
-    const savePrompt: SavePromptCardShape = {
-      kind: 'save_prompt',
-      target: 'biller',
-      billerId: billerSuggestion.billerId,
-      consumerNo: billerSuggestion.consumerNo,
-      consumerName: billerSuggestion.consumerName,
-      prompt: {
-        en: i18n.t('save.billerPrompt', { lng: 'en', name: billerSuggestion.consumerName }),
-        ur: i18n.t('save.billerPrompt', { lng: 'ur', name: billerSuggestion.consumerName }),
-      },
-    };
-    cards.push(savePrompt as unknown as ChatCard);
-  }
-  return cards;
-}
-
-function ConfirmationCardView({ card, onAppendLocal }: {
+function ConfirmationCardView({ card, onAppendLocal, live }: {
   card: ChatCard;
   onAppendLocal?: (m: Omit<ChatMessage, 'id'> & { id?: string }) => void;
+  live?: boolean;
 }) {
   const { t } = useTranslation();
   const urdu = useIsUrdu();
@@ -120,26 +109,51 @@ function ConfirmationCardView({ card, onAppendLocal }: {
         // no sheet to surface a failure inside, so an error (ACTION_GONE,
         // INSUFFICIENT_FUNDS, ...) is rendered as an error bubble here.
         try {
-          const { transaction, recipientSuggestion, billerSuggestion } = await execute({ id: action.id }).unwrap();
+          const res = await execute({ id: action.id }).unwrap();
           markActionDone(action.id);
-          onAppendLocal?.({ role: 'assistant', text: '', cards: buildResultCards(summary, transaction, recipientSuggestion, billerSuggestion) });
+          onAppendLocal?.({ role: 'assistant', text: '', cards: buildResultCards(summary, res, res.recipientSuggestion, res.billerSuggestion) });
         } catch (e) {
           onAppendLocal?.({ role: 'error', text: apiErr(e).message, cards: [] });
         }
         return;
       }
-      const { transaction, recipientSuggestion, billerSuggestion } = await openPinSheet(action);
-      onAppendLocal?.({ role: 'assistant', text: '', cards: buildResultCards(summary, transaction, recipientSuggestion, billerSuggestion) });
-    } catch {
+      const res = await openPinSheet(action);
+      onAppendLocal?.({ role: 'assistant', text: '', cards: buildResultCards(summary, res, res.recipientSuggestion, res.billerSuggestion) });
+    } catch (e) {
       // openPinSheet rejects with 'cancelled' (sheet dismissed/swiped away) or
       // 'busy' (a sheet is already open for another action) — an execute
       // failure while the sheet IS open (INVALID_PIN/PIN_LOCKED) is handled
       // inside the sheet itself and keeps it open, so nothing to render here
       // for either case.
+      //
+      // 'busy' means no sheet was ever shown for THIS card, so the auto-open
+      // claim taken below was spent on nothing — hand it back so the card can
+      // still self-open once the other sheet is out of the way.
+      if ((e as Error)?.message === 'busy') releaseAutoOpen(action.id);
     } finally {
       setConfirming(false);
     }
   };
+
+  // autoOpenPin (cards.py default true, so `undefined` also means "open"):
+  // the sheet opens by itself the first time this card mounts from the live
+  // stream. onConfirm is reused verbatim, so cancelling leaves the card exactly
+  // as it is — Confirm still works.
+  const onConfirmRef = useRef(onConfirm);
+  onConfirmRef.current = onConfirm;
+  useEffect(() => {
+    const open = claimAutoOpenPin(String(card.actionId), {
+      autoOpenPin: card.autoOpenPin as boolean | undefined,
+      requiresPin: Boolean(card.requiresPin),
+      live: live !== false,
+      done,
+    });
+    if (!open) return;
+    onConfirmRef.current();
+    // Deliberately depends only on the action's identity: a re-render (or a
+    // cancelled sheet flipping `confirming`) must not re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card.actionId]);
 
   return (
     <NewCard style={{ marginTop: space.s, borderWidth: 1, borderColor: undefined, gap: space.m, alignItems: 'center' }}>
@@ -188,6 +202,10 @@ function ChipRow({ label, detail, onPress, testID }: {
           backgroundColor: c.surface2, borderRadius: radius.pill,
           borderWidth: 1, borderColor: c.amber,
           paddingHorizontal: space.m, paddingVertical: space.s,
+          // A one-line chip is ~36pt tall from padding alone; the floor + centring
+          // brings every chip (telco/institution/biller/recipient) up to the 44pt
+          // minimum touch target without changing how a two-line chip looks.
+          minHeight: touch.min, justifyContent: 'center',
         },
         style,
       ]}
@@ -478,6 +496,609 @@ function SavePromptCardView({ card }: { card: ChatCard }) {
           style={{ flex: 1 }}
         />
       </View>
+    </NewCard>
+  );
+}
+
+// ---- v5 card kinds (spec §4.2 / §6) ----
+
+/** The current language's half of a Bilingual field. */
+function useBilingual(): (b: Bilingual | undefined) => string {
+  const urdu = useIsUrdu();
+  return (b) => (b ? (urdu ? b.ur : b.en) : '');
+}
+
+/** A label/value row, same shape as the DetailRow on app/txn/[id].tsx. */
+function DetailRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  return (
+    <View
+      style={{
+        flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between',
+        paddingVertical: space.m, borderBottomWidth: last ? 0 : 1, borderBottomColor: c.separator,
+      }}
+    >
+      <Text variant="sub">{label}</Text>
+      <Text variant="hl">{value}</Text>
+    </View>
+  );
+}
+
+// receipt — the chat mirror of app/txn/[id].tsx: who, how much (coloured by
+// direction), when, ref no., category, status. Plus a Share button, which the
+// full-screen receipt does not have (it is the one thing the AI turn adds).
+function ReceiptCardView({ card }: { card: ChatCard }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  const bi = useBilingual();
+  const shape = card as unknown as ReceiptCardShape;
+  const txn = shape.txn;
+  const name = urdu && txn.counterparty.urduName ? txn.counterparty.urduName : txn.counterparty.name;
+  const sign = txn.direction === 'in' ? '+' : '−';
+  const amountColor = txn.direction === 'in' ? c.green : c.ink;
+  const headline = txn.direction === 'in'
+    ? t('activity.receivedFrom', { name })
+    : t('activity.sentTo', { name });
+
+  const onShare = () => {
+    const message = bi(shape.shareText);
+    if (!message) return;
+    Share.share({ message }).catch(() => {
+      // User dismissed the share sheet, or the platform refused it — nothing to recover.
+    });
+  };
+
+  return (
+    <NewCard style={{ marginTop: space.s, gap: space.m }}>
+      <View style={{ alignItems: 'center', gap: space.s }}>
+        <Avatar name={name} size={56} />
+        <Text variant="hl" center>{headline}</Text>
+        <Text variant="money" style={{ fontSize: 30, lineHeight: 36 }} color={amountColor}>
+          {ltrIsolate(sign + formatPaisa(txn.amountPaisa))}
+        </Text>
+        <Pill
+          label={t('activity.completed')}
+          bg={c.greenTint}
+          color={c.green}
+          icon={<Check size={14} color={c.green} strokeWidth={3} />}
+        />
+      </View>
+      <View>
+        <DetailRow label={t('activity.date')} value={ltrIsolate(new Date(txn.createdAt).toLocaleString())} />
+        <DetailRow label={t('activity.category')} value={txn.category} />
+        <DetailRow label={t('activity.refNo')} value={ltrIsolate(txn.refNo)} last />
+      </View>
+      <Button
+        testID="chat-receipt-share"
+        variant="ghost"
+        label={t('cards.receipt.share')}
+        icon={<Share2 size={20} color={c.ink2} strokeWidth={2} />}
+        onPress={onShare}
+      />
+    </NewCard>
+  );
+}
+
+// spending — plain bars, no chart library (spec §6). Bar width = the category's
+// share of money out; amber fill on surface2, mirroring PocketCardView's meter.
+function SpendingCardView({ card }: { card: ChatCard }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  const bi = useBilingual();
+  const shape = card as unknown as SpendingCardShape;
+  const compare = shape.compare ?? undefined;
+  const delta = compare ? compare.deltaPaisa : 0;
+  // Spending MORE is the bad direction — red with an up arrow; spending less is green.
+  const deltaColor = delta > 0 ? c.red : delta < 0 ? c.green : c.ink2;
+  const DeltaIcon = delta > 0 ? ArrowUpRight : ArrowDownRight;
+  const comparePeriod = compare ? bi(compare.period) : '';
+  const compareText = !compare ? ''
+    : delta === 0 ? t('cards.spending.sameAs', { period: comparePeriod })
+      : t(delta > 0 ? 'cards.spending.moreThan' : 'cards.spending.lessThan', {
+        amount: formatPaisa(Math.abs(delta)), period: comparePeriod,
+      });
+
+  return (
+    <NewCard style={{ marginTop: space.s, gap: space.m }}>
+      <View style={{ alignItems: 'center', gap: space.xs }}>
+        <Text variant="cap">{bi(shape.period)}</Text>
+        <Text variant="cap">{t('cards.spending.moneyOut')}</Text>
+        <Text variant="money" style={{ fontSize: 30, lineHeight: 36 }}>
+          {ltrIsolate(formatPaisa(shape.totalOutPaisa))}
+        </Text>
+        <Text variant="foot">
+          {ltrIsolate(`${t('cards.spending.moneyIn')} ${formatPaisa(shape.totalInPaisa)}`)}
+        </Text>
+      </View>
+
+      {shape.byCategory.length ? (
+        <View style={{ gap: space.s }}>
+          <Text variant="cap">{t('cards.spending.byCategory')}</Text>
+          {shape.byCategory.map((row) => (
+            <View key={row.category} style={{ gap: space.xs }}>
+              <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
+                <Text variant="sub">{bi(row.label)}</Text>
+                <Text variant="sub" weight={600}>{ltrIsolate(formatPaisa(row.totalPaisa))}</Text>
+              </View>
+              <View style={{ height: 8, borderRadius: 4, backgroundColor: c.surface2, overflow: 'hidden' }}>
+                <View
+                  testID={`spending-bar-${row.category}`}
+                  style={{
+                    // share is 0..1 from the service; clamp so a bad value can't
+                    // overflow the track or render a negative width.
+                    width: `${Math.max(0, Math.min(1, row.share)) * 100}%`,
+                    height: 8, borderRadius: 4, backgroundColor: c.amber,
+                    alignSelf: urdu ? 'flex-end' : 'flex-start',
+                  }}
+                />
+              </View>
+              <Text variant="foot">{t('cards.spending.txnCount', { count: row.count })}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text variant="foot" center>{t('cards.empty')}</Text>
+      )}
+
+      {compare ? (
+        <View
+          testID="spending-compare"
+          style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.s }}
+        >
+          <DeltaIcon size={18} color={deltaColor} strokeWidth={2.4} />
+          <Text variant="sub" color={deltaColor} style={{ flex: 1 }}>{compareText}</Text>
+        </View>
+      ) : null}
+    </NewCard>
+  );
+}
+
+function AccountCardView({ card }: { card: ChatCard }) {
+  const { t } = useTranslation();
+  const urdu = useIsUrdu();
+  const shape = card as unknown as AccountCardShape;
+  const name = urdu && shape.urduName ? shape.urduName : shape.name;
+  return (
+    <NewCard style={{ marginTop: space.s, gap: space.m }}>
+      <View style={{ alignItems: 'center', gap: space.s }}>
+        <Avatar name={name} size={56} />
+        <Text variant="hl" center>{name}</Text>
+        <Text variant="money" style={{ fontSize: 28, lineHeight: 34 }}>
+          {ltrIsolate(formatPaisa(shape.balancePaisa))}
+        </Text>
+      </View>
+      <View>
+        <DetailRow label={t('cards.account.phone')} value={ltrIsolate(shape.phone)} />
+        <DetailRow label={t('cards.account.memberSince')} value={ltrIsolate(shape.memberSince.slice(0, 10))} />
+        <DetailRow
+          label={t('cards.account.language')}
+          value={shape.language === 'ur' ? t('profile.urdu') : t('profile.english')}
+          last
+        />
+      </View>
+    </NewCard>
+  );
+}
+
+// profile — shows what actually changed. When `applied` includes 'language' the
+// app switches i18n itself (spec §6), through the same applyLanguage() the
+// More → Profile toggle uses, so the choice survives a cold start.
+function ProfileCardView({ card }: { card: ChatCard }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  const shape = card as unknown as ProfileCardShape;
+  const applied = shape.applied ?? [];
+  const language = shape.language;
+  const appliedLanguage = applied.includes('language');
+
+  useEffect(() => {
+    if (!appliedLanguage || !language) return;
+    if (i18n.language === language) return;
+    applyLanguage(language).catch(() => {
+      // Persisting failed; the in-session switch already happened.
+    });
+  }, [appliedLanguage, language]);
+
+  const name = urdu && shape.urduName ? shape.urduName : shape.name;
+  const labels: Record<string, string> = {
+    name: t('cards.profile.updatedName'),
+    urduName: t('cards.profile.updatedUrduName'),
+    language: t('cards.profile.updatedLanguage'),
+  };
+
+  return (
+    <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.s }}>
+      <Avatar name={name} size={48} />
+      <Text variant="hl" center>{t('cards.profile.title')}</Text>
+      <Text variant="sub" center>{name}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s, justifyContent: 'center' }}>
+        {applied.map((field) => (
+          <Pill key={field} label={labels[field] ?? field} bg={c.greenTint} color={c.green} />
+        ))}
+      </View>
+    </NewCard>
+  );
+}
+
+// help — every row is a ≥44pt tap target that sends the intent phrased in the
+// language the user is reading, so the assistant answers in that language too.
+function HelpCardView({ card, onChipTap }: Props) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const bi = useBilingual();
+  const shape = card as unknown as HelpCardShape;
+  return (
+    <NewCard style={{ marginTop: space.s, gap: space.xs }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s }}>
+        <HelpCircle size={18} color={c.ink2} strokeWidth={2} />
+        <Text variant="cap">{t('cards.help.title')}</Text>
+      </View>
+      {shape.intents.map((item, i) => (
+        <ListRow
+          key={`${item.intent.en}-${i}`}
+          testID={`chat-help-${i}`}
+          title={bi(item.label)}
+          showChevron
+          separator={i < shape.intents.length - 1}
+          style={{ minHeight: touch.min }}
+          onPress={() => onChipTap?.(bi(item.intent))}
+        />
+      ))}
+    </NewCard>
+  );
+}
+
+// card — the gradient-less navy card visual from app/card.tsx. Only ever
+// renders `maskedPan`: the full pan and the CVV are not in this contract, and
+// a payload that smuggled them in still would not display them.
+function CardCardView({ card }: { card: ChatCard }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const shape = card as unknown as CardCardShape;
+  // holder is optional on CardSummary (older backends omit it) and the whole
+  // labelled block is dropped rather than rendered as an empty line.
+  const holder = (shape.holder ?? '').toUpperCase();
+  return (
+    <View style={{ marginTop: space.s, gap: space.s }}>
+      <View
+        testID="chat-card-visual"
+        style={{
+          height: 190, borderRadius: 24, padding: 20,
+          backgroundColor: shape.frozen ? c.ink3 : c.navy,
+          overflow: 'hidden', justifyContent: 'space-between',
+        }}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text weight={800} color={c.white} style={{ letterSpacing: 1.5 }}>PAYO</Text>
+          <Pill
+            label={shape.frozen ? t('card.frozen') : t('cards.card.active')}
+            bg="rgba(255,255,255,0.14)"
+            color={c.white}
+          />
+        </View>
+        <Text color={c.white} weight={600} style={{ fontSize: 20, letterSpacing: 3 }}>
+          {ltrIsolate(shape.maskedPan)}
+        </Text>
+        <View
+          style={{
+            flexDirection: 'row', alignItems: 'flex-end',
+            // With no holder the expiry is the only block left — keep it on the
+            // right where it sits on the full Card screen, rather than letting
+            // space-between slide it across to the left edge.
+            justifyContent: holder ? 'space-between' : 'flex-end',
+          }}
+        >
+          {holder ? (
+            <View>
+              <Text variant="cap" color="rgba(255,255,255,0.55)">{t('card.holder')}</Text>
+              <Text color={c.white} weight={600} style={{ marginTop: 2 }}>{holder}</Text>
+            </View>
+          ) : null}
+          <View>
+            <Text variant="cap" color="rgba(255,255,255,0.55)">{t('card.expiry')}</Text>
+            <Text color={c.white} weight={600} style={{ marginTop: 2 }}>{ltrIsolate(shape.expiry)}</Text>
+          </View>
+        </View>
+      </View>
+      <Text variant="foot" center>{t('cards.card.hint')}</Text>
+    </View>
+  );
+}
+
+function StatementsCardView({ card }: { card: ChatCard }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const router = useRouter();
+  const bi = useBilingual();
+  const shape = card as unknown as StatementsCardShape;
+  if (!shape.items.length) {
+    return (
+      <NewCard style={{ marginTop: space.s }}>
+        <Text variant="foot" center>{t('statements.empty')}</Text>
+      </NewCard>
+    );
+  }
+  return (
+    <NewCard style={{ marginTop: space.s, gap: space.xs }}>
+      <Text variant="cap">{t('cards.statements.title')}</Text>
+      {shape.items.map((item, i) => (
+        <ListRow
+          key={item.statementId}
+          testID={`chat-statement-${item.statementId}`}
+          left={<FileText size={20} color={c.ink2} strokeWidth={2} />}
+          title={bi(item.period)}
+          subtitle={ltrIsolate(`${t('statements.moneyIn')} ${formatPaisa(item.totalInPaisa)} · ${t('statements.moneyOut')} ${formatPaisa(item.totalOutPaisa)}`)}
+          separator={i < shape.items.length - 1}
+          style={{ minHeight: touch.min }}
+          right={<Download size={20} color={c.ink2} strokeWidth={2} />}
+          // Same destination as the single-statement card's Download button —
+          // the Statements screen owns the authenticated PDF fetch + share.
+          onPress={() => router.push('/statements')}
+        />
+      ))}
+    </NewCard>
+  );
+}
+
+/** A list card body: a titled card of ≥44pt rows, or the empty line. */
+function ListCard({ title, empty, children }: {
+  title: string;
+  empty: boolean;
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <NewCard style={{ marginTop: space.s, gap: space.xs }}>
+      <Text variant="cap">{title}</Text>
+      {empty ? <Text variant="foot" center>{t('cards.empty')}</Text> : children}
+    </NewCard>
+  );
+}
+
+function RecipientsCardView({ card, onChipTap }: Props) {
+  const { t } = useTranslation();
+  const shape = card as unknown as RecipientsCardShape;
+  const items = shape.items ?? [];
+  return (
+    <ListCard title={t('cards.recipients.title')} empty={items.length === 0}>
+      {items.map((r, i) => (
+        <ListRow
+          key={r.recipientId}
+          testID={`chat-recipient-${r.recipientId}`}
+          left={<Avatar name={r.title} size={36} />}
+          title={r.nickname}
+          subtitle={`${r.institutionName} · ${ltrIsolate(maskIdentifier(r.identifier))}`}
+          showChevron
+          separator={i < items.length - 1}
+          style={{ minHeight: touch.min }}
+          onPress={() => onChipTap?.(t('cards.recipients.intent', { name: r.nickname }))}
+        />
+      ))}
+    </ListCard>
+  );
+}
+
+function BillsCardView({ card, onChipTap }: Props) {
+  const { t } = useTranslation();
+  const shape = card as unknown as BillsCardShape;
+  const items = shape.items ?? [];
+  return (
+    <ListCard title={t('cards.bills.title')} empty={items.length === 0}>
+      {items.map((b, i) => (
+        <ListRow
+          key={b.billId}
+          testID={`chat-bill-${b.billId}`}
+          title={`${b.biller} · ${b.consumerName}`}
+          subtitle={ltrIsolate(`${t('bills.dueDate')} ${String(b.dueDate).slice(0, 10)}`)}
+          right={<Text variant="hl">{ltrIsolate(formatPaisa(b.amountPaisa))}</Text>}
+          separator={i < items.length - 1}
+          style={{ minHeight: touch.min }}
+          onPress={() => onChipTap?.(t('cards.bills.intent', { name: b.biller }))}
+        />
+      ))}
+    </ListCard>
+  );
+}
+
+function BillersCardView({ card, onChipTap }: Props) {
+  const { t } = useTranslation();
+  const urdu = useIsUrdu();
+  const shape = card as unknown as BillersCardShape;
+  const items = shape.items ?? [];
+  return (
+    <ListCard title={t('cards.billers.title')} empty={items.length === 0}>
+      {items.map((b, i) => {
+        const label = urdu && b.urduName ? b.urduName : b.name;
+        return (
+          <ListRow
+            key={b.savedBillerId ?? b.billerId}
+            testID={`chat-biller-${b.savedBillerId ?? b.billerId}`}
+            title={label}
+            subtitle={b.consumerNo ? ltrIsolate(b.consumerNo) : undefined}
+            showChevron
+            separator={i < items.length - 1}
+            style={{ minHeight: touch.min }}
+            onPress={() => onChipTap?.(t('cards.bills.intent', { name: label }))}
+          />
+        );
+      })}
+    </ListCard>
+  );
+}
+
+function TelcoChipsCardView({ card, onChipTap }: Props) {
+  const urdu = useIsUrdu();
+  const bi = useBilingual();
+  const shape = card as unknown as TelcoChipsCardShape;
+  const telcos = shape.telcos ?? [];
+  return (
+    <View style={{ marginTop: space.s }}>
+      <Text variant="foot">{bi(shape.prompt)}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s, marginTop: space.s }}>
+        {telcos.map((telco) => {
+          const label = urdu && telco.urduName ? telco.urduName : telco.name;
+          return (
+            <ChipRow
+              key={telco.telcoId}
+              testID={`chip-telco-${telco.telcoId}`}
+              label={label}
+              onPress={() => onChipTap?.(label)}
+            />
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function PocketsCardView({ card, onChipTap }: Props) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  const shape = card as unknown as PocketsCardShape;
+  const items = shape.items ?? [];
+  return (
+    <ListCard title={t('cards.pockets.title')} empty={items.length === 0}>
+      {items.map((p, i) => {
+        const name = urdu && p.urduName ? p.urduName : p.name;
+        return (
+          <ListRow
+            key={p.pocketId}
+            testID={`chat-pocket-${p.pocketId}`}
+            title={`${p.emoji} ${name}`}
+            subtitle={
+              <View style={{ gap: space.xs, marginTop: space.xs }}>
+                <Text variant="foot">{ltrIsolate(formatPaisa(p.balancePaisa))}</Text>
+                <View style={{ height: 6, borderRadius: 3, backgroundColor: c.surface2, overflow: 'hidden' }}>
+                  <View
+                    testID={`chat-pocket-progress-${p.pocketId}`}
+                    style={{
+                      width: `${Math.max(0, Math.min(1, p.progress ?? 0)) * 100}%`,
+                      height: 6, borderRadius: 3, backgroundColor: c.amber,
+                      alignSelf: urdu ? 'flex-end' : 'flex-start',
+                    }}
+                  />
+                </View>
+              </View>
+            }
+            separator={i < items.length - 1}
+            style={{ minHeight: touch.min }}
+            onPress={() => onChipTap?.(t('cards.pockets.intent', { name }))}
+          />
+        );
+      })}
+    </ListCard>
+  );
+}
+
+/** One money request. Approve/Decline are offered only for an incoming request
+ *  that is still pending — an outgoing or settled one has nothing to act on.
+ *  Both buttons send a turn, so the assistant runs the tool and the loop stays live. */
+function RequestRow({ item, onChipTap, separator }: {
+  item: RequestItem;
+  onChipTap?: (text: string) => void;
+  separator: boolean;
+}) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  const name = urdu && item.counterparty.urduName ? item.counterparty.urduName : item.counterparty.name;
+  const actionable = item.direction === 'in' && item.status === 'pending';
+  const headline = item.direction === 'in'
+    ? t('cards.requests.owesYou', { name })
+    : t('cards.requests.youOwe', { name });
+
+  return (
+    <View
+      testID={`chat-request-${item.requestId}`}
+      style={{
+        gap: space.s, paddingVertical: space.m,
+        borderBottomWidth: separator ? 1 : 0, borderBottomColor: c.separator,
+      }}
+    >
+      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m }}>
+        <Avatar name={name} size={36} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="hl" numberOfLines={1}>{headline}</Text>
+          {item.note ? <Text variant="foot" numberOfLines={1}>{item.note}</Text> : null}
+        </View>
+        <Text variant="hl">{ltrIsolate(formatPaisa(item.amountPaisa))}</Text>
+      </View>
+      {actionable ? (
+        <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s }}>
+          <Button
+            testID={`chat-request-approve-${item.requestId}`}
+            label={t('requests.approve')}
+            onPress={() => onChipTap?.(t('cards.requests.approveIntent', { id: item.requestId }))}
+            style={{ flex: 1 }}
+          />
+          <Button
+            testID={`chat-request-decline-${item.requestId}`}
+            variant="secondary"
+            label={t('requests.decline')}
+            onPress={() => onChipTap?.(t('cards.requests.declineIntent', { id: item.requestId }))}
+            style={{ flex: 1 }}
+          />
+        </View>
+      ) : (
+        <Pill
+          label={t(`requests.${item.status}`, { defaultValue: item.status })}
+          bg={c.surface2}
+          color={c.ink2}
+        />
+      )}
+    </View>
+  );
+}
+
+function RequestCardView({ card, onChipTap }: Props) {
+  const shape = card as unknown as RequestCardShape;
+  return (
+    <NewCard style={{ marginTop: space.s }}>
+      <RequestRow item={shape as RequestItem} onChipTap={onChipTap} separator={false} />
+    </NewCard>
+  );
+}
+
+function RequestsCardView({ card, onChipTap }: Props) {
+  const { t } = useTranslation();
+  const shape = card as unknown as RequestsCardShape;
+  const items = shape.items ?? [];
+  return (
+    <ListCard title={t('cards.requests.title')} empty={items.length === 0}>
+      {items.map((item, i) => (
+        <RequestRow
+          key={item.requestId}
+          item={item}
+          onChipTap={onChipTap}
+          separator={i < items.length - 1}
+        />
+      ))}
+    </ListCard>
+  );
+}
+
+// qr — the same react-native-qrcode-svg renderer app/qr uses, on the white
+// backing the scanner needs regardless of theme.
+function QrCardView({ card }: { card: ChatCard }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const shape = card as unknown as QrCardShape;
+  return (
+    <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.s }}>
+      <Text variant="cap">{t('cards.qr.title')}</Text>
+      <View style={{ backgroundColor: c.white, borderRadius: radius.tile, padding: space.l }}>
+        {shape.payload
+          ? <QRCode value={shape.payload} size={180} />
+          : <QrIcon size={64} color={c.ink3} strokeWidth={1.5} />}
+      </View>
+      <Text variant="hl" center>{shape.name}</Text>
+      <Text variant="foot" center>{ltrIsolate(shape.phone)}</Text>
+      <Text variant="foot" center>{t('cards.qr.hint')}</Text>
     </NewCard>
   );
 }
