@@ -47,3 +47,21 @@ iPhone 17 = Bilal (`+923001110002`, Expo Go installed from the Expo cache).
 - Proactive greeting spoken on Home in the live app (blocked by the 4 h stamp after the first
   fetch; `digestSpeech` and the fetch rule are unit-tested; `/speak` verified to require auth).
 - Urdu end-to-end for the check-in chain (smoke rows fail one turn behind — see item 6).
+
+## v6.1 addendum (2026-09-06) — logos, spoken outcome, age-based rules
+
+Owner findings after the v6 hand-off: Rs 1,000 to a new recipient asked for guardian approval
+(the rule fired on *any* new recipient), the check-in asked every time (the pressure flag stuck
+to every later send in the session), and no sentence was spoken after a PIN.
+
+| Change | Verified |
+|---|---|
+| Approval = ceiling, or new recipient ≥ Rs 20,000, or a scoped pressure flag | Rs 1,000 to a new number (Ammi, 65, guardian set) → PIN directly → sent (`02-rs1000-new-recipient-pin-only.png`) |
+| Check-in: pressure language for all; large new-recipient for seniors only (24 h memory per recipient); ceiling-sized new sends for others; DOB on profile | backend 154 tests incl. `riskRules.test.ts`; review: ship |
+| Pressure flag scoped to the named recipient, 30-min expiry | AI 325 tests; live V16 EN pass |
+| Logos: `domain` + `logoUrl` for 38 institutions and 12 billers; `InstitutionLogo` with initials fallback and `assets/logos/` override folder | chat chips (`01-institution-chips-with-logos.png`), classic picker (`03-classic-picker-logos.png`); institutions without a usable favicon show initials |
+| Spoken outcome after every PIN (send, bill, unfreeze, pockets, approval) in EN/UR | one `POST /speak` after the PIN, 145 KB audio; mobile 365 tests |
+
+Known limit: settling a money request cannot carry a chat pressure flag (settlements are approved
+by tap). Reseed note: `npm run seed` is required after pulling — the seed now carries domains and
+dates of birth.
