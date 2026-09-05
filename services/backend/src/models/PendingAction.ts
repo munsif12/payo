@@ -4,7 +4,7 @@ const pendingActionSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   kind: { type: String, required: true },
   payload: { type: Schema.Types.Mixed, required: true },
-  amountPaisa: { type: Number, required: true, min: 1, validate: Number.isInteger },
+  amountPaisa: { type: Number, required: true, min: 0, validate: Number.isInteger },
   feePaisa: { type: Number, required: true, default: 0, min: 0, validate: Number.isInteger },
   summary: {
     en: { type: String, required: true },

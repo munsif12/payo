@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import mongoose from 'mongoose';
-import { PendingAction, Recipient, SavedBiller, Bill } from '../models';
+import { PendingAction, Recipient, SavedBiller, Bill, Card } from '../models';
 import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { executeAction, txnDto } from '../lib/pendingActions';
+import { publicCardDto } from './cardsController';
 
 const SEND_KINDS = ['send_money', 'send_money_bank', 'send_money_wallet'];
 
@@ -14,8 +15,14 @@ export async function execute(req: Request, res: Response) {
   if (typeof id !== 'string') throw new ApiError(404, 'NOT_FOUND', 'Action not found');
   const txn = await executeAction(req.userId, id, pin);
 
-  const data: Record<string, unknown> = { transaction: txnDto(txn) };
+  const data: Record<string, unknown> = { transaction: txn ? txnDto(txn) : null };
   const action = await PendingAction.findOne({ _id: id, userId: req.userId });
+
+  if (action && action.kind === 'card_unfreeze') {
+    const p = action.payload as { cardId: string };
+    const card = await Card.findOne({ _id: p.cardId, userId: req.userId });
+    if (card) data.card = publicCardDto(card);
+  }
 
   if (action && SEND_KINDS.includes(action.kind)) {
     const p = action.payload as { institutionId: string; identifier: string; title: string; recipientId?: string };

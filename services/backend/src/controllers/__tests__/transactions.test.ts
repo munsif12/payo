@@ -70,3 +70,51 @@ test("other user's transactions never appear in list", async () => {
   const res = await request(app).get('/api/v1/transactions').set('Authorization', `Bearer ${token}`);
   expect(res.body.data.items).toHaveLength(0);
 });
+
+test('q filters case-insensitively across counterparty name/urduName/detail/refNo and composes with category', async () => {
+  const { userId, token } = await createVerifiedUser(app);
+  await Transaction.create([
+    { userId, type: 'p2p', direction: 'out', amountPaisa: 1000, feePaisa: 0,
+      counterparty: { name: 'Ali Khan', urduName: 'علی', detail: 'friend' }, category: 'food',
+      status: 'completed', refNo: 'PAYO-MATCH001' },
+    { userId, type: 'p2p', direction: 'out', amountPaisa: 2000, feePaisa: 0,
+      counterparty: { name: 'Sara', detail: 'other' }, category: 'transport',
+      status: 'completed', refNo: 'PAYO-NOPE002' },
+    { userId, type: 'p2p', direction: 'out', amountPaisa: 3000, feePaisa: 0,
+      counterparty: { name: 'Zafar', detail: 'ali detail here' }, category: 'food',
+      status: 'completed', refNo: 'PAYO-NOPE003' },
+  ]);
+
+  const res = await request(app).get('/api/v1/transactions?q=ali').set('Authorization', `Bearer ${token}`);
+  expect(res.status).toBe(200);
+  expect(res.body.data.items).toHaveLength(2);
+
+  const composed = await request(app).get('/api/v1/transactions?q=ali&category=food').set('Authorization', `Bearer ${token}`);
+  expect(composed.body.data.items).toHaveLength(2);
+  const composedNoMatch = await request(app).get('/api/v1/transactions?q=ali&category=transport').set('Authorization', `Bearer ${token}`);
+  expect(composedNoMatch.body.data.items).toHaveLength(0);
+
+  const escaped = await request(app).get('/api/v1/transactions?q=' + encodeURIComponent('(ali')).set('Authorization', `Bearer ${token}`);
+  expect(escaped.status).toBe(200);
+  expect(escaped.body.data.items).toHaveLength(0);
+});
+
+test('GET /transactions/:id returns own txn, 404 for others, 400 for invalid id', async () => {
+  const { userId, token } = await createVerifiedUser(app);
+  const other = await createVerifiedUser(app);
+  const [txn] = await Transaction.create([{
+    userId, type: 'p2p', direction: 'out', amountPaisa: 1000, feePaisa: 0,
+    counterparty: { name: 'Ali', detail: 'x' }, category: 'food', status: 'completed', refNo: 'PAYO-DETAIL01',
+  }]);
+
+  const ok = await request(app).get(`/api/v1/transactions/${txn!._id}`).set('Authorization', `Bearer ${token}`);
+  expect(ok.status).toBe(200);
+  expect(ok.body.data.id).toBe(String(txn!._id));
+
+  const notOwned = await request(app).get(`/api/v1/transactions/${txn!._id}`).set('Authorization', `Bearer ${other.token}`);
+  expect(notOwned.status).toBe(404);
+  expect(notOwned.body.code).toBe('NOT_FOUND');
+
+  const badId = await request(app).get('/api/v1/transactions/not-an-id').set('Authorization', `Bearer ${token}`);
+  expect(badId.status).toBe(400);
+});

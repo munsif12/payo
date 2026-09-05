@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { Types } from 'mongoose';
 import { Transaction } from '../models';
+import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { txnDto } from '../lib/pendingActions';
 
@@ -10,9 +11,12 @@ const listQuery = z.object({
   category: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
+  q: z.string().max(64).optional(),
   limit: z.coerce.number().int().positive().max(100).default(20),
   cursor: z.string().optional(),
 });
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function decodeCursor(cursor: string): { createdAt: Date; id: string } | null {
   try {
@@ -36,6 +40,15 @@ export async function listTransactions(req: Request, res: Response) {
   if (q.from) range.$gte = new Date(q.from);
   if (q.to) range.$lte = new Date(q.to);
   if (Object.keys(range).length) filter.createdAt = range;
+  if (q.q) {
+    const re = new RegExp(escapeRegex(q.q), 'i');
+    filter.$or = [
+      { 'counterparty.name': re },
+      { 'counterparty.urduName': re },
+      { 'counterparty.detail': re },
+      { refNo: re },
+    ];
+  }
 
   const conditions: Record<string, unknown>[] = [filter];
   if (q.cursor) {
@@ -63,6 +76,14 @@ export async function listTransactions(req: Request, res: Response) {
       ? encodeCursor((last as unknown as { createdAt: Date }).createdAt, String(last._id))
       : null,
   });
+}
+
+export async function getTransaction(req: Request, res: Response) {
+  const id = req.params.id;
+  if (typeof id !== 'string' || !Types.ObjectId.isValid(id)) throw new ApiError(400, 'INVALID_ID', 'Invalid transaction id');
+  const txn = await Transaction.findOne({ _id: id, userId: req.userId });
+  if (!txn) throw new ApiError(404, 'NOT_FOUND', 'Transaction not found');
+  return ok(res, txnDto(txn));
 }
 
 export interface SpendingSummary {

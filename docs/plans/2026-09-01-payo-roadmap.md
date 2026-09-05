@@ -85,7 +85,8 @@ with 401 `OTP_SCOPE`.
 | 🔒\* `POST /auth/verify-pin` | `{ pin }` → with an **otpToken**: `{ token, user }` (completes login) or 401 `INVALID_PIN`; with a **session token**: `{ valid: true }` (unchanged in-app re-check) or 401 `INVALID_PIN`. \*accepts otp-scope OR session-scope token. |
 | 🔒 `GET /me` | → `{ user: { id, name, urduName?, email?, phone, avatar?, language, pinSet }, account: { id, balancePaisa }, card: { id, last4, frozen } }` |
 | 🔒 `PATCH /me` | `{ name?, urduName?, language? }` → updated `user` (partial update). |
-| 🔒 `GET /transactions?type&category&from&to&limit&cursor` | → `{ items: Txn[], nextCursor }` |
+| 🔒 `GET /transactions?type&category&from&to&q&limit&cursor` | → `{ items: Txn[], nextCursor }`. `q` case-insensitively substring-matches `counterparty.name`, `counterparty.urduName`, `counterparty.detail`, `refNo` (regex-escaped); composes with the other filters. |
+| 🔒 `GET /transactions/:id` | → `Txn` (same DTO as the list), own transaction only — 404 `NOT_FOUND` otherwise, 400 `INVALID_ID` if `:id` isn't a valid ObjectId. |
 | 🔒 `GET /transactions/spending-summary?from&to` | → `{ totalOutPaisa, totalInPaisa, byCategory: [{ category, totalPaisa, count }] }` |
 | 🔒 `GET /institutions?q=` | → `{ items: [{ id, name, urduName, kind: 'wallet'\|'bank', code, popular }] }` — ~35 entries (5 wallets: PAYO, Easypaisa, JazzCash, SadaPay, NayaPay; ~30 banks); `q` matches name/urduName/code; popular first, then alphabetical. |
 | 🔒 `POST /transfers/resolve` | `{ institutionId, identifier }` → `{ title, institution: {id,name,urduName,kind}, identifier, linkedUserId? }`. PAYO + phone → real user (404 `RECIPIENT_NOT_FOUND`, 400 `SELF_TRANSFER`); other wallets → phone normalised to `+92…`, deterministic title; banks → IBAN or 10–16 digit account no, deterministic title; else 400 `INVALID_IDENTIFIER`. |
@@ -101,18 +102,19 @@ with 401 `OTP_SCOPE`.
 | 🔒 `GET /requests` / `POST /requests` | create: `{ fromPhone, amountPaisa, note? }`; incoming request approve: `POST /requests/:id/approve` → `PendingAction` (payer side); `POST /requests/:id/decline` |
 | 🔒 `GET /pockets` / `POST /pockets` | create: `{ name, urduName?, emoji, goalPaisa? }` → `Pocket` |
 | 🔒 `POST /pockets/:id/deposit` / `.../withdraw` | `{ amountPaisa }` → `PendingAction` |
-| 🔒 `GET /cards/mine` | → full card `{ id, pan, cvv, expiry, frozen }` (display-only fake) |
-| 🔒 `POST /cards/mine/freeze` | `{ frozen: boolean }` → `Card` |
+| 🔒 `GET /cards/mine` | → full card `{ id, pan, cvv, expiry, frozen, last4, maskedPan }` (display-only fake; `last4` is `pan`'s last 4 digits, `maskedPan` is `•••• •••• •••• 1234`) |
+| 🔒 `POST /cards/mine/freeze` | `{ frozen: true }` only (any other body → 400) → `Card`. Instant, no PIN. |
+| 🔒 `POST /cards/mine/unfreeze` | → `PendingAction` (`kind: 'card_unfreeze'`, `requiresPin: true`, `amountPaisa: 0`); executor sets `frozen: false`. 409 `CARD_NOT_FROZEN` if the card is already unfrozen. |
 | 🔒 `POST /statements` | `{ year, month? }` (month omitted = yearly) → `{ statementId, summary }` |
 | 🔒 `GET /statements` | → `{ items: StatementMeta[] }` |
 | 🔒 `GET /statements/:id/pdf` | → `application/pdf` bytes |
 | 🔒 `GET /qr/mine` | → `{ payload }` (signed string encoding userId+phone) |
 | 🔒 `POST /qr/resolve` | `{ payload }` → `{ user: { name, urduName, phone, avatar } }` |
-| 🔒 `POST /actions/:id/execute` | `{ pin }` → `{ transaction: Txn, recipientSuggestion?: { institutionId, identifier, title, alreadySaved }, billerSuggestion?: { billerId, consumerNo, consumerName, alreadySaved } }` (atomic; idempotent; 410 if expired/consumed; `recipientSuggestion` on `send_money*` kinds, `billerSuggestion` on `pay_bill`) |
+| 🔒 `POST /actions/:id/execute` | `{ pin }` → `{ transaction: Txn \| null, recipientSuggestion?: { institutionId, identifier, title, alreadySaved }, billerSuggestion?: { billerId, consumerNo, consumerName, alreadySaved }, card?: { last4, maskedPan, expiry, frozen } }` (atomic; idempotent; 410 if expired/consumed; `recipientSuggestion` on `send_money*` kinds, `billerSuggestion` on `pay_bill`; `transaction` is `null` for non-money kinds — currently `card_unfreeze`, which returns `card` instead, the `GET /cards/mine` DTO minus `pan`/`cvv`) |
 | 🔒 `POST /actions/:id/cancel` | → `{ cancelled: true }` |
 | 🔒 `GET /chat/sessions` / `POST /chat/sessions` → `Session`; `GET /chat/sessions/:id/messages`; `POST /chat/sessions/:id/messages` `{ role, text, cards? }` → `Message` (written by AI service) |
 
-**`Txn` shape:** `{ id, type: 'p2p'|'bank_transfer'|'bill'|'recharge'|'pocket_deposit'|'pocket_withdraw'|'request_settlement', direction: 'in'|'out', amountPaisa, feePaisa, counterparty: { name, urduName?, detail }, category, status: 'completed', refNo, createdAt }`
+**`Txn` shape:** `{ id, type: 'p2p'|'bank_transfer'|'bill'|'recharge'|'pocket_deposit'|'pocket_withdraw'|'request_settlement'|'card_unfreeze', direction: 'in'|'out', amountPaisa, feePaisa, counterparty: { name, urduName?, detail }, category, status: 'completed', refNo, createdAt }`
 
 **`PendingAction` shape (the confirmation contract):**
 ```json

@@ -5,7 +5,7 @@ import { assertPinOk } from './pinAuth';
 
 type PADoc = InstanceType<typeof PendingAction>;
 type TxnDoc = InstanceType<typeof Transaction>;
-export type Executor = (session: ClientSession, action: PADoc) => Promise<TxnDoc>;
+export type Executor = (session: ClientSession, action: PADoc) => Promise<TxnDoc | null>;
 const executors = new Map<string, Executor>();
 export const registerExecutor = (kind: string, fn: Executor) => executors.set(kind, fn);
 
@@ -54,10 +54,13 @@ export async function executeAction(userId: string, actionId: string, pin: strin
 
   const session = await mongoose.startSession();
   try {
-    let txn: TxnDoc | undefined;
+    let txn: TxnDoc | null = null;
     await session.withTransaction(async () => { txn = await exec(session, claimed); });
-    await PendingAction.updateOne({ _id: actionId }, { status: 'completed', resultTxnId: txn!._id });
-    return txn!;
+    await PendingAction.updateOne(
+      { _id: actionId },
+      txn ? { status: 'completed', resultTxnId: (txn as TxnDoc)._id } : { status: 'completed' },
+    );
+    return txn;
   } catch (e) {
     await PendingAction.updateOne({ _id: actionId, status: 'processing' }, { status: 'pending' });
     throw e;
