@@ -7,6 +7,7 @@ from pydantic import Field
 
 from app.agent import run_agent
 from app.backend_client import BackendClient
+from app.lang import has_arabic_script
 
 pytestmark = pytest.mark.asyncio
 
@@ -546,4 +547,406 @@ async def test_run_agent_reply_is_speakable_even_when_the_model_bullets_a_card_t
     reply, cards = await run_agent(client, [], "show my recent transactions", "en", model=model)
     assert cards[0]["kind"] == "transactions"
     assert "*" not in reply and "\n" not in reply
+    await client.aclose()
+
+
+async def test_generic_non_answer_is_nudged_into_calling_the_tool(fake_backend):
+    """Spec §4.4 defect: "I can help you with your banking needs…" instead of an action.
+    Seen live on a bare "help" — one nudge must turn it into the help tool + card."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="I can help you with your banking needs. I can show you your balance."),
+        AIMessage(content="", tool_calls=[{"name": "help", "args": {}, "id": "t1"}]),
+        AIMessage(content="Tap any of these to start."),
+    ])
+    reply, cards = await run_agent(client, [], "help", "en", model=model)
+    assert [c["kind"] for c in cards] == ["help"]
+    assert "banking needs" not in reply
+    await client.aclose()
+
+
+async def test_a_real_answer_is_not_nudged(fake_backend):
+    """The guard must not fire on a normal tool-backed reply (it costs a model call)."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "get_balance", "args": {}, "id": "t1"}]),
+        AIMessage(content="Your balance is 84,500 rupees."),
+    ])
+    reply, cards = await run_agent(client, [], "balance?", "en", model=model)
+    assert reply == "Your balance is 84,500 rupees." and cards[0]["kind"] == "balance"
+    await client.aclose()
+
+
+async def test_announcing_data_without_a_tool_is_nudged_into_calling_it(fake_backend):
+    """Live miss: "Here is your card." with no tool call — the app hides the text and shows
+    the card, so an unfetched announcement leaves the user with an empty turn."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="Here is your card. It shows the last four digits and the expiry."),
+        AIMessage(content="", tool_calls=[{"name": "get_card", "args": {}, "id": "t1"}]),
+        AIMessage(content="Your card ends in 9405 and is active."),
+    ])
+    reply, cards = await run_agent(client, [], "show my card", "en", model=model)
+    assert [c["kind"] for c in cards] == ["card"]
+    assert "9405" in reply
+    await client.aclose()
+
+
+async def test_announcement_guard_does_not_fire_when_a_tool_produced_the_card(fake_backend):
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "get_card", "args": {}, "id": "t1"}]),
+        AIMessage(content="Here is your card; it ends in 9405."),
+    ])
+    reply, cards = await run_agent(client, [], "show my card", "en", model=model)
+    assert reply == "Here is your card; it ends in 9405." and cards[0]["kind"] == "card"
+    await client.aclose()
+
+
+async def test_urdu_turn_gets_an_urdu_nudge_and_still_calls_the_tool(fake_backend):
+    """Live UR miss: an English [SYSTEM CHECK] inside an Urdu turn read as noise and the
+    model just repeated «یہ رہا آپ کا کارڈ» with no tool. The nudge is Urdu for Urdu turns."""
+    from app.agent import ANNOUNCE_NUDGE_UR, NUDGE_UR
+    from langchain_core.messages import HumanMessage
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="جی اماں جی، یہ رہا آپ کا کارڈ۔"),
+        AIMessage(content="", tool_calls=[{"name": "get_card", "args": {}, "id": "t1"}]),
+        AIMessage(content="جی، آپ کے کارڈ کے آخری چار ہندسے نو چار صفر پانچ ہیں۔"),
+    ]))
+    reply, cards = await run_agent(client, [], "میرا کارڈ دکھائیں", "ur", model=model)
+    assert [c["kind"] for c in cards] == ["card"]
+    nudges = [m.content for turn in model.received for m in turn
+              if isinstance(m, HumanMessage) and "SYSTEM CHECK" in str(m.content)]
+    assert nudges, "no nudge was sent"
+    assert nudges[-1] in (ANNOUNCE_NUDGE_UR, NUDGE_UR), "the nudge reached an Urdu turn in English"
+    assert has_arabic_script(nudges[-1])
+    await client.aclose()
+
+
+# ---- generic-non-answer guard: only the canned reply, never a clarification or refusal ----
+
+def test_generic_nonanswer_matches_only_the_canned_reply():
+    from app.agent import _is_generic_nonanswer
+
+    canned = [
+        "I can help you with your banking needs. I can show you your balance.",
+        "I can help you with many banking tasks. Please tap one.",
+        "میں آپ کی بینکنگ ضروریات میں مدد کر سکتی ہوں۔",
+        "جی، میں آپ کی مدد کے لیے حاضر ہوں۔ نیچے سے چنیں۔",
+    ]
+    legitimate = [
+        "I can help you with that — how much would you like to send?",       # clarification
+        "I cannot help you with the full number; it is on the Card screen.",  # refusal
+        "جی، کتنے پیسے بھیجنے ہیں؟",                                          # clarification
+        "پورا نمبر میں نہیں بتا سکتی، وہ کارڈ سکرین پر ہے۔",                    # refusal
+        "Your balance is 84,500 rupees.",
+    ]
+    for reply in canned:
+        assert _is_generic_nonanswer(reply), reply
+    for reply in legitimate:
+        assert not _is_generic_nonanswer(reply), reply
+
+
+async def test_a_clarifying_question_is_not_nudged(fake_backend):
+    """A clarification must reach the user as-is — nudging it would bury the question."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([AIMessage(content="I can help you with that — how much would you like to send?")])
+    reply, cards = await run_agent(client, [], "I want to send money to Bilal", "en", model=model)
+    assert reply.endswith("?") and not cards
+    await client.aclose()
+
+
+async def test_prose_ask_for_a_network_is_nudged_into_list_telcos(fake_backend):
+    """Live UR miss: «کس نیٹ ورک پر لوڈ کرانا ہے؟» in prose — a voice user cannot type one."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="جی، کس نیٹ ورک پر لوڈ کرانا ہے؟"),
+        AIMessage(content="", tool_calls=[{"name": "list_telcos", "args": {}, "id": "t1"}]),
+        AIMessage(content="جی، نیچے سے نیٹ ورک چنیں۔"),
+    ])
+    reply, cards = await run_agent(client, [], "مجھے موبائل لوڈ کرانا ہے", "ur", model=model)
+    assert [c["kind"] for c in cards] == ["telco_chips"]
+    await client.aclose()
+
+
+async def test_last_turn_model_calls_counts_the_nudges(fake_backend):
+    """The QA smoke budgets on real invocations, so run_agent must report them."""
+    import app.agent as agent_module
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    plain = scripted([
+        AIMessage(content="", tool_calls=[{"name": "get_balance", "args": {}, "id": "t1"}]),
+        AIMessage(content="Your balance is 84,500 rupees."),
+    ])
+    await run_agent(client, [], "balance?", "en", model=plain)
+    assert agent_module.last_turn_model_calls == 1
+
+    nudged = scripted([
+        AIMessage(content="Here is your card. It ends in 9405."),   # no tool -> one nudge
+        AIMessage(content="", tool_calls=[{"name": "get_card", "args": {}, "id": "t1"}]),
+        AIMessage(content="Your card ends in 9405."),
+    ])
+    await run_agent(client, [], "show my card", "en", model=nudged)
+    assert agent_module.last_turn_model_calls == 2
+    await client.aclose()
+
+
+def test_announced_noun_maps_to_the_one_tool_that_produces_it():
+    from app.agent import announced_tool
+
+    assert announced_tool("Here are your saved recipients.") == "list_recipients"
+    assert announced_tool("یہ رہے آپ کے محفوظ رابطے۔") == "list_recipients"
+    assert announced_tool("Here is your card.") == "get_card"
+    assert announced_tool("Here are your pockets.") == "list_pockets"
+    assert announced_tool("Here is your QR code.") == "get_my_qr"
+    assert announced_tool("All done.") is None
+
+
+async def test_announce_nudge_names_the_tool_for_the_announced_noun(fake_backend):
+    """Live EN+UR miss: a generic 'call the right tool' nudge was ignored for
+    "Here are your saved recipients." — the nudge now names list_recipients."""
+    from langchain_core.messages import HumanMessage
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="Here are your saved recipients."),
+        AIMessage(content="", tool_calls=[{"name": "list_recipients", "args": {}, "id": "t1"}]),
+        AIMessage(content="You have one saved recipient, Sara Khan."),
+    ]))
+    reply, cards = await run_agent(client, [], "show my saved recipients", "en", model=model)
+    assert [c["kind"] for c in cards] == ["recipients"]
+    nudges = [str(m.content) for turn in model.received for m in turn
+              if isinstance(m, HumanMessage) and "SYSTEM CHECK" in str(m.content)]
+    assert nudges and "Call list_recipients now." in nudges[-1]
+    await client.aclose()
+
+
+def test_bare_help_utterances_are_recognised():
+    from app.agent import _asks_for_help
+
+    for text in ["help", "Help!", "menu", "What can you do?", "مدد", "میں آپ سے کیا پوچھ سکتا ہوں؟"]:
+        assert _asks_for_help(text), text
+    for text in ["send money to Bilal", "I need help paying my bill", "مجھے بل ادا کرنے میں مدد چاہیے"]:
+        assert not _asks_for_help(text), text
+
+
+async def test_help_answered_with_a_polite_question_is_still_nudged(fake_backend):
+    """Live UR miss: a bare «مدد» answered «میں آپ کی کیا مدد کر سکتی ہوں؟» — a question, so
+    the generic-non-answer guard skipped it, but the answer to "help" is the help CARD."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="میں آپ کی کیا مدد کر سکتی ہوں، اماں جی؟"),
+        AIMessage(content="", tool_calls=[{"name": "help", "args": {}, "id": "t1"}]),
+        AIMessage(content="جی، ان میں سے کوئی بھی چن لیں۔"),
+    ])
+    reply, cards = await run_agent(client, [], "مدد", "ur", model=model)
+    assert [c["kind"] for c in cards] == ["help"]
+    await client.aclose()
+
+
+async def test_a_normal_clarifying_question_is_still_not_nudged(fake_backend):
+    """The bare-help bypass must not make every question a nudge target."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([AIMessage(content="جی، کتنے پیسے بھیجنے ہیں؟")])
+    reply, cards = await run_agent(client, [], "بلال کو پیسے بھیجنے ہیں", "ur", model=model)
+    assert reply.endswith("؟") and not cards
+    await client.aclose()
+
+
+async def test_a_repeated_prose_chips_ask_is_nudged_twice(fake_backend):
+    """Live UR miss: after one nudge the model re-asked «کس نیٹ ورک پر لوڈ کرانا ہے؟»
+    verbatim; the chips ask gets a second attempt inside the same nudge budget."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="جی، کس نیٹ ورک پر لوڈ کرانا ہے؟"),
+        AIMessage(content="جی، کس نیٹ ورک پر لوڈ کرانا ہے؟"),   # ignored the first nudge
+        AIMessage(content="", tool_calls=[{"name": "list_telcos", "args": {}, "id": "t1"}]),
+        AIMessage(content="جی، نیچے سے نیٹ ورک چنیں۔"),
+    ])
+    reply, cards = await run_agent(client, [], "مجھے موبائل لوڈ کرانا ہے", "ur", model=model)
+    assert [c["kind"] for c in cards] == ["telco_chips"]
+    await client.aclose()
+
+
+async def test_echoing_the_previous_answer_is_nudged(fake_backend):
+    """Live: after a spending card, "what can you do" was answered with the spending
+    sentence verbatim and no tool ran — the new message went unanswered."""
+    from langchain_core.messages import HumanMessage
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    previous = ("Last month, you spent 180,967 rupees. The largest was food.\n"
+                "[cards] spending: total_out_paisa=18096700")
+    history = [HumanMessage(content="What did I spend last month?"), AIMessage(content=previous)]
+    model = scripted([
+        AIMessage(content="Last month, you spent 180,967 rupees. The largest was food."),  # echo
+        AIMessage(content="", tool_calls=[{"name": "help", "args": {}, "id": "t1"}]),
+        AIMessage(content="Tap any of these to start."),
+    ])
+    reply, cards = await run_agent(client, history, "what can you do", "en", model=model)
+    assert [c["kind"] for c in cards] == ["help"]
+    assert "180,967" not in reply
+    await client.aclose()
+
+
+def test_echo_detection_normalises_punctuation_and_ignores_short_replies():
+    from app.agent import _echoes_history
+
+    history = [AIMessage(content="Here are your last five transactions; the largest was 142,928 rupees.")]
+    assert _echoes_history("Here are your last five transactions - the largest was 142,928 rupees!", history)
+    assert not _echoes_history("Your balance is 84,500 rupees.", history)
+    assert not _echoes_history("جی", history)      # a short ack may legitimately repeat
+    assert not _echoes_history("Anything else?", [])
+
+
+# ---- deterministic fallbacks: the model holds its answer and nudging does not work ----
+
+async def test_cancel_preroute_cancels_without_asking_the_model(fake_backend):
+    """Live UR: «منسوخ کر دو» after a confirmation card routed to `help` and the pending
+    action stayed alive. The action_id is in the history's own [cards] line — just cancel."""
+    from langchain_core.messages import HumanMessage
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    fake_backend.route("POST", "/api/v1/actions/act9/cancel", {"cancelled": True})
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    history = [
+        HumanMessage(content="میرا کارڈ کھول دیں"),
+        AIMessage(content="تصدیق کریں۔\n[cards] confirmation: action_id=act9 amount_paisa=0"),
+    ]
+    model = scripted([AIMessage(content="SHOULD NOT BE CALLED")])   # no model call at all
+    reply, cards = await run_agent(client, history, "رہنے دو، منسوخ کر دو", "ur", model=model)
+    assert "منسوخ" in reply and not cards
+    assert [r.url.path for r in fake_backend.requests] == ["/api/v1/actions/act9/cancel"]
+    await client.aclose()
+
+
+async def test_cancel_preroute_is_english_for_english_turns(fake_backend):
+    from langchain_core.messages import HumanMessage
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    fake_backend.route("POST", "/api/v1/actions/act9/cancel", {"cancelled": True})
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    history = [
+        HumanMessage(content="unfreeze my card"),
+        AIMessage(content="Please confirm.\n[cards] confirmation: action_id=act9 amount_paisa=0"),
+    ]
+    reply, cards = await run_agent(client, history, "never mind, cancel that", "en",
+                                   model=scripted([AIMessage(content="SHOULD NOT BE CALLED")]))
+    assert reply.startswith("That is cancelled")
+    await client.aclose()
+
+
+async def test_cancel_falls_through_to_the_model_with_no_pending_action(fake_backend):
+    """No confirmation in history -> nothing to cancel; the model handles the message."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([AIMessage(content="There is nothing pending to cancel right now.")])
+    reply, cards = await run_agent(client, [], "cancel that", "en", model=model)
+    assert reply == "There is nothing pending to cancel right now."
+    assert not [r for r in fake_backend.requests if "/cancel" in r.url.path]
+    await client.aclose()
+
+
+async def test_cancel_preroute_falls_through_when_the_action_is_already_gone(fake_backend):
+    """A stale action_id (already executed/expired) must not swallow the turn."""
+    from langchain_core.messages import HumanMessage
+    from tests.conftest import err
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    fake_backend.route("POST", "/api/v1/actions/act9/cancel",
+                       responder=lambda req: err(410, "ACTION_GONE", "Action already handled"))
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    history = [AIMessage(content="ok\n[cards] confirmation: action_id=act9 amount_paisa=0")]
+    model = scripted([AIMessage(content="That one was already completed.")])
+    reply, cards = await run_agent(client, history, "cancel that", "en", model=model)
+    assert reply == "That one was already completed."
+    await client.aclose()
+
+
+async def test_prose_which_network_gets_the_chips_attached_even_if_the_model_refuses(fake_backend):
+    """Live UR: the model re-asked «کس نیٹ ورک پر لوڈ کرانا ہے؟» through every nudge. A voice
+    user cannot type a network, so the chips are fetched and attached to its own sentence."""
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="جی، کس نیٹ ورک پر لوڈ کرانا ہے؟"),
+        AIMessage(content="جی، کس نیٹ ورک پر لوڈ کرانا ہے؟"),
+        AIMessage(content="جی، کس نیٹ ورک پر لوڈ کرانا ہے؟"),
+    ])
+    reply, cards = await run_agent(client, [], "مجھے موبائل لوڈ کرانا ہے", "ur", model=model)
+    assert [c["kind"] for c in cards] == ["telco_chips"]
+    assert "کس نیٹ ورک" in reply          # the model's sentence stays as the spoken prompt
+    assert len(cards[0]["telcos"]) == 2
+    await client.aclose()
+
+
+async def test_english_prose_which_network_also_gets_chips(fake_backend):
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="Which network do you want to top up?"),
+        AIMessage(content="Which network do you want to top up?"),
+        AIMessage(content="Which network do you want to top up?"),
+    ])
+    reply, cards = await run_agent(client, [], "I want to top up a phone", "en", model=model)
+    assert [c["kind"] for c in cards] == ["telco_chips"]
+    await client.aclose()
+
+
+async def test_chips_fallback_does_not_fire_when_the_tool_already_ran(fake_backend):
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "list_telcos", "args": {}, "id": "t1"}]),
+        AIMessage(content="Which network do you want?"),
+    ])
+    reply, cards = await run_agent(client, [], "top up my phone", "en", model=model)
+    assert [c["kind"] for c in cards] == ["telco_chips"]   # exactly one, not two
     await client.aclose()

@@ -403,3 +403,64 @@ async def test_tts_uses_the_turn_language_not_the_ui_language(fake_backend, wire
     assert res.status_code == 200
     assert calls and calls[-1][1] == "ur"
     wired_app.state.tts = StubTts()
+
+
+def test_is_no_speech_covers_the_sentinel_empties_and_narrations():
+    from app.conversation import is_no_speech
+
+    for text in ["", "   ", "NO_SPEECH", "no_speech.", None,
+                 "There is no speech in the audio. The audio contains a ball bouncing.",
+                 "کوئی آواز نہیں آ رہی"]:
+        assert is_no_speech(text), text
+    for text in ["میرا بیلنس کیا ہے؟", "What is my balance?", "no, cancel that"]:
+        assert not is_no_speech(text), text
+
+
+async def test_no_speech_audio_turn_answers_without_running_the_agent(fake_backend, wired_app):
+    """A silent clip must not become a chat turn: no agent run, no persisted user message,
+    just a short spoken 'say it again' in the UI language."""
+    wire_routes(fake_backend)
+
+    class SilentTranscriber:
+        async def transcribe(self, audio, mime_type, language):
+            return "NO_SPEECH"
+
+    wired_app.state.transcriber = SilentTranscriber()
+    wired_app.state.model_override = scripted([AIMessage(content="SHOULD NOT BE USED")])
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wired_app), base_url="http://test") as client:
+        res = await client.post(
+            "/converse",
+            files={"audio": ("clip.m4a", b"\x00\x01", "audio/m4a")},
+            data={"language": "ur"},
+            headers={"Authorization": "Bearer jwt1"},
+        )
+    assert res.status_code == 200
+    body = res.text
+    assert "معاف کیجیے" in body
+    assert "event: transcript" in body and 'data: {"text": ""}' in body
+    assert "event: audio" in body and "event: done" in body
+    assert "event: card" not in body
+    # nothing was written to the chat history
+    assert not [r for r in fake_backend.requests if r.url.path.endswith("/messages")
+                and r.method == "POST"]
+
+
+async def test_narrated_silence_is_also_treated_as_no_speech(fake_backend, wired_app):
+    wire_routes(fake_backend)
+
+    class NarratingTranscriber:
+        async def transcribe(self, audio, mime_type, language):
+            return "There is no speech in the audio. The audio contains the sound of a ball bouncing."
+
+    wired_app.state.transcriber = NarratingTranscriber()
+    wired_app.state.model_override = scripted([AIMessage(content="SHOULD NOT BE USED")])
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wired_app), base_url="http://test") as client:
+        res = await client.post(
+            "/converse",
+            files={"audio": ("clip.m4a", b"\x00\x01", "audio/m4a")},
+            data={"language": "en"},
+            headers={"Authorization": "Bearer jwt1"},
+        )
+    assert res.status_code == 200
+    assert "didn't catch that" in res.text
+    assert "ball bouncing" not in res.text

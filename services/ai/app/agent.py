@@ -7,6 +7,7 @@ model only sees text.
 """
 import re
 from datetime import date
+from difflib import SequenceMatcher
 from typing import Annotated, Any, Sequence
 
 from langchain_core.language_models import BaseChatModel
@@ -26,7 +27,7 @@ call that tool — never answer with "I can help you with your banking needs"):
 | account info / my details | get_account | account |
 | change my name / Urdu name | update_profile(name?, urdu_name?) | profile |
 | switch language / bolo Urdu mein | update_profile(language) | profile |
-| what can you do / help | help | help |
+| what can you do / what can I ask / help / I don't know what to say | help | help |
 | my last transaction | list_transactions(limit=1) | receipt |
 | recent transactions | list_transactions(limit) | transactions |
 | transactions with X / of a category / in a period | list_transactions(q?, category?, from_date?, to_date?) | transactions |
@@ -38,21 +39,21 @@ call that tool — never answer with "I can help you with your banking needs"):
 | show my card | get_card | card |
 | freeze my card | freeze_card | card (instant, NO PIN) |
 | unfreeze my card | unfreeze_card | confirmation (PIN) |
-| full card number / CVV | REFUSE — say it is on the Card screen; optionally get_card | card |
+| full card number / CVV | get_card AND refuse in words (it is on the Card screen) | card |
 | my saved recipients | list_recipients | recipients |
 | delete recipient X | delete_recipient(recipient_id) after a spoken yes | text |
-| cancel that pending payment | cancel_action(action_id) | confirmation (cancelled) |
+| cancel that / never mind / I don't want it (after a confirmation) | cancel_action(action_id) | confirmation (cancelled) |
 | which bills are due | list_due_bills | bills |
-| bills I already paid | list_transactions(category='bill', from_date, to_date) | transactions |
+| bills I already paid | list_transactions(category='bills', from_date, to_date) | transactions |
 | my saved billers | list_saved_billers(browse=true) | billers |
 | delete saved biller X | delete_saved_biller(saved_biller_id) after a spoken yes | text |
 | mobile load / top up | list_telcos then recharge | telco_chips then confirmation (PIN) |
-| my pockets | list_pockets | pockets |
-| create a pocket | create_pocket | pocket |
+| my pockets / how much have I saved | list_pockets | pockets |
+| create a pocket | create_pocket (goal optional — never ask first) | pocket |
 | put money in a pocket | pocket_deposit | confirmation (PIN) |
 | take money out of a pocket | pocket_withdraw | confirmation (PIN) |
-| ask someone for money | request_money | request |
-| who owes me / my requests | list_requests(direction) | requests |
+| ask someone for money | search_recipients (if a name) then request_money(from_phone) | request |
+| who owes me / my requests | list_requests(direction) — pending only; include_history=true for the full history | requests |
 | approve request <id> | approve_request(request_id) | confirmation (PIN) |
 | decline request <id> | decline_request(request_id) after a spoken yes | text |
 | show my QR code | get_my_qr | qr |
@@ -77,10 +78,24 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — گھر کے بزر�
 - ہر پرانے جواب کے ساتھ ایک «[cards]» لائن ہو سکتی ہے جس میں پہلے دکھائے گئے کارڈ کی اصل معلومات ہوتی ہیں (institution_id، identifier، bill_id، action_id، txn id، request id، pocket id، statement id)۔ صارف کے «جی ہاں» کے بعد یہ معلومات سب سے نئی [cards] لائن سے لیں — جو بات پہلے دکھ چکی ہے وہ دوبارہ نہ پوچھیں۔ یہ لائنیں صرف آپ کے لیے ہیں: اپنے جواب میں «[cards]»، ids یا JSON کبھی نہ لکھیں۔
 
 - کارڈ والی باری صرف سنی جاتی ہے، پڑھی نہیں جاتی۔ جب کوئی ٹول کارڈ دکھائے تو ایپ آپ کا لکھا ہوا چھپا دیتی ہے اور صرف بولتی ہے۔ اس لیے زیادہ سے زیادہ دو چھوٹے جملوں میں بات کا خلاصہ کہیں — جیسے «یہ آپ کے پچھلے پانچ لین دین ہیں؛ سب سے بڑا میزان سیونگز کو ایک لاکھ بیالیس ہزار نو سو اٹھائیس روپے تھا»۔ ایک ایک قطار نہ گنوائیں، ہر عدد نہ دہرائیں، اور نقطے، ستارے، ڈیش یا کوئی مارک ڈاؤن ہرگز نہ لکھیں۔ تفصیل کارڈ خود دکھا رہا ہے؛ آپ صرف اس کا مطلب بتائیں۔
+- کسی سے پیسے مانگنا: request_money کو فون نمبر چاہیے۔ صارف نام بتائے تو پہلے search_recipients چلائیں اور محفوظ رابطے کا نمبر لیں — نمبر تبھی پوچھیں جب اس نام سے کچھ محفوظ نہ ہو۔ «ان کا نمبر کیا ہے؟» پہلے سے نہ پوچھیں۔
+- پاکٹ بنانا: ہدف (goal) ضروری نہیں۔ نام (اور ہدف اگر بتایا ہو) کے ساتھ فوراً create_pocket چلائیں — «ہدف رکھنا ہے؟» پہلے نہ پوچھیں۔
+- پاکٹس یا بچت کا کوئی بھی سوال → list_pockets چلائیں۔ جو فہرست آپ نے اسی باری میں نہیں منگوائی، اس کا ٹول چلائیں۔ جو نتیجہ کسی ٹول نے نہیں دیا وہ کبھی نہ سنائیں؛ ٹول خالی آئے تو صاف کہہ دیں کہ کچھ نہیں ملا۔
+- «آپ کیا کر سکتی ہیں»، «میں کیا پوچھ سکتا ہوں»، اکیلا لفظ «مدد»، «سمجھ نہیں آ رہا کیا کہوں» → help ٹول چلائیں۔ اکیلا «مدد» بھی ٹول ہے، جملہ نہیں۔ اپنی خوبیاں جملوں میں نہ گنوائیں؛ جواب help کارڈ ہی ہے۔
+- جو معلومات آپ نے منگوائی نہیں، اس کا اعلان کبھی نہ کریں۔ اگر آپ کہہ رہی ہیں «یہ رہے…»، «آپ کے پاس…» اور بات لین دین، بلوں، پاکٹس، درخواستوں، اسٹیٹمنٹس، رابطوں، بلرز یا کارڈ کی ہے، تو اسی باری میں متعلقہ ٹول ضرور چلا ہونا چاہیے۔ ٹول نہ چلا ہو تو پہلے وہی چلائیں۔
+- تصدیقی کارڈ کے فوراً بعد «منسوخ کریں»، «رہنے دیں»، «نہیں چاہیے» → سب سے نئی [cards] لائن کے action_id کے ساتھ cancel_action چلائیں۔ help ہرگز نہیں۔
+- اردو الفاظ اور ان کا ٹول (یہی الفاظ سنیں تو سیدھا وہی ٹول چلائیں، پہلے کچھ نہ پوچھیں):
+  «محفوظ رابطے / میرے رابطے / کس کس کو بھیجتی ہوں» → list_recipients؛
+  «محفوظ بلر» → list_saved_billers(browse=true)؛ «واجب الادا بل / کون سے بل» → list_due_bills؛
+  «پاکٹس / بچت» → list_pockets؛ «درخواستیں / کس نے مانگے» → list_requests؛
+  «اسٹیٹمنٹس» → list_statements؛ «کارڈ» → get_card؛ «QR / کیو آر» → get_my_qr؛
+  «اکاؤنٹ / تفصیل» → get_account؛ «آخری لین دین» → list_transactions(limit=1)؛
+  «موبائل لوڈ / بیلنس ڈلوانا» → list_telcos (پہلے نیٹ ورک کی چپس، جملے میں نہ پوچھیں)؛
+  «منسوخ کریں / رہنے دیں / نہیں چاہیے» (تصدیقی کارڈ کے بعد) → cancel_action۔
 - پڑھنے والے سوال: ایک ٹول، ایک کارڈ، ایک چھوٹا جملہ۔ اکاؤنٹ کی کوئی بات بغیر ٹول کے نہ کہیں۔ نیچے کی فہرست میں سے کوئی بات ملتی ہو تو وہی ٹول چلائیں — «میں آپ کی بینکنگ میں مدد کر سکتی ہوں» جیسا گول جواب کبھی نہ دیں۔
 - «میرا آخری لین دین» → list_transactions(limit=1)، جو رسید کا کارڈ دکھاتا ہے۔
 - وقت: «پچھلا مہینہ»، «اس ہفتے»، «اگست میں»، «پچھلے سال» کو نیچے دی گئی آج کی تاریخ سے ISO تاریخوں میں بدلیں۔ دو عرصوں کا موازنہ ایک ہی spending_summary کال میں compare_from/compare_to کے ساتھ کریں۔
-- کارڈ: بند کرنا فوری ہے، PIN نہیں چاہیے۔ کھولنے کے لیے تصدیق اور PIN لازمی ہے۔ پورا کارڈ نمبر اور CVV یہاں ہوتے ہی نہیں — کوئی پوچھے تو نرمی سے کہیں کہ وہ ایپ کی کارڈ سکرین پر ہیں۔
+- کارڈ: بند کرنا فوری ہے، PIN نہیں چاہیے۔ کھولنے کے لیے تصدیق اور PIN لازمی ہے۔ پورا کارڈ نمبر اور CVV یہاں ہوتے ہی نہیں۔ کوئی پورا نمبر یا CVV مانگے تو پھر بھی get_card ضرور چلائیں تاکہ اُنہیں اپنا چھپا ہوا کارڈ نظر آئے، اور ساتھ ہی نرمی سے کہہ دیں کہ پورا نمبر ایپ کی کارڈ سکرین پر ہے۔ خالی انکار، بغیر کارڈ کے، غلط ہے — جو دکھا سکتی ہیں وہ ضرور دکھائیں۔
 - زبان بدلنے کو کہیں تو update_profile(language) چلائیں اور آگے نئی زبان میں بات کریں۔
 - مٹانے والے کام (رابطہ یا بلر مٹانا، درخواست رد کرنا، زیرِ التوا کام منسوخ کرنا): ایک بار سادہ الفاظ میں پوچھیں، «جی ہاں» سنیں، پھر کریں۔
 
@@ -90,7 +105,7 @@ call that tool — never answer with "I can help you with your banking needs"):
 | account info / my details | get_account | account |
 | change my name / Urdu name | update_profile(name?, urdu_name?) | profile |
 | switch language / bolo Urdu mein | update_profile(language) | profile |
-| what can you do / help | help | help |
+| what can you do / what can I ask / help / I don't know what to say | help | help |
 | my last transaction | list_transactions(limit=1) | receipt |
 | recent transactions | list_transactions(limit) | transactions |
 | transactions with X / of a category / in a period | list_transactions(q?, category?, from_date?, to_date?) | transactions |
@@ -102,21 +117,21 @@ call that tool — never answer with "I can help you with your banking needs"):
 | show my card | get_card | card |
 | freeze my card | freeze_card | card (instant, NO PIN) |
 | unfreeze my card | unfreeze_card | confirmation (PIN) |
-| full card number / CVV | REFUSE — say it is on the Card screen; optionally get_card | card |
+| full card number / CVV | get_card AND refuse in words (it is on the Card screen) | card |
 | my saved recipients | list_recipients | recipients |
 | delete recipient X | delete_recipient(recipient_id) after a spoken yes | text |
-| cancel that pending payment | cancel_action(action_id) | confirmation (cancelled) |
+| cancel that / never mind / I don't want it (after a confirmation) | cancel_action(action_id) | confirmation (cancelled) |
 | which bills are due | list_due_bills | bills |
-| bills I already paid | list_transactions(category='bill', from_date, to_date) | transactions |
+| bills I already paid | list_transactions(category='bills', from_date, to_date) | transactions |
 | my saved billers | list_saved_billers(browse=true) | billers |
 | delete saved biller X | delete_saved_biller(saved_biller_id) after a spoken yes | text |
 | mobile load / top up | list_telcos then recharge | telco_chips then confirmation (PIN) |
-| my pockets | list_pockets | pockets |
-| create a pocket | create_pocket | pocket |
+| my pockets / how much have I saved | list_pockets | pockets |
+| create a pocket | create_pocket (goal optional — never ask first) | pocket |
 | put money in a pocket | pocket_deposit | confirmation (PIN) |
 | take money out of a pocket | pocket_withdraw | confirmation (PIN) |
-| ask someone for money | request_money | request |
-| who owes me / my requests | list_requests(direction) | requests |
+| ask someone for money | search_recipients (if a name) then request_money(from_phone) | request |
+| who owes me / my requests | list_requests(direction) — pending only; include_history=true for the full history | requests |
 | approve request <id> | approve_request(request_id) | confirmation (PIN) |
 | decline request <id> | decline_request(request_id) after a spoken yes | text |
 | show my QR code | get_my_qr | qr |
@@ -173,6 +188,24 @@ Rules:
   your last five transactions; the largest was 142,928 rupees to Meezan Savings." Never
   enumerate the rows, never repeat every number, never use bullets, asterisks, dashes as list
   markers, or any markdown. The card already shows the detail; you say what it means.
+- ASKING SOMEONE FOR MONEY: request_money needs a phone number. If the user gives a NAME,
+  call search_recipients(name) first and use the saved recipient's identifier — only ask the
+  user for a phone number when nothing is saved under that name. Never ask "what is their
+  phone number?" before you have looked.
+- CREATING A POCKET: a goal is optional. Call create_pocket right away with the name (and the
+  goal if one was said) — do not ask "would you like to set a goal?" first.
+- ANY question about pockets/savings ("my pockets", "how much have I saved") -> call
+  list_pockets. Any question about a list you have not fetched this turn -> call its tool.
+  Never describe results ("here are your transactions with X") that no tool returned; if a
+  tool came back empty, say plainly that there are none.
+- "What can you do", "what can I ask you", a bare "help" or "menu", "I don't know what to
+  say" -> call the help tool. A one-word "help" is a tool call, never a prose answer. Never list your abilities in prose; the help card is the answer.
+- NEVER ANNOUNCE DATA YOU DID NOT FETCH. If your sentence starts like "Here is/Here are/These
+  are/You have..." about transactions, bills, pockets, requests, statements, recipients,
+  billers or a card, then a tool MUST have run this turn and produced that card. If no tool
+  ran, call it now instead of describing anything.
+- "Cancel that", "never mind", "I don't want it" right after a confirmation card -> call
+  cancel_action with the action_id from the most recent [cards] line. Do not call help.
 - READS: exactly one tool call, one card, one short sentence. Never state an account fact
   without calling its tool, and never reply "I can help you with your banking needs" when a
   row of the table below matches — call that tool instead.
@@ -182,8 +215,10 @@ Rules:
   today's date given below. To compare two periods, make ONE spending_summary call with
   compare_from/compare_to — not two separate turns.
 - CARD SAFETY: freezing is instant and needs no PIN; UNfreezing makes a confirmation card and
-  needs the PIN. The full card number and CVV do not exist here — if asked, say warmly that
-  they are on the Card screen in the app, and offer the masked card instead.
+  needs the PIN. The full card number and CVV do not exist here. If the user asks for the full
+  number or the CVV, still CALL get_card so they see their masked card, and say warmly in the
+  same breath that the full number is on the Card screen in the app. A bare refusal with no
+  card is wrong — always show what you CAN show.
 - LANGUAGE SWITCH: call update_profile(language) and reply in the new language from then on.
 - DESTRUCTIVE NON-MONEY ACTIONS (delete a recipient or saved biller, decline a request,
   cancel a pending action): ask once in plain words, then act on a clear yes.
@@ -194,7 +229,7 @@ call that tool — never answer with "I can help you with your banking needs"):
 | account info / my details | get_account | account |
 | change my name / Urdu name | update_profile(name?, urdu_name?) | profile |
 | switch language / bolo Urdu mein | update_profile(language) | profile |
-| what can you do / help | help | help |
+| what can you do / what can I ask / help / I don't know what to say | help | help |
 | my last transaction | list_transactions(limit=1) | receipt |
 | recent transactions | list_transactions(limit) | transactions |
 | transactions with X / of a category / in a period | list_transactions(q?, category?, from_date?, to_date?) | transactions |
@@ -206,21 +241,21 @@ call that tool — never answer with "I can help you with your banking needs"):
 | show my card | get_card | card |
 | freeze my card | freeze_card | card (instant, NO PIN) |
 | unfreeze my card | unfreeze_card | confirmation (PIN) |
-| full card number / CVV | REFUSE — say it is on the Card screen; optionally get_card | card |
+| full card number / CVV | get_card AND refuse in words (it is on the Card screen) | card |
 | my saved recipients | list_recipients | recipients |
 | delete recipient X | delete_recipient(recipient_id) after a spoken yes | text |
-| cancel that pending payment | cancel_action(action_id) | confirmation (cancelled) |
+| cancel that / never mind / I don't want it (after a confirmation) | cancel_action(action_id) | confirmation (cancelled) |
 | which bills are due | list_due_bills | bills |
-| bills I already paid | list_transactions(category='bill', from_date, to_date) | transactions |
+| bills I already paid | list_transactions(category='bills', from_date, to_date) | transactions |
 | my saved billers | list_saved_billers(browse=true) | billers |
 | delete saved biller X | delete_saved_biller(saved_biller_id) after a spoken yes | text |
 | mobile load / top up | list_telcos then recharge | telco_chips then confirmation (PIN) |
-| my pockets | list_pockets | pockets |
-| create a pocket | create_pocket | pocket |
+| my pockets / how much have I saved | list_pockets | pockets |
+| create a pocket | create_pocket (goal optional — never ask first) | pocket |
 | put money in a pocket | pocket_deposit | confirmation (PIN) |
 | take money out of a pocket | pocket_withdraw | confirmation (PIN) |
-| ask someone for money | request_money | request |
-| who owes me / my requests | list_requests(direction) | requests |
+| ask someone for money | search_recipients (if a name) then request_money(from_phone) | request |
+| who owes me / my requests | list_requests(direction) — pending only; include_history=true for the full history | requests |
 | approve request <id> | approve_request(request_id) | confirmation (PIN) |
 | decline request <id> | decline_request(request_id) after a spoken yes | text |
 | show my QR code | get_my_qr | qr |
@@ -287,6 +322,9 @@ class ListSavedBillersArgs(BaseModel):
 
 class ListRequestsArgs(BaseModel):
     direction: str | None = Field(None, description="'in' (people asking the user to pay) or 'out'")
+    include_history: bool = Field(
+        False, description="true only for 'show me ALL my requests' — otherwise pending only"
+    )
 
 
 class RequestIdArgs(BaseModel):
@@ -554,7 +592,8 @@ def build_tools(
              "The user's virtual debit card: last-4, masked number, expiry, frozen state. The "
              "full number and CVV are never available - they are only on the app's Card screen.", NoArgs),
         wrap(t.list_requests, "list_requests",
-             "List money requests; direction='in' for people asking the user to pay.", ListRequestsArgs),
+             "List money requests; direction='in' for people asking the user to pay. Returns "
+             "PENDING requests only unless include_history=true.", ListRequestsArgs),
         wrap(t.approve_request, "approve_request",
              "Prepare paying an incoming money request (confirmation card; PIN).", RequestIdArgs),
         wrap(t.decline_request, "decline_request",
@@ -592,6 +631,20 @@ async def run_agent(
     reject a same-turn confirmation because its own bookkeeping is per-call.
     """
     cards: list[dict[str, Any]] = []
+
+    # Pre-route: "cancel that" / «منسوخ کر دو» right after a confirmation card. Live UR:
+    # the model routed this to `help`, leaving the pending action alive. There is nothing
+    # to decide here — the action_id is in the history's own [cards] line — so cancel it
+    # directly. If the backend says it is gone or not pending, fall through to the model.
+    if _asks_to_cancel(user_text):
+        action_id = _pending_action_id(history)
+        if action_id:
+            result = await t.cancel_action(client, action_id)
+            if not result["text"].startswith("ERROR"):
+                if result.get("card"):
+                    cards.append(result["card"])
+                return CANCELLED_REPLY.get(language, CANCELLED_REPLY["en"]), cards
+
     model = model or build_model()
     agent = create_react_agent(model, build_tools(client, cards, resolved_pairs))
     messages: list[BaseMessage] = [SystemMessage(content=system_prompt(language)), *history, HumanMessage(content=user_text)]
@@ -603,7 +656,7 @@ async def run_agent(
     # card/confirmation but no tool produced one, re-prompt exactly once with the
     # tool context intact so it performs the action instead of narrating it.
     if not cards and _mentions_card(reply):
-        nudged = [*state["messages"], HumanMessage(content=NUDGE)]
+        nudged = [*state["messages"], HumanMessage(content=_nudge(NUDGE, NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
         reply = strip_cards_marker(_last_reply(state))
         extra_invocations += 1
@@ -612,17 +665,58 @@ async def run_agent(
     # tappable chips ("which bank or wallet?", "which biller / what reference number?").
     # Elderly voice-first users cannot type an institution id, so a prose question is a
     # dead end. If no tool ran this turn and the ask is one of those, re-prompt once.
-    if extra_invocations < MAX_NUDGES and not _called_a_tool(state):
-        prose_nudge = _prose_ask_nudge(user_text, reply)
-        if prose_nudge:
-            nudged = [*state["messages"], HumanMessage(content=prose_nudge)]
-            state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-            reply = strip_cards_marker(_last_reply(state))
-            extra_invocations += 1
+    # A prose chips-ask gets another attempt while budget remains: one nudge is often not
+    # enough (live: the model re-asked «کس نیٹ ورک پر لوڈ کرانا ہے؟» verbatim).
+    while extra_invocations < MAX_NUDGES and not _called_a_tool(state):
+        prose_nudge = _prose_ask_nudge(user_text, reply, language)
+        if not prose_nudge:
+            break
+        nudged = [*state["messages"], HumanMessage(content=prose_nudge)]
+        state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+        reply = strip_cards_marker(_last_reply(state))
+        extra_invocations += 1
+
+    # Guard: echoing the PREVIOUS answer. Live: after a spending card, "what can you do"
+    # was answered with the spending sentence verbatim and no tool ran — the user's new
+    # message went unanswered and the app showed nothing.
+    if extra_invocations < MAX_NUDGES and not _called_a_tool(state) and _echoes_history(reply, history):
+        nudged = [*state["messages"],
+                  HumanMessage(content=_nudge(ECHO_NUDGE, ECHO_NUDGE_UR, language))]
+        state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+        reply = strip_cards_marker(_last_reply(state))
+        extra_invocations += 1
+
+    # Guard: announcing data no tool fetched — "Here is your card." / "Here are your last
+    # five transactions." with no tool call this turn (seen live; in a chained session the
+    # model sometimes just repeats the PREVIOUS turn's answer). The app hides the text and
+    # shows the card, so this leaves the user with an empty turn.
+    if extra_invocations < MAX_NUDGES and not cards and not _called_a_tool(state) and _announces_data(reply):
+        base = _nudge(ANNOUNCE_NUDGE, ANNOUNCE_NUDGE_UR, language)
+        tool_hint = announced_tool(reply)
+        if tool_hint:
+            base += (f" Call {tool_hint} now." if language != "ur"
+                     else f" ابھی {tool_hint} چلائیں۔")
+        nudged = [*state["messages"], HumanMessage(content=base)]
+        state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+        reply = strip_cards_marker(_last_reply(state))
+        extra_invocations += 1
+
+    # Guard: the generic "I can help you with your banking needs…" non-answer. The spec
+    # treats it as a defect: a listed intent matched, so a tool must run. Seen live on a
+    # bare "help" / «مدد».
+    if extra_invocations < MAX_NUDGES and not _called_a_tool(state) and (
+        _is_generic_nonanswer(reply) or (_asks_for_help(user_text) and not cards)
+    ):
+        nudged = [*state["messages"],
+                  HumanMessage(content=_nudge(GENERIC_NONANSWER_NUDGE, GENERIC_NONANSWER_NUDGE_UR, language))]
+        state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+        reply = strip_cards_marker(_last_reply(state))
+        extra_invocations += 1
 
     # If the model's whole reply WAS the imitated marker, sanitizing left nothing to speak.
     if not reply and extra_invocations < MAX_NUDGES:
-        nudged = [*state["messages"], HumanMessage(content=NO_MARKER_NUDGE)]
+        nudged = [*state["messages"],
+                  HumanMessage(content=_nudge(NO_MARKER_NUDGE, NO_MARKER_NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
         reply = strip_cards_marker(_last_reply(state))
         extra_invocations += 1
@@ -634,8 +728,22 @@ async def run_agent(
         state = await agent.ainvoke({"messages": lang_nudged}, config={"recursion_limit": 12})
         reply = strip_cards_marker(_last_reply(state))
         extra_invocations += 1
+    # Fallback: the model asked "which network?" in prose and never called list_telcos —
+    # nudging it did not work live (it repeated the question). A voice user cannot type a
+    # network, so fetch the chips ourselves and attach them to the model's own sentence.
+    if not cards and not _called_a_tool(state) and _ASKS_TELCO_RE.search(reply):
+        result = await t.list_telcos(client)
+        if result.get("card"):
+            cards.append(result["card"])
+
+    global last_turn_model_calls
+    last_turn_model_calls = 1 + extra_invocations
     return spoken_text(str(reply)), cards
 
+
+# Diagnostics for the QA smoke (scripts/ai-smoke.py): how many model invocations the LAST
+# run_agent turn actually cost — 1 plus the nudges it needed. Not read by the request path.
+last_turn_model_calls: int = 0
 
 # At most this many nudge re-invocations per turn, across ALL guards (card, prose,
 # marker-echo, language) — so a turn never costs more than 1 + MAX_NUDGES model calls.
@@ -647,7 +755,33 @@ NUDGE = (
     "list_saved_billers/lookup_bill → pay_bill, or recharge / pocket_deposit / get_statement — "
     "then reply. Never describe a card that does not exist."
 )
+NUDGE_UR = (
+    "[SYSTEM CHECK] کوئی کارڈ نہیں بنا کیونکہ آپ نے کوئی ایکشن ٹول نہیں چلایا۔ ابھی چلائیں: "
+    "search_recipients/list_institutions → resolve_recipient → send_money، یا "
+    "list_saved_billers/lookup_bill → pay_bill، یا recharge / pocket_deposit / get_statement / "
+    "get_card — پھر جواب دیں۔ جو کارڈ موجود ہی نہیں اس کا ذکر کبھی نہ کریں۔"
+)
 URDU_LANGUAGE_NUDGE = "Answer in Urdu (Nastaliq script) only."
+NO_MARKER_NUDGE_UR = (
+    "[SYSTEM CHECK] آپ کا جواب اندرونی [cards] لائن تھا، بات نہیں۔ دوبارہ ایک دو سادہ بولے جانے "
+    "والے جملوں میں جواب دیں — نہ [cards]، نہ ids، نہ JSON۔"
+)
+INSTITUTION_NUDGE_UR = (
+    "[SYSTEM CHECK] آپ نے بینک/والٹ جملے میں پوچھا۔ ابھی list_institutions چلائیں تاکہ صارف کو "
+    "چھونے کے قابل چپس ملیں، پھر پوچھیں۔"
+)
+TELCO_NUDGE = (
+    "[SYSTEM CHECK] You asked which mobile network in prose. Call list_telcos now so the user "
+    "gets tappable chips, then ask."
+)
+TELCO_NUDGE_UR = (
+    "[SYSTEM CHECK] آپ نے نیٹ ورک جملے میں پوچھا۔ صارف بول کر بات کر رہا ہے، وہ نیٹ ورک ٹائپ نہیں "
+    "کر سکتا۔ سوال دوبارہ نہ لکھیں — پہلے list_telcos چلائیں، پھر چپس کے ساتھ پوچھیں۔"
+)
+BILLER_NUDGE_UR = (
+    "[SYSTEM CHECK] آپ نے بلر/ریفرنس نمبر جملے میں پوچھا۔ ابھی list_saved_billers (یا list_billers) "
+    "چلائیں تاکہ صارف کو چھونے کے قابل چپس ملیں، پھر پوچھیں۔"
+)
 INSTITUTION_NUDGE = (
     "[SYSTEM CHECK] You asked for the bank/wallet in prose. Call list_institutions now so the "
     "user gets tappable choices, then ask."
@@ -656,6 +790,50 @@ BILLER_NUDGE = (
     "[SYSTEM CHECK] You asked for the biller/reference number in prose. Call list_saved_billers "
     "(or list_billers) now so the user gets tappable choices, then ask."
 )
+# Spoken confirmation for the deterministic cancel pre-route — no model call needed for
+# one fixed sentence.
+CANCELLED_REPLY = {
+    "en": "That is cancelled. Nothing was paid or changed.",
+    "ur": "جی، وہ منسوخ کر دیا۔ کچھ ادا نہیں ہوا۔",
+}
+
+ECHO_NUDGE = (
+    "[SYSTEM CHECK] That repeats your previous answer. Answer the user's NEW message: call "
+    "the matching tool from the intent table, then reply in one short sentence about THAT."
+)
+ECHO_NUDGE_UR = (
+    "[SYSTEM CHECK] یہ آپ کا پچھلا جواب دہرایا گیا ہے۔ صارف کے نئے پیغام کا جواب دیں: فہرست میں "
+    "سے متعلقہ ٹول چلائیں، پھر اُسی بارے میں ایک چھوٹے جملے میں بات کریں۔"
+)
+ANNOUNCE_NUDGE = (
+    "[SYSTEM CHECK] You announced data ('here is/here are…') but called no tool this turn, "
+    "so there is no card and the user sees nothing. Call the tool for what you just "
+    "described — get_card, get_transaction, list_transactions, list_pockets, list_requests, "
+    "list_due_bills, list_statements, list_recipients, list_saved_billers, get_my_qr — then "
+    "reply in one short sentence. Never repeat a previous turn's answer instead of acting."
+)
+ANNOUNCE_NUDGE_UR = (
+    "[SYSTEM CHECK] آپ نے کہا «یہ رہا/یہ رہے…» مگر اس باری میں کوئی ٹول نہیں چلایا، اس لیے کوئی "
+    "کارڈ نہیں بنا اور صارف کو کچھ نظر نہیں آ رہا۔ ابھی وہی ٹول چلائیں جس کی بات آپ نے کی — "
+    "get_card، get_transaction، list_transactions، list_pockets، list_requests، list_due_bills، "
+    "list_statements، list_recipients، list_saved_billers، get_my_qr — پھر ایک چھوٹے جملے میں "
+    "اردو میں جواب دیں۔ پچھلی باری کا جواب دہرانا منع ہے؛ پہلے کام کریں۔"
+)
+GENERIC_NONANSWER_NUDGE = (
+    "[SYSTEM CHECK] That was the generic non-answer. Do not describe what you can do in "
+    "prose: call the tool the user's words map to in the intent table — for a bare "
+    "'help'/'what can you do', call the help tool now — then reply in one short sentence."
+)
+GENERIC_NONANSWER_NUDGE_UR = (
+    "[SYSTEM CHECK] یہ گول جواب تھا۔ اپنی صلاحیتیں جملوں میں نہ گنوائیں: صارف کی بات جس ٹول سے "
+    "ملتی ہے وہی چلائیں — اکیلا «مدد» یا «آپ کیا کر سکتی ہیں» ہو تو ابھی help ٹول چلائیں — پھر "
+    "ایک چھوٹے جملے میں اردو میں جواب دیں۔"
+)
+
+
+def _nudge(en: str, ur: str, language: str) -> str:
+    """A nudge the model will actually act on: in the language of the conversation."""
+    return ur if language == "ur" else en
 NO_MARKER_NUDGE = (
     "[SYSTEM CHECK] Your reply was the internal [cards] context line, not speech. Reply again "
     "in one or two plain spoken sentences, with no [cards] marker, no ids and no JSON."
@@ -672,6 +850,10 @@ _ASKS_BILLER_RE = re.compile(
     r"کون سا بلر|کنزیومر نمبر|ریفرنس نمبر", re.IGNORECASE
 )
 _BILL_WORDS_RE = re.compile(r"\bbill\b|\bbills\b|بل", re.IGNORECASE)
+_ASKS_TELCO_RE = re.compile(
+    r"which (?:network|telco|operator|mobile network)|کون سا نیٹ ورک|کس نیٹ ورک", re.IGNORECASE
+)
+_LOAD_WORDS_RE = re.compile(r"top ?up|recharge|load|لوڈ|بیلنس ڈلوا", re.IGNORECASE)
 
 
 # Leading list markers the model sometimes emits despite the prompt rule ("* ", "- ", "• ",
@@ -695,6 +877,137 @@ def strip_cards_marker(reply: str) -> str:
     return reply if idx < 0 else reply[:idx].strip()
 
 
+# The CANNED non-answer only: "I can help you with your banking needs / with many banking
+# tasks…" (spec §4.4). Deliberately narrow — "I can help you with that, how much?" is a
+# legitimate clarification and "I cannot help you with that" a legitimate refusal; nudging
+# either would spend a model call and bury a real answer under a help card.
+_GENERIC_NONANSWER_RE = re.compile(
+    r"i can (?:help|assist) you with (?:your |the |many |all )?"
+    r"(?:banking needs|banking tasks|banking|many things|anything)"
+    r"|i can show you (?:your|the) [a-z ]{0,20}(?:and|,)"
+    r"|here (?:is|are) (?:a )?(?:list of )?(?:some )?things i can"
+    r"|میں آپ کی (?:بینکنگ|ہر طرح کی)"
+    r"|میں آپ کی مدد کے لیے حاضر ہوں",
+    re.IGNORECASE,
+)
+
+
+# "Here is your card." / "Here are your last five transactions." / «یہ رہا آپ کا کارڈ» —
+# a sentence that presents data. Only meaningful when NO tool ran this turn.
+_ANNOUNCES_DATA_RE = re.compile(
+    r"\b(?:here (?:is|are)|these are|this is)\b.{0,40}?"
+    r"\b(?:card|transaction|transactions|receipt|statement|statements|bill|bills|biller|billers|"
+    r"pocket|pockets|request|requests|recipient|recipients|balance|spending|qr)\b"
+    r"|یہ (?:رہا|رہے|رہی)|یہ آپ کے|آپ کے (?:پاس|حالیہ)",
+    re.IGNORECASE,
+)
+
+
+# The noun the model announced -> the one tool that produces it. Naming the tool in the
+# nudge is far more reliable than listing all of them ("Here are your saved recipients."
+# survived a generic nudge live).
+_ANNOUNCED_NOUN_TOOLS: list[tuple[str, str]] = [
+    (r"recipient|رابط", "list_recipients"),
+    (r"saved biller|billers|بلر", "list_saved_billers(browse=true)"),
+    (r"bills? due|due bills?|واجب الادا", "list_due_bills"),
+    (r"statement|اسٹیٹمنٹ", "list_statements"),
+    (r"pocket|پاکٹ", "list_pockets"),
+    (r"request|درخواست", "list_requests"),
+    (r"qr|کیو آر", "get_my_qr"),
+    (r"card|کارڈ", "get_card"),
+    (r"receipt|رسید", "get_transaction"),
+    (r"transaction|لین دین", "list_transactions"),
+    (r"spend|spending|خرچ", "spending_summary"),
+    (r"balance|بیلنس", "get_balance"),
+]
+
+
+def announced_tool(reply: str) -> str | None:
+    """Which tool the announced noun points at, if exactly one obviously fits."""
+    text = (reply or "").lower()
+    for pattern, tool in _ANNOUNCED_NOUN_TOOLS:
+        if re.search(pattern, text, re.IGNORECASE):
+            return tool
+    return None
+
+
+_PUNCT_RE = re.compile(r"[\s\.,!\?۔،؟:;\-—()«»\"']+")
+
+
+def _normalise_for_echo(text: str) -> str:
+    return _PUNCT_RE.sub(" ", (text or "").lower()).strip()
+
+
+def _echoes_history(reply: str, history: Sequence[BaseMessage]) -> bool:
+    """Is this reply (near-)identical to the last assistant reply in history? The `[cards]`
+    context line is stripped first — it is bookkeeping, not speech."""
+    current = _normalise_for_echo(reply)
+    if len(current) < 15:  # "ok"/"جی ٹھیک ہے" legitimately repeats
+        return False
+    for message in reversed(list(history)):
+        if isinstance(message, AIMessage):
+            previous = _normalise_for_echo(strip_cards_marker(_content_text(message.content)))
+            if not previous:
+                return False
+            return SequenceMatcher(None, current, previous).ratio() >= 0.9
+    return False
+
+
+def _announces_data(reply: str) -> bool:
+    return bool(_ANNOUNCES_DATA_RE.search(reply or ""))
+
+
+# A bare "help" / «مدد» / "what can you do" — the whole message, not a passing mention.
+_BARE_HELP_RE = re.compile(
+    r"^\W*(?:help|menu|options|what can you do\??|what can i ask(?: you)?\??|"
+    r"مدد|مینو|آپ کیا (?:کیا )?کر سکتی ہیں؟?|میں (?:آپ سے )?کیا پوچھ سکتا ہوں؟?)\W*$",
+    re.IGNORECASE,
+)
+
+
+# "cancel that/it", "never mind", "forget it" / «منسوخ», «رہنے دو», «کینسل», «نہیں چاہیے».
+_ASKS_TO_CANCEL_RE = re.compile(
+    r"\b(?:cancel(?:\s+(?:that|it|this|the\s+\w+))?|never\s?mind|forget\s+it|"
+    r"don'?t\s+(?:do|want)\s+it)\b"
+    r"|منسوخ|کینسل|رہنے (?:دو|دیں)|نہیں چاہیے|چھوڑ (?:دو|دیں)",
+    re.IGNORECASE,
+)
+# The action_id carried by the most recent `confirmation` line of the [cards] history.
+_CARDS_ACTION_ID_RE = re.compile(r"confirmation:[^|\n]*?action_id=(\S+)")
+
+
+def _asks_to_cancel(user_text: str) -> bool:
+    return bool(_ASKS_TO_CANCEL_RE.search(user_text or ""))
+
+
+def _pending_action_id(history: Sequence[BaseMessage]) -> str | None:
+    """The action_id of the most recent confirmation card in the windowed history."""
+    for message in reversed(list(history)):
+        if isinstance(message, AIMessage):
+            found = _CARDS_ACTION_ID_RE.search(_content_text(message.content))
+            if found:
+                return found.group(1)
+    return None
+
+
+def _asks_for_help(user_text: str) -> bool:
+    """The user asked what the assistant can do — the answer is the help CARD, so even a
+    polite "how can I help you?" back is a non-answer here."""
+    return bool(_BARE_HELP_RE.match((user_text or "").strip()))
+
+
+def _is_generic_nonanswer(reply: str) -> bool:
+    """True only for the canned ability-listing reply — never for a question the assistant
+    asks back (a clarification ends in '?'/'؟') nor for a refusal ("I cannot help…")."""
+    text = (reply or "").strip()
+    if not text or text.endswith(("?", "؟")):
+        return False
+    if re.search(r"\b(?:cannot|can'?t|can not)\b|نہیں کر سکتی|نہیں بتا سکتی|نہیں دکھا سکتی",
+                 text, re.IGNORECASE):
+        return False
+    return bool(_GENERIC_NONANSWER_RE.search(text))
+
+
 def _mentions_card(reply: str) -> bool:
     low = reply.lower()
     return any(w in low for w in _CARD_WORDS)
@@ -705,12 +1018,14 @@ def _called_a_tool(state: dict[str, Any]) -> bool:
     return any(isinstance(m, ToolMessage) for m in state.get("messages", []))
 
 
-def _prose_ask_nudge(user_text: str, reply: str) -> str | None:
-    """Which prose-instead-of-tool nudge (if any) this turn needs."""
+def _prose_ask_nudge(user_text: str, reply: str, language: str = "en") -> str | None:
+    """Which prose-instead-of-tool nudge (if any) this turn needs, in the turn's language."""
     if _ASKS_INSTITUTION_RE.search(reply) or _IDENTIFIER_RE.search(user_text):
-        return INSTITUTION_NUDGE
+        return _nudge(INSTITUTION_NUDGE, INSTITUTION_NUDGE_UR, language)
     if _ASKS_BILLER_RE.search(reply) and _BILL_WORDS_RE.search(user_text + " " + reply):
-        return BILLER_NUDGE
+        return _nudge(BILLER_NUDGE, BILLER_NUDGE_UR, language)
+    if _ASKS_TELCO_RE.search(reply) and _LOAD_WORDS_RE.search(user_text + " " + reply):
+        return _nudge(TELCO_NUDGE, TELCO_NUDGE_UR, language)
     return None
 
 

@@ -14,8 +14,30 @@ from .agent import run_agent
 from .backend_client import BackendClient, BackendError
 from .config import settings
 from .lang import reply_language
-from .stt import TranscribeProvider
+from .stt import NO_SPEECH, TranscribeProvider
 from .tts import TtsProvider
+
+
+# What the assistant says when the clip carried no speech. Never reaches the model.
+NO_SPEECH_REPLY = {
+    "en": "I didn't catch that — please say it again.",
+    "ur": "معاف کیجیے، سنائی نہیں دیا، دوبارہ کہیں۔",
+}
+# Belt and braces: older prompts (or a stubborn model) narrate the audio instead of
+# answering NO_SPEECH — "There is no speech in the audio. The audio contains…".
+_NO_SPEECH_PREFIXES = ("there is no speech", "there's no speech", "no speech",
+                       "کوئی آواز نہیں", "کوئی بات نہیں سنائی")
+
+
+def is_no_speech(transcript: str | None) -> bool:
+    """True when the clip carried nothing to answer: empty, NO_SPEECH, or a narration of
+    the sounds in it. Such a turn must never reach the model or the chat history."""
+    text = (transcript or "").strip()
+    if not text:
+        return True
+    if text.upper().strip(".!") == NO_SPEECH:
+        return True
+    return text.lower().startswith(_NO_SPEECH_PREFIXES)
 
 
 def sse(event: str, data: dict[str, Any]) -> dict[str, str]:
@@ -233,6 +255,16 @@ async def converse_turn(
             return
         if audio is not None:
             text = await transcriber.transcribe(audio, audio_mime or "audio/m4a", language)
+            if is_no_speech(text):
+                # Nothing was said: don't run the agent, don't persist a user message, and
+                # never let a narration of the noise ("...a ball bouncing") become a turn.
+                reply = NO_SPEECH_REPLY.get(language, NO_SPEECH_REPLY["en"])
+                yield sse("transcript", {"text": ""})
+                yield sse("token", {"text": reply})
+                audio_id = await tts.synthesize(reply, language)
+                yield sse("audio", {"url": f"/tts/{audio_id}"})
+                yield sse("done", {"sessionId": session_id})
+                return
             yield sse("transcript", {"text": text})
         if not text or not text.strip():
             yield sse("error", {"code": "EMPTY_INPUT", "message": "No text or audio provided"})

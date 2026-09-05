@@ -12,10 +12,14 @@ from .lang import has_devanagari_script
 
 logger = logging.getLogger(__name__)
 
+NO_SPEECH = "NO_SPEECH"
+
 TRANSCRIBE_PROMPT = (
     "The speech is in Urdu and/or English. Transcribe exactly as spoken. If it is Urdu, "
     "write it in Urdu (Perso-Arabic/Nastaliq) script — NEVER in Hindi/Devanagari script. "
-    "If English, write English. Reply with ONLY the transcript."
+    "If English, write English. Reply with ONLY the transcript. "
+    f"If there is no intelligible speech in the audio — silence, noise, music, or any other "
+    f"sound — reply with exactly {NO_SPEECH} and nothing else. Never describe the audio."
 )
 
 REDO_IN_URDU_SCRIPT_PROMPT = (

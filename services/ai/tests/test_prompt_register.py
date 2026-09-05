@@ -69,3 +69,36 @@ def test_card_turns_are_spoken_not_shown_rule_is_in_both_prompts():
     assert "ایک ایک قطار نہ گنوائیں" in ur
     assert "مارک ڈاؤن" in ur
     assert "میزان سیونگز" in ur
+
+
+def test_help_and_no_unfetched_announcement_rules_are_in_both_prompts():
+    """Live routing misses: "what can you do" answered in prose with no help card, and
+    "here are your transactions with X" announced over an empty tool result."""
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "what can I ask you" in en and "help card is the answer" in en
+    assert "NEVER ANNOUNCE DATA YOU DID NOT FETCH" in en
+    assert "a tool MUST have run this turn" in en
+    assert "cancel_action with the action_id" in en
+
+    assert "میں کیا پوچھ سکتا ہوں" in ur and "help کارڈ" in ur
+    assert "اعلان کبھی نہ کریں" in ur
+    assert "cancel_action" in ur
+
+
+def test_request_money_and_pocket_creation_rules_are_in_both_prompts():
+    en, ur = system_prompt("en"), system_prompt("ur")
+    assert "call search_recipients(name) first" in en and "a goal is optional" in en
+    assert "search_recipients" in ur and "ہدف (goal) ضروری نہیں" in ur
+
+
+def test_urdu_prompt_maps_urdu_wordings_to_the_read_tools():
+    """Live UR miss: «میرے محفوظ رابطے دکھائیں» was answered in prose with no tool."""
+    ur = system_prompt("ur")
+    for phrase, tool in [
+        ("محفوظ رابطے", "list_recipients"), ("محفوظ بلر", "list_saved_billers"),
+        ("واجب الادا بل", "list_due_bills"), ("پاکٹس", "list_pockets"),
+        ("درخواستیں", "list_requests"), ("اسٹیٹمنٹس", "list_statements"),
+        ("کیو آر", "get_my_qr"),
+    ]:
+        assert phrase in ur, phrase
+        assert tool in ur, tool

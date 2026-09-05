@@ -35,6 +35,11 @@ MATRIX = [
      [("update_profile", {"language": "en"})], ["profile"], "/api/v1/me"),
     ("A5", "What can you do?", "آپ کیا کیا کر سکتی ہیں؟",
      [("help", {})], ["help"], None),
+    # Live misses: the same intent worded differently must still reach the help tool.
+    ("A5b", "What can I ask you?", "میں آپ سے کیا پوچھ سکتا ہوں؟",
+     [("help", {})], ["help"], None),
+    ("A5c", "help", "مدد",
+     [("help", {})], ["help"], None),
     ("T1", "What was my last transaction?", "میرا آخری لین دین کیا تھا؟",
      [("list_transactions", {"limit": 1})], ["receipt"], "/api/v1/transactions"),
     ("T2", "Show my recent transactions", "میرے حالیہ لین دین دکھائیں",

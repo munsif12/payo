@@ -3,7 +3,8 @@
 Every tool returns {"text": <what the model reads>, "card": <Card dict for the app> | None}.
 Write tools only ever CREATE pending actions — the human tap + PIN in the app executes.
 """
-from datetime import datetime
+from calendar import monthrange
+from datetime import date, datetime
 from typing import Any
 
 from .backend_client import BackendClient, BackendError
@@ -19,6 +20,77 @@ from .cards import (
 from .config import settings
 
 Result = dict[str, Any]
+
+
+URDU_MONTHS = ["جنوری", "فروری", "مارچ", "اپریل", "مئی", "جون",
+               "جولائی", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"]
+EN_MONTHS = ["January", "February", "March", "April", "May", "June",
+             "July", "August", "September", "October", "November", "December"]
+EN_MONTHS_SHORT = [m[:3] for m in EN_MONTHS]
+
+
+def _parse_iso(value: str | None) -> date | None:
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def period_label(from_date: str | None, to_date: str | None) -> Bilingual:
+    """A human period label for a card. ISO dates stay in the tool arguments — this is only
+    what the user reads/hears: a whole calendar month becomes "August 2026" / «اگست 2026»,
+    a whole year "2026", and anything else a spoken range ("1-15 Aug 2026")."""
+    start, end = _parse_iso(from_date), _parse_iso(to_date)
+    if start and end and end >= start:
+        last_day = monthrange(start.year, start.month)[1]
+        if start.day == 1 and start.month == end.month and start.year == end.year and end.day == last_day:
+            return Bilingual(en=f"{EN_MONTHS[start.month - 1]} {start.year}",
+                             ur=f"{URDU_MONTHS[start.month - 1]} {start.year}")
+        if (start.month, start.day) == (1, 1) and (end.month, end.day) == (12, 31) and start.year == end.year:
+            return Bilingual(en=str(start.year), ur=str(start.year))
+        if start.year == end.year and start.month == end.month:
+            return Bilingual(
+                en=f"{start.day}-{end.day} {EN_MONTHS_SHORT[start.month - 1]} {start.year}",
+                ur=f"{start.day}-{end.day} {URDU_MONTHS[start.month - 1]} {start.year}",
+            )
+        return Bilingual(en=f"{_day_en(start)} - {_day_en(end)}", ur=f"{_day_ur(start)} تا {_day_ur(end)}")
+    if start:
+        return Bilingual(en=f"since {_day_en(start)}", ur=f"{_day_ur(start)} سے")
+    if end:
+        return Bilingual(en=f"up to {_day_en(end)}", ur=f"{_day_ur(end)} تک")
+    return Bilingual(en="All time", ur="مکمل مدت")
+
+
+def _day_en(d: date) -> str:
+    return f"{d.day} {EN_MONTHS_SHORT[d.month - 1]} {d.year}"
+
+
+def _day_ur(d: date) -> str:
+    return f"{d.day} {URDU_MONTHS[d.month - 1]} {d.year}"
+
+
+def _statement_period(item: dict[str, Any]) -> Bilingual:
+    """The list DTO carries year/month, not a rendered period (unlike POST /statements)."""
+    period = item.get("period")
+    if period:
+        return Bilingual(en=period["en"], ur=period["ur"])
+    year, month = item.get("year"), item.get("month")
+    if year and month:
+        return Bilingual(en=f"{EN_MONTHS[month - 1]} {year}", ur=f"{URDU_MONTHS[month - 1]} {year}")
+    if year:
+        return Bilingual(en=str(year), ur=str(year))
+    return Bilingual(en="All time", ur="پوری مدت")
+
+
+# The seeded categories are plural ("bills"); the model naturally passes the singular it
+# read in the user's words ("show the bills I paid" -> category='bill'), which matches
+# nothing. Normalise instead of returning an empty list.
+CATEGORY_ALIASES = {
+    "bill": "bills", "utility": "bills", "utilities": "bills",
+    "groceries": "food", "grocery": "food", "eating out": "food",
+    "travel": "transport", "top-up": "recharge", "topup": "recharge", "mobile load": "recharge",
+    "saving": "savings", "transfers": "transfer", "salary": "income",
+}
 
 
 def _rs(paisa: int) -> str:
@@ -92,6 +164,7 @@ async def list_transactions(client: BackendClient, q: str | None = None, categor
     card for that single transaction; any other limit emits a `transactions` card. No
     separate flag - the limit itself is the switch (spec 4.3).
     """
+    category = CATEGORY_ALIASES.get((category or "").strip().lower(), category)
     try:
         data = await client.transactions(
             q=q, category=category, limit=min(limit, 10), **{"from": from_date, "to": to_date}
@@ -100,7 +173,18 @@ async def list_transactions(client: BackendClient, q: str | None = None, categor
         return _fail(e)
     items = [Txn(**t) for t in data["items"]]
     if not items:
-        return _ok("No transactions found.")
+        # Be explicit about the filter that came back empty: the model must say so rather
+        # than presenting an imaginary list ("Here are your transactions with X").
+        what = ", ".join(
+            part for part in [
+                f"matching '{q}'" if q else "", f"in category {category}" if category else "",
+                f"from {from_date}" if from_date else "", f"to {to_date}" if to_date else "",
+            ] if part
+        )
+        return _ok(
+            f"No transactions found{' ' + what if what else ''}. Tell the user plainly that "
+            "there are none - do NOT present a list or claim results were found."
+        )
     if limit == 1:
         return _ok(_receipt_text(items[0]), _receipt_card(items[0]))
     lines = [
@@ -162,14 +246,6 @@ def _category_label(category: str) -> Bilingual:
     return CATEGORY_LABELS.get(category, Bilingual(en=category.title(), ur=category))
 
 
-def _period_label(from_date: str | None, to_date: str | None) -> Bilingual:
-    if from_date and to_date:
-        return Bilingual(en=f"{from_date} to {to_date}", ur=f"{from_date} \u062a\u0627 {to_date}")
-    if from_date:
-        return Bilingual(en=f"since {from_date}", ur=f"{from_date} \u0633\u06d2")
-    return Bilingual(en="All time", ur="\u0645\u06a9\u0645\u0644 \u0645\u062f\u062a")
-
-
 async def spending_summary(client: BackendClient, from_date: str | None = None, to_date: str | None = None,
                            compare_from: str | None = None, compare_to: str | None = None) -> Result:
     """Spending totals by category for a period, optionally against a previous period.
@@ -201,7 +277,7 @@ async def spending_summary(client: BackendClient, from_date: str | None = None, 
         prev_out = prev["totalOutPaisa"]
         delta = total_out - prev_out
         compare = SpendingCompare(
-            period=_period_label(compare_from, compare_to),
+            period=period_label(compare_from, compare_to),
             totalOutPaisa=prev_out, deltaPaisa=delta,
             deltaPct=round(delta / prev_out * 100, 1) if prev_out else None,
         )
@@ -211,7 +287,7 @@ async def spending_summary(client: BackendClient, from_date: str | None = None, 
             + (f" ({compare.deltaPct:+.1f}%)." if compare.deltaPct is not None else ".")
         )
     card = SpendingCard(
-        period=_period_label(from_date, to_date),
+        period=period_label(from_date, to_date),
         totalOutPaisa=total_out, totalInPaisa=data["totalInPaisa"],
         byCategory=cats, compare=compare,
     )
@@ -562,16 +638,28 @@ def _request_fields(r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def list_requests(client: BackendClient, direction: str | None = None) -> Result:
+async def list_requests(client: BackendClient, direction: str | None = None,
+                        include_history: bool = False) -> Result:
     """Money requests. direction='in' = people asking the user to pay (approvable);
-    direction='out' = the user's own requests to others."""
+    direction='out' = the user's own requests to others.
+
+    PENDING ONLY by default — "who owes me money" must not render a card full of declined
+    and settled history. `include_history=True` is the explicit "show me all my requests"
+    intent.
+    """
     try:
         data = await client.requests(direction)
     except BackendError as e:
         return _fail(e)
-    if not data["items"]:
-        return _ok("No money requests.")
-    items = [RequestItem(**_request_fields(r)) for r in data["items"]]
+    rows = data["items"] if include_history else [r for r in data["items"] if r["status"] == "pending"]
+    if not rows:
+        if data["items"] and not include_history:
+            return _ok(
+                "No PENDING money requests (only settled or declined ones). Tell the user "
+                "plainly that nobody is waiting on them right now."
+            )
+        return _ok("No money requests at all. Tell the user plainly that there are none.")
+    items = [RequestItem(**_request_fields(r)) for r in rows]
     lines = [
         f"{i.direction} {i.status}: {_rs(i.amountPaisa)} "
         f"{'from' if i.direction == 'out' else 'to'} {i.counterparty.name} (request id {i.requestId})"
@@ -644,14 +732,21 @@ async def delete_saved_biller(client: BackendClient, saved_biller_id: str) -> Re
 
 
 async def cancel_action(client: BackendClient, action_id: str) -> Result:
-    """Cancel a pending action the user no longer wants to confirm."""
+    """Cancel a pending action the user no longer wants to confirm.
+
+    POST /actions/:id/cancel answers `{cancelled: true}`, not the action DTO, so there is
+    usually nothing to build a card from — the reply is plain text. If a future backend
+    returns the cancelled action, the card is emitted (marked done, PIN sheet suppressed).
+    """
     try:
         action = await client.cancel_action(action_id)
     except BackendError as e:
         return _fail(e)
+    if not isinstance(action, dict) or "id" not in action:
+        return _ok("That pending action is cancelled. Nothing was paid or changed.")
     card = confirmation_from_action(action)
     card.autoOpenPin = False  # nothing left to confirm
-    return _ok("That pending action is cancelled.", card)
+    return _ok("That pending action is cancelled. Nothing was paid or changed.", card)
 
 
 async def list_telcos(client: BackendClient) -> Result:
@@ -678,17 +773,22 @@ async def list_statements(client: BackendClient) -> Result:
         return _fail(e)
     items = data["items"]
     if not items:
-        return _ok("No statements generated yet. Call get_statement for a period to make one.")
+        return _ok(
+            "No statements have been generated yet. Offer to make one for a month - "
+            "get_statement(year, month) creates it."
+        )
     summaries = [
         StatementSummary(
-            statementId=i["statementId"], period=Bilingual(**i["period"]),
+            statementId=i.get("statementId") or i["id"], period=_statement_period(i),
             totalInPaisa=i["totalInPaisa"], totalOutPaisa=i["totalOutPaisa"],
-            downloadUrl=i.get("downloadUrl") or f"{settings.backend_base_url}/statements/{i['statementId']}/pdf",
+            downloadUrl=i.get("downloadUrl")
+            or f"{settings.backend_base_url}/statements/{i.get('statementId') or i['id']}/pdf",
         )
         for i in items
     ]
     return _ok(
-        "Statements: " + "; ".join(f"{x.period.en} (id {x.statementId})" for x in summaries),
+        "Statements: " + "; ".join(f"{x.period.en} (id {x.statementId})" for x in summaries)
+        + ". A statements card was shown.",
         StatementsCard(items=summaries),
     )
 

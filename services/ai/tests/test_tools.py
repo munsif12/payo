@@ -381,3 +381,99 @@ async def test_cancel_action_returns_a_cancelled_confirmation_that_does_not_open
     r = await tools.cancel_action(await client_for(fake_backend), "act1")
     assert r["card"]["kind"] == "confirmation"
     assert r["card"]["autoOpenPin"] is False
+
+
+async def test_list_statements_maps_the_backend_list_dto(fake_backend):
+    """GET /statements items carry `id` + year/month — not `statementId`/`period`."""
+    fake_backend.route("GET", "/api/v1/statements", {"items": [
+        {"id": "st1", "year": 2026, "month": 8, "totalInPaisa": 500000, "totalOutPaisa": 320000, "txnCount": 11},
+        {"id": "st2", "year": 2025, "totalInPaisa": 100, "totalOutPaisa": 50, "txnCount": 1},
+    ]})
+    r = await tools.list_statements(await client_for(fake_backend))
+    assert r["card"]["kind"] == "statements"
+    assert r["card"]["items"][0]["statementId"] == "st1"
+    assert r["card"]["items"][0]["period"] == {"en": "August 2026", "ur": "اگست 2026"}
+    assert r["card"]["items"][0]["downloadUrl"].endswith("/statements/st1/pdf")
+    assert r["card"]["items"][1]["period"] == {"en": "2025", "ur": "2025"}
+
+
+async def test_empty_filtered_transactions_tells_the_model_to_say_there_are_none(fake_backend):
+    fake_backend.route("GET", "/api/v1/transactions", {"items": []})
+    r = await tools.list_transactions(await client_for(fake_backend), q="Bilal")
+    assert r["card"] is None
+    assert "No transactions found matching 'Bilal'" in r["text"]
+    assert "do NOT present a list" in r["text"]
+
+
+def test_period_label_is_human_not_iso():
+    assert tools.period_label("2026-08-01", "2026-08-31").model_dump() == {"en": "August 2026", "ur": "اگست 2026"}
+    assert tools.period_label("2026-08-01", "2026-08-15").en == "1-15 Aug 2026"
+    assert tools.period_label("2026-08-01", "2026-08-15").ur == "1-15 اگست 2026"
+    assert tools.period_label("2026-01-01", "2026-12-31").en == "2026"
+    assert tools.period_label("2026-08-20", "2026-09-05").en == "20 Aug 2026 - 5 Sep 2026"
+    assert tools.period_label("2026-08-01", None).en == "since 1 Aug 2026"
+    assert tools.period_label(None, None).en == "All time"
+
+
+async def test_spending_card_periods_are_human_labels(fake_backend):
+    from tests.fixtures_backend import _spending_responder
+    fake_backend.route("GET", "/api/v1/transactions/spending-summary", responder=_spending_responder)
+    r = await tools.spending_summary(
+        await client_for(fake_backend), from_date="2026-08-01", to_date="2026-08-31",
+        compare_from="2026-07-01", compare_to="2026-07-31",
+    )
+    assert r["card"]["period"] == {"en": "August 2026", "ur": "اگست 2026"}
+    assert r["card"]["compare"]["period"] == {"en": "July 2026", "ur": "جولائی 2026"}
+
+
+async def test_cancel_action_handles_the_backend_cancelled_true_shape(fake_backend):
+    """POST /actions/:id/cancel returns {cancelled: true}, not the action DTO."""
+    fake_backend.route("POST", "/api/v1/actions/act1/cancel", {"cancelled": True})
+    r = await tools.cancel_action(await client_for(fake_backend), "act1")
+    assert r["card"] is None
+    assert "cancelled" in r["text"]
+
+
+async def test_transaction_category_singular_is_normalised_to_the_seeded_plural(fake_backend):
+    """Live miss: the model passed category='bill'; the data uses 'bills'."""
+    from tests.fixtures_backend import BILL_TXN
+    fake_backend.route("GET", "/api/v1/transactions", {"items": [BILL_TXN, BILL_TXN]})
+    r = await tools.list_transactions(await client_for(fake_backend), category="bill")
+    assert fake_backend.requests[0].url.params["category"] == "bills"
+    assert r["card"]["kind"] == "transactions"
+    assert tools.CATEGORY_ALIASES["topup"] == "recharge"
+
+
+def test_statement_period_never_renders_none():
+    assert tools._statement_period({"year": 2026, "month": 8}).model_dump() == {
+        "en": "August 2026", "ur": "اگست 2026"}
+    assert tools._statement_period({"year": 2026}).en == "2026"
+    assert tools._statement_period({}).model_dump() == {"en": "All time", "ur": "پوری مدت"}
+    assert tools._statement_period({"period": {"en": "August 2026", "ur": "اگست 2026"}}).ur == "اگست 2026"
+
+
+async def test_list_requests_returns_pending_only_by_default(fake_backend):
+    """Live: "who owes me money" rendered a card full of declined history."""
+    from tests.fixtures_backend import REQUEST_DTO
+    declined = {**REQUEST_DTO, "id": "req9", "status": "declined"}
+    settled = {**REQUEST_DTO, "id": "req8", "status": "settled"}
+    fake_backend.route("GET", "/api/v1/requests", {"items": [declined, REQUEST_DTO, settled]})
+    r = await tools.list_requests(await client_for(fake_backend))
+    assert [i["requestId"] for i in r["card"]["items"]] == ["req1"]
+
+
+async def test_list_requests_with_only_history_emits_no_card(fake_backend):
+    from tests.fixtures_backend import REQUEST_DTO
+    fake_backend.route("GET", "/api/v1/requests", {"items": [{**REQUEST_DTO, "status": "declined"}]})
+    r = await tools.list_requests(await client_for(fake_backend))
+    assert r["card"] is None
+    assert "No PENDING money requests" in r["text"]
+
+
+async def test_list_requests_include_history_shows_everything(fake_backend):
+    from tests.fixtures_backend import REQUEST_DTO
+    fake_backend.route("GET", "/api/v1/requests", {"items": [
+        {**REQUEST_DTO, "id": "req9", "status": "declined"}, REQUEST_DTO,
+    ]})
+    r = await tools.list_requests(await client_for(fake_backend), include_history=True)
+    assert [i["requestId"] for i in r["card"]["items"]] == ["req9", "req1"]
