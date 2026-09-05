@@ -79,6 +79,25 @@ Tap one; the choice returns as your reply and PAYO replies in Urdu, RTL, through
 **Say (en):** "It doesn't guess with your money — ambiguity becomes a question. Same
 brain, either language."
 
+## Flow E — Ask it anything: the whole bank as cards (1 min) — "no menus"
+
+**Say (en):** *say:* "What was my last transaction?"
+**Audience sees:** a receipt card — who, how much, when, reference, Share — and nothing
+else: no wall of text. PAYO *speaks* the gist («آپ کی آخری ادائیگی PTCL کو…» in Urdu
+mode) while the card carries the detail.
+**Say (en):** *say:* "What did I spend last month compared to the month before?"
+**Audience sees:** a spending card — total out/in, bars by category, and a red/green
+"more/less than July" row.
+**Say (en):** *say:* "Show my card." then "Freeze my card." then "Unfreeze my card."
+**Audience sees:** the card, masked (last four only — the full number stays on the Card
+screen); freeze is instant; unfreeze opens the PIN sheet *by itself* — the spoken request
+was the confirmation. The same auto-PIN applies to every money action: say "yes" and the
+sheet appears, no Confirm tap.
+**Say (en):** *say:* "Switch to Urdu." — the whole app flips and PAYO answers in Urdu from
+here on. Try «مدد» for the help card, «میرے بچت والے پاکٹ دکھاؤ» for pockets.
+**Say (en):** "Every screen in the classic app has a spoken equivalent, and every answer
+is a card — because our users don't read menus, they ask."
+
 ## Flow D — Classic layer: Wallet / Activity (45 s)
 
 **Say (en):** "Everything the AI can do, your hands can do too — that's the second

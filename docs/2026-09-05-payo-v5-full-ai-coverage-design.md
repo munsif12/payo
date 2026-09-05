@@ -50,7 +50,7 @@ security-sensitive → confirmation card + PIN sheet.
 | C4 | Card | Full number / CVV | prompt rule: refuse, point to Card screen | `card` + text | – | 🆕 rule |
 | R1 | Recipients | List saved | `list_recipients` | `recipients` | – | 🆕 |
 | R2 | Recipients | Delete | `delete_recipient(id)` after chat confirm | text | – | 🆕 |
-| R3 | Actions | Cancel pending | `cancel_action(action_id)` | `confirmation` marked cancelled | – | 🆕 |
+| R3 | Actions | Cancel pending | `cancel_action(action_id)` | text only ("cancelled") — a confirmation card would show a Confirm button for a dead action; the backend returns `{cancelled:true}` | – | 🆕 |
 | B1 | Bills | Due bills | `list_due_bills` | `bills` (list) | – | 🟡 card |
 | B2 | Bills | Paid bills history | `list_transactions(category='bill', from, to)` | `transactions` | – | 🆕 routing |
 | B3 | Bills | Saved billers list / delete | `list_saved_billers` / `delete_saved_biller` | `billers` / text | – | 🆕 |
