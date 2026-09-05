@@ -20,6 +20,7 @@ def test_confirmation_card_golden():
         "feePaisa": 0,
         "requiresPin": True,
         "expiresAt": "2026-09-02T12:00:00.000Z",
+        "autoOpenPin": True,
     }
 
 

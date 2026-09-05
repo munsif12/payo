@@ -8,9 +8,13 @@ from typing import Any
 
 from .backend_client import BackendClient, BackendError
 from .cards import (
-    BalanceCard, BillCard, BillerChip, BillerChipsCard, Bilingual, InstitutionChip,
-    InstitutionChipsCard, InstitutionRef, PocketCard, RecipientCard, RecipientChip,
-    RecipientChipsCard, StatementCard, TransactionsCard, Txn, confirmation_from_action,
+    AccountCard, BalanceCard, BillCard, BillItem, BillerChip, BillerChipsCard, BillersCard,
+    BillsCard, Bilingual, CardCard, HelpCard, HelpIntent, InstitutionChip,
+    InstitutionChipsCard, InstitutionRef, PocketCard, PocketItem, PocketsCard, ProfileCard,
+    QrCard, ReceiptCard, RecipientCard, RecipientChip, RecipientChipsCard, RecipientsCard,
+    RequestCard, RequestCounterparty, RequestItem, RequestsCard, SpendingCard,
+    SpendingCategory, SpendingCompare, StatementCard, StatementSummary, StatementsCard,
+    TelcoChip, TelcoChipsCard, TransactionsCard, Txn, confirmation_from_action,
 )
 from .config import settings
 
@@ -58,6 +62,18 @@ async def _biller_id_by_name(client: BackendClient, name: str) -> str | None:
     return loose[0]["id"] if len(loose) == 1 else None
 
 
+def _confirm_text(prefix: str, action: dict[str, Any]) -> str:
+    """Confirmation wording that follows the pending-action DTO rather than assuming it.
+    Whether a PIN is needed is the backend's call (`requiresPin`), so the sentence the model
+    reads — and repeats to the user — is derived from it, never hardcoded per tool."""
+    gate = (
+        "the user must tap confirm and enter their PIN"
+        if action.get("requiresPin")
+        else "the user must tap confirm (no PIN needed)"
+    )
+    return f"{prefix} - a confirmation card is shown; {gate}. Do not claim it is done yet."
+
+
 async def get_balance(client: BackendClient) -> Result:
     try:
         me = await client.me()
@@ -67,28 +83,143 @@ async def get_balance(client: BackendClient) -> Result:
     return _ok(f"Current balance is {_rs(paisa)} ({paisa} paisa).", BalanceCard(balancePaisa=paisa))
 
 
-async def list_transactions(client: BackendClient, category: str | None = None, limit: int = 5) -> Result:
+async def list_transactions(client: BackendClient, q: str | None = None, category: str | None = None,
+                            from_date: str | None = None, to_date: str | None = None,
+                            limit: int = 5) -> Result:
+    """List transactions, newest first.
+
+    Card contract: `limit == 1` is the "last transaction" intent and emits a **receipt**
+    card for that single transaction; any other limit emits a `transactions` card. No
+    separate flag - the limit itself is the switch (spec 4.3).
+    """
     try:
-        data = await client.transactions(category=category, limit=min(limit, 10))
+        data = await client.transactions(
+            q=q, category=category, limit=min(limit, 10), **{"from": from_date, "to": to_date}
+        )
     except BackendError as e:
         return _fail(e)
     items = [Txn(**t) for t in data["items"]]
+    if not items:
+        return _ok("No transactions found.")
+    if limit == 1:
+        return _ok(_receipt_text(items[0]), _receipt_card(items[0]))
     lines = [
         f"{t.createdAt[:10]} {'+' if t.direction == 'in' else '-'}{_rs(t.amountPaisa)} {t.counterparty.name} ({t.category})"
         for t in items
     ]
-    return _ok("Recent transactions:\n" + "\n".join(lines) if lines else "No transactions found.",
-               TransactionsCard(items=items) if items else None)
+    total_out = sum(t.amountPaisa for t in items if t.direction == "out")
+    total_in = sum(t.amountPaisa for t in items if t.direction == "in")
+    return _ok(
+        "Recent transactions:\n" + "\n".join(lines)
+        + f"\nTotal out {_rs(total_out)}, total in {_rs(total_in)}.",
+        TransactionsCard(items=items),
+    )
 
 
-async def spending_summary(client: BackendClient, from_date: str | None = None, to_date: str | None = None) -> Result:
+def _receipt_card(txn: Txn) -> ReceiptCard:
+    sign = "+" if txn.direction == "in" else "-"
+    return ReceiptCard(
+        txn=txn,
+        shareText=Bilingual(
+            en=f"PAYO: {sign}{_rs(txn.amountPaisa)} {txn.counterparty.name} on {txn.createdAt[:10]} (ref {txn.refNo})",
+            ur=f"PAYO: {sign}{_rs(txn.amountPaisa)} {txn.counterparty.urduName or txn.counterparty.name}"
+               f" - {txn.createdAt[:10]} (\u0631\u06cc\u0641\u0631\u0646\u0633 {txn.refNo})",
+        ),
+    )
+
+
+def _receipt_text(txn: Txn) -> str:
+    sign = "+" if txn.direction == "in" else "-"
+    return (
+        f"Last transaction: {txn.createdAt[:10]} {sign}{_rs(txn.amountPaisa)} "
+        f"{txn.counterparty.name} ({txn.category}), status {txn.status}, ref {txn.refNo}, "
+        f"txn id {txn.id}. A receipt card was shown."
+    )
+
+
+async def get_transaction(client: BackendClient, transaction_id: str) -> Result:
+    try:
+        data = await client.transaction(transaction_id)
+    except BackendError as e:
+        return _fail(e)
+    txn = Txn(**data)
+    return _ok(_receipt_text(txn), _receipt_card(txn))
+
+
+CATEGORY_LABELS: dict[str, Bilingual] = {
+    "food": Bilingual(en="Food", ur="\u06a9\u06be\u0627\u0646\u0627"),
+    "transport": Bilingual(en="Transport", ur="\u0633\u0641\u0631"),
+    "bills": Bilingual(en="Bills", ur="\u0628\u0644"),
+    "bill": Bilingual(en="Bills", ur="\u0628\u0644"),
+    "recharge": Bilingual(en="Mobile load", ur="\u0645\u0648\u0628\u0627\u0626\u0644 \u0644\u0648\u0688"),
+    "savings": Bilingual(en="Savings", ur="\u0628\u0686\u062a"),
+    "transfer": Bilingual(en="Transfers", ur="\u0645\u0646\u062a\u0642\u0644\u06cc"),
+    "income": Bilingual(en="Income", ur="\u0622\u0645\u062f\u0646\u06cc"),
+}
+
+
+def _category_label(category: str) -> Bilingual:
+    return CATEGORY_LABELS.get(category, Bilingual(en=category.title(), ur=category))
+
+
+def _period_label(from_date: str | None, to_date: str | None) -> Bilingual:
+    if from_date and to_date:
+        return Bilingual(en=f"{from_date} to {to_date}", ur=f"{from_date} \u062a\u0627 {to_date}")
+    if from_date:
+        return Bilingual(en=f"since {from_date}", ur=f"{from_date} \u0633\u06d2")
+    return Bilingual(en="All time", ur="\u0645\u06a9\u0645\u0644 \u0645\u062f\u062a")
+
+
+async def spending_summary(client: BackendClient, from_date: str | None = None, to_date: str | None = None,
+                           compare_from: str | None = None, compare_to: str | None = None) -> Result:
+    """Spending totals by category for a period, optionally against a previous period.
+
+    With compare_from/compare_to the card's `compare` block carries the previous period's
+    out-total, `deltaPaisa` (current - previous) and `deltaPct` (rounded to 1 decimal;
+    None when the previous period spent nothing, since the percentage is undefined).
+    """
     try:
         data = await client.spending_summary(**{"from": from_date, "to": to_date})
     except BackendError as e:
         return _fail(e)
-    cats = ", ".join(f"{c['category']}: {_rs(c['totalPaisa'])} ({c['count']}x)" for c in data["byCategory"])
+    total_out = data["totalOutPaisa"]
+    cats = [
+        SpendingCategory(
+            category=c["category"], label=_category_label(c["category"]),
+            totalPaisa=c["totalPaisa"], count=c["count"],
+            share=round(c["totalPaisa"] / total_out, 4) if total_out else 0.0,
+        )
+        for c in data["byCategory"]
+    ]
+    compare: SpendingCompare | None = None
+    compare_text = ""
+    if compare_from or compare_to:
+        try:
+            prev = await client.spending_summary(**{"from": compare_from, "to": compare_to})
+        except BackendError as e:
+            return _fail(e)
+        prev_out = prev["totalOutPaisa"]
+        delta = total_out - prev_out
+        compare = SpendingCompare(
+            period=_period_label(compare_from, compare_to),
+            totalOutPaisa=prev_out, deltaPaisa=delta,
+            deltaPct=round(delta / prev_out * 100, 1) if prev_out else None,
+        )
+        direction = "more" if delta > 0 else "less"
+        compare_text = (
+            f" Previous period out {_rs(prev_out)} - {_rs(abs(delta))} {direction}"
+            + (f" ({compare.deltaPct:+.1f}%)." if compare.deltaPct is not None else ".")
+        )
+    card = SpendingCard(
+        period=_period_label(from_date, to_date),
+        totalOutPaisa=total_out, totalInPaisa=data["totalInPaisa"],
+        byCategory=cats, compare=compare,
+    )
+    cat_text = ", ".join(f"{c.category}: {_rs(c.totalPaisa)} ({c.count}x)" for c in cats)
     return _ok(
-        f"Money in {_rs(data['totalInPaisa'])}, money out {_rs(data['totalOutPaisa'])}. By category: {cats or 'none'}."
+        f"Money in {_rs(data['totalInPaisa'])}, money out {_rs(total_out)}. "
+        f"By category: {cat_text or 'none'}.{compare_text}",
+        card,
     )
 
 
@@ -263,28 +394,40 @@ async def list_due_bills(client: BackendClient) -> Result:
     items = data["items"]
     if not items:
         return _ok("No bills currently due.")
-    cards = []
-    lines = []
-    for b in items:
-        biller = b["biller"]
-        consumer = b.get("consumerName") or b["consumerNo"]
-        card = BillCard(
-            billId=b["billId"], biller=biller["name"], consumerName=consumer,
+    bills = [
+        BillItem(
+            billId=b["billId"], biller=b["biller"]["name"],
+            consumerName=b.get("consumerName") or b["consumerNo"],
             amountPaisa=b["amountPaisa"], dueDate=b["dueDate"], month=b["month"],
         )
-        cards.append(card.model_dump(exclude_none=True))
-        lines.append(
-            f"{biller['name']}: {_rs(b['amountPaisa'])}, due {b['dueDate'][:10]}, "
-            f"month {b['month']}, billId {b['billId']}"
-        )
+        for b in items
+    ]
+    lines = [
+        f"{b.biller}: {_rs(b.amountPaisa)}, due {b.dueDate[:10]}, month {b.month}, billId {b.billId}"
+        for b in bills
+    ]
     text = (
-        f"{len(items)} bill(s) due:\n" + "\n".join(lines)
+        f"{len(bills)} bill(s) due:\n" + "\n".join(lines)
         + ". If exactly one bill is due, call pay_bill(bill_id) immediately."
     )
-    return {"text": text, "card": cards}
+    return _ok(text, BillsCard(items=bills))
 
 
-async def list_saved_billers(client: BackendClient) -> Result:
+def _biller_chip(b: dict[str, Any]) -> BillerChip:
+    return BillerChip(
+        savedBillerId=b["id"], billerId=b["biller"]["id"], name=b["biller"]["name"],
+        urduName=b["biller"].get("urduName"), consumerNo=b["consumerNo"],
+    )
+
+
+async def list_saved_billers(client: BackendClient, browse: bool = False) -> Result:
+    """The user's saved billers.
+
+    `browse=True` is the "show me my saved billers" intent and always emits a `billers`
+    card. The default (`browse=False`) is the pay-a-bill flow: one saved biller returns a
+    plain text pointer so the model proceeds straight to lookup_bill/pay_bill, several
+    return a `biller_chips` card to disambiguate.
+    """
     try:
         data = await client.saved_billers()
     except BackendError as e:
@@ -295,6 +438,14 @@ async def list_saved_billers(client: BackendClient) -> Result:
             "No saved billers. Ask the user for the biller and reference/consumer number, "
             "then call list_billers and lookup_bill."
         )
+    if browse:
+        chips = [_biller_chip(b) for b in items]
+        return _ok(
+            "Saved billers: "
+            + "; ".join(f"{c.name} ({c.consumerNo}, savedBillerId {c.savedBillerId})" for c in chips)
+            + ". A billers card was shown.",
+            BillersCard(items=chips),
+        )
     if len(items) == 1:
         b = items[0]
         return _ok(
@@ -302,13 +453,7 @@ async def list_saved_billers(client: BackendClient) -> Result:
             f"consumer {b['consumerNo']}, biller_id {b['biller']['id']}, savedBillerId {b['id']}. "
             "Call lookup_bill(biller_id, consumer_no) then pay_bill — do not ask the user again."
         )
-    chips = [
-        BillerChip(
-            savedBillerId=b["id"], billerId=b["biller"]["id"], name=b["biller"]["name"],
-            urduName=b["biller"].get("urduName"), consumerNo=b["consumerNo"],
-        )
-        for b in items
-    ]
+    chips = [_biller_chip(b) for b in items]
     card = BillerChipsCard(
         prompt=Bilingual(en="Which saved biller?", ur="کون سا محفوظ شدہ بلر؟"),
         billers=chips,
@@ -335,43 +480,326 @@ async def list_pockets(client: BackendClient) -> Result:
         return _fail(e)
     if not data["items"]:
         return _ok("No savings pockets yet.")
-    p = data["items"][0]
-    card = PocketCard(
-        pocketId=p["id"], name=p["name"], urduName=p.get("urduName"), emoji=p["emoji"],
-        balancePaisa=p["balancePaisa"], goalPaisa=p.get("goalPaisa"),
-    )
+    items = [
+        PocketItem(
+            pocketId=p["id"], name=p["name"], urduName=p.get("urduName"), emoji=p["emoji"],
+            balancePaisa=p["balancePaisa"], goalPaisa=p.get("goalPaisa"),
+            progress=round(min(p["balancePaisa"] / p["goalPaisa"], 1.0), 4) if p.get("goalPaisa") else 0.0,
+        )
+        for p in data["items"]
+    ]
     text = "Pockets: " + "; ".join(
-        f"{q['emoji']} {q['name']} — {_rs(q['balancePaisa'])}"
-        + (f" of {_rs(q['goalPaisa'])} goal" if q.get("goalPaisa") else "")
-        + f" (id {q['id']})"
-        for q in data["items"]
+        f"{p.emoji} {p.name} - {_rs(p.balancePaisa)}"
+        + (f" of {_rs(p.goalPaisa)} goal" if p.goalPaisa else "")
+        + f" (id {p.pocketId})"
+        for p in items
     )
-    return _ok(text, card)
+    return _ok(text, PocketsCard(items=items))
 
 
-async def get_card_status(client: BackendClient) -> Result:
+async def get_card(client: BackendClient) -> Result:
+    """The user's virtual debit card, **stripped**: `pan` and `cvv` from the backend are
+    dropped here and never reach the model, the card payload, or the spoken reply. Only
+    last-4, the masked pan, expiry, holder and frozen state travel onward (spec 1.4)."""
     try:
-        card = await client.card()
+        data = await client.card()
     except BackendError as e:
         return _fail(e)
-    last4 = card["pan"].replace(" ", "")[-4:]
-    state = "FROZEN" if card["frozen"] else "active"
-    return _ok(f"Card ending {last4} is {state}. Never read the full number aloud.")
+    return _ok(_card_text(_card_card(data)), _card_card(data))
 
 
-async def list_requests(client: BackendClient) -> Result:
+def _card_card(data: dict[str, Any]) -> CardCard:
+    pan = str(data.get("pan") or "")
+    last4 = data.get("last4") or pan.replace(" ", "")[-4:]
+    return CardCard(
+        last4=last4,
+        maskedPan=data.get("maskedPan") or (f"\u2022\u2022\u2022\u2022 {last4}" if last4 else "\u2022\u2022\u2022\u2022"),
+        expiry=data["expiry"], frozen=bool(data["frozen"]), holder=data.get("holder", ""),
+    )
+
+
+def _card_text(card: CardCard) -> str:
+    state = "FROZEN" if card.frozen else "active"
+    return (
+        f"Card {card.maskedPan} (ending {card.last4}), expires {card.expiry}, {state}. "
+        "The full number and CVV are never available here - tell the user they are on the "
+        "Card screen in the app."
+    )
+
+
+async def freeze_card(client: BackendClient) -> Result:
+    """Freeze instantly - a panic action, no PIN (spec 1.4)."""
     try:
-        data = await client.requests()
+        data = await client.freeze_card(True)
+    except BackendError as e:
+        return _fail(e)
+    return _ok("Card is now FROZEN - instantly, no PIN needed.", _card_card(data))
+
+
+async def unfreeze_card(client: BackendClient) -> Result:
+    """Unfreezing is security-sensitive: it creates a PIN-gated pending action."""
+    try:
+        action = await client.unfreeze_card()
+    except BackendError as e:
+        return _fail(e)
+    return _ok(
+        _confirm_text("Prepared unfreezing the card", action),
+        confirmation_from_action(action),
+    )
+
+
+def _request_fields(r: dict[str, Any]) -> dict[str, Any]:
+    cp = r["counterparty"]
+    return {
+        "requestId": r["id"],
+        "direction": "in" if r["direction"] in ("in", "incoming") else "out",
+        "counterparty": RequestCounterparty(
+            name=cp["name"], urduName=cp.get("urduName"), phone=cp.get("phone", "")
+        ),
+        "amountPaisa": r["amountPaisa"],
+        "note": r.get("note"),
+        "status": r["status"],
+    }
+
+
+async def list_requests(client: BackendClient, direction: str | None = None) -> Result:
+    """Money requests. direction='in' = people asking the user to pay (approvable);
+    direction='out' = the user's own requests to others."""
+    try:
+        data = await client.requests(direction)
     except BackendError as e:
         return _fail(e)
     if not data["items"]:
         return _ok("No money requests.")
+    items = [RequestItem(**_request_fields(r)) for r in data["items"]]
     lines = [
-        f"{r['direction']} {r['status']}: {_rs(r['amountPaisa'])} {'from' if r['direction'] == 'outgoing' else 'to'} "
-        f"{r['counterparty']['name']}" + (f" — {r['note']}" if r.get("note") else "")
-        for r in data["items"]
+        f"{i.direction} {i.status}: {_rs(i.amountPaisa)} "
+        f"{'from' if i.direction == 'out' else 'to'} {i.counterparty.name} (request id {i.requestId})"
+        + (f" - {i.note}" if i.note else "")
+        for i in items
     ]
-    return _ok("Requests:\n" + "\n".join(lines))
+    return _ok("Requests:\n" + "\n".join(lines), RequestsCard(items=items))
+
+
+async def approve_request(client: BackendClient, request_id: str) -> Result:
+    try:
+        action = await client.approve_request(request_id)
+    except BackendError as e:
+        return _fail(e)
+    return _ok(
+        _confirm_text("Prepared paying that money request", action),
+        confirmation_from_action(action),
+    )
+
+
+async def decline_request(client: BackendClient, request_id: str) -> Result:
+    try:
+        await client.decline_request(request_id)
+    except BackendError as e:
+        return _fail(e)
+    return _ok("Request declined.")
+
+
+async def list_recipients(client: BackendClient) -> Result:
+    """All of the user's saved recipients as a tappable list."""
+    try:
+        data = await client.recipients()
+    except BackendError as e:
+        return _fail(e)
+    items = data["items"]
+    if not items:
+        return _ok("No saved recipients yet.")
+    chips = [
+        RecipientChip(
+            recipientId=r["id"], nickname=r["nickname"], title=r["title"],
+            institutionId=r["institution"]["id"], institutionName=r["institution"]["name"],
+            identifier=r["identifier"],
+        )
+        for r in items
+    ]
+    return _ok(
+        "Saved recipients: " + "; ".join(
+            f"{c.nickname} ({c.institutionName} {c.identifier}, recipient_id {c.recipientId})" for c in chips
+        ),
+        RecipientsCard(items=chips),
+    )
+
+
+async def delete_recipient(client: BackendClient, recipient_id: str) -> Result:
+    """Delete a saved recipient. Ask the user once in prose first; act on a clear yes."""
+    try:
+        await client.delete_recipient(recipient_id)
+    except BackendError as e:
+        return _fail(e)
+    return _ok("Saved recipient deleted.")
+
+
+async def delete_saved_biller(client: BackendClient, saved_biller_id: str) -> Result:
+    """Delete a saved biller. Ask the user once in prose first; act on a clear yes."""
+    try:
+        await client.delete_saved_biller(saved_biller_id)
+    except BackendError as e:
+        return _fail(e)
+    return _ok("Saved biller deleted.")
+
+
+async def cancel_action(client: BackendClient, action_id: str) -> Result:
+    """Cancel a pending action the user no longer wants to confirm."""
+    try:
+        action = await client.cancel_action(action_id)
+    except BackendError as e:
+        return _fail(e)
+    card = confirmation_from_action(action)
+    card.autoOpenPin = False  # nothing left to confirm
+    return _ok("That pending action is cancelled.", card)
+
+
+async def list_telcos(client: BackendClient) -> Result:
+    try:
+        data = await client.telcos()
+    except BackendError as e:
+        return _fail(e)
+    chips = [TelcoChip(telcoId=t["id"], name=t["name"], urduName=t.get("urduName")) for t in data["items"]]
+    card = TelcoChipsCard(
+        prompt=Bilingual(en="Which network?", ur="\u06a9\u0648\u0646 \u0633\u0627 \u0646\u06cc\u0679 \u0648\u0631\u06a9\u061f"),
+        telcos=chips,
+    )
+    return _ok(
+        "Networks: " + "; ".join(f"{c.name} (id {c.telcoId})" for c in chips)
+        + ". A chip card was shown - ask the user to tap one, do NOT guess.",
+        card,
+    )
+
+
+async def list_statements(client: BackendClient) -> Result:
+    try:
+        data = await client.statements()
+    except BackendError as e:
+        return _fail(e)
+    items = data["items"]
+    if not items:
+        return _ok("No statements generated yet. Call get_statement for a period to make one.")
+    summaries = [
+        StatementSummary(
+            statementId=i["statementId"], period=Bilingual(**i["period"]),
+            totalInPaisa=i["totalInPaisa"], totalOutPaisa=i["totalOutPaisa"],
+            downloadUrl=i.get("downloadUrl") or f"{settings.backend_base_url}/statements/{i['statementId']}/pdf",
+        )
+        for i in items
+    ]
+    return _ok(
+        "Statements: " + "; ".join(f"{x.period.en} (id {x.statementId})" for x in summaries),
+        StatementsCard(items=summaries),
+    )
+
+
+async def get_account(client: BackendClient) -> Result:
+    try:
+        me = await client.me()
+    except BackendError as e:
+        return _fail(e)
+    user, account = me["user"], me["account"]
+    card = AccountCard(
+        name=user["name"], urduName=user.get("urduName"), phone=user["phone"],
+        memberSince=user.get("createdAt") or account.get("createdAt", ""),
+        balancePaisa=account["balancePaisa"], language=user.get("language", "ur"),
+    )
+    return _ok(
+        f"Account: {card.name}, {card.phone}, member since {card.memberSince[:10]}, "
+        f"balance {_rs(card.balancePaisa)}, app language {card.language}.",
+        card,
+    )
+
+
+async def update_profile(client: BackendClient, name: str | None = None, urdu_name: str | None = None,
+                         language: str | None = None) -> Result:
+    """Change the user's display name, Urdu name, and/or app language.
+
+    The returned `profile` card's `applied` lists exactly what changed - the app switches
+    its i18n language when `applied` contains 'language'.
+    """
+    body: dict[str, Any] = {}
+    applied: list[str] = []
+    if name:
+        body["name"] = name
+        applied.append("name")
+    if urdu_name:
+        body["urduName"] = urdu_name
+        applied.append("urduName")
+    if language:
+        body["language"] = language
+        applied.append("language")
+    if not body:
+        return _ok("ERROR: update_profile needs a name, urdu_name, or language to change.")
+    try:
+        user = await client.update_me(body)
+    except BackendError as e:
+        return _fail(e)
+    card = ProfileCard(
+        name=user["name"], urduName=user.get("urduName"),
+        language=user.get("language", language or "ur"), applied=applied,
+    )
+    return _ok(
+        f"Profile updated ({', '.join(applied)}). App language is now {card.language}. "
+        + ("Reply in the NEW language from now on." if "language" in applied else ""),
+        card,
+    )
+
+
+async def get_my_qr(client: BackendClient) -> Result:
+    try:
+        qr = await client.my_qr()
+        me = await client.me()
+    except BackendError as e:
+        return _fail(e)
+    user = me["user"]
+    return _ok(
+        "Here is the user's PAYO QR code - the card shows it; others scan it to pay them.",
+        QrCard(payload=qr["payload"], name=user["name"], phone=user["phone"]),
+    )
+
+
+def _hi(en_label, ur_label, en_intent, ur_intent) -> HelpIntent:
+    return HelpIntent(label=Bilingual(en=en_label, ur=ur_label), intent=Bilingual(en=en_intent, ur=ur_intent))
+
+
+HELP_INTENTS: list[HelpIntent] = [
+    _hi("Check balance", "\u0628\u06cc\u0644\u0646\u0633 \u062f\u06cc\u06a9\u06be\u06cc\u06ba", "What is my balance?", "\u0645\u06cc\u0631\u0627 \u0628\u06cc\u0644\u0646\u0633 \u06a9\u062a\u0646\u0627 \u06c1\u06d2\u061f"),
+    _hi("Send money", "\u067e\u06cc\u0633\u06d2 \u0628\u06be\u06cc\u062c\u06cc\u06ba", "I want to send money", "\u0645\u062c\u06be\u06d2 \u067e\u06cc\u0633\u06d2 \u0628\u06be\u06cc\u062c\u0646\u06d2 \u06c1\u06cc\u06ba"),
+    _hi("Last transaction", "\u0622\u062e\u0631\u06cc \u0644\u06cc\u0646 \u062f\u06cc\u0646", "What was my last transaction?", "\u0645\u06cc\u0631\u0627 \u0622\u062e\u0631\u06cc \u0644\u06cc\u0646 \u062f\u06cc\u0646 \u06a9\u06cc\u0627 \u062a\u06be\u0627\u061f"),
+    _hi("Recent transactions", "\u062d\u0627\u0644\u06cc\u06c1 \u0644\u06cc\u0646 \u062f\u06cc\u0646", "Show my recent transactions", "\u0645\u06cc\u0631\u06d2 \u062d\u0627\u0644\u06cc\u06c1 \u0644\u06cc\u0646 \u062f\u06cc\u0646 \u062f\u06a9\u06be\u0627\u0626\u06cc\u06ba"),
+    _hi("My spending", "\u0645\u06cc\u0631\u06d2 \u0627\u062e\u0631\u0627\u062c\u0627\u062a", "What did I spend last month?", "\u067e\u0686\u06be\u0644\u06d2 \u0645\u06c1\u06cc\u0646\u06d2 \u06a9\u062a\u0646\u0627 \u062e\u0631\u0686 \u06c1\u0648\u0627\u061f"),
+    _hi("Pay a bill", "\u0628\u0644 \u0627\u062f\u0627 \u06a9\u0631\u06cc\u06ba", "I want to pay a bill", "\u0645\u062c\u06be\u06d2 \u0628\u0644 \u0627\u062f\u0627 \u06a9\u0631\u0646\u0627 \u06c1\u06d2"),
+    _hi("Mobile load", "\u0645\u0648\u0628\u0627\u0626\u0644 \u0644\u0648\u0688", "I want to top up a phone", "\u0645\u062c\u06be\u06d2 \u0645\u0648\u0628\u0627\u0626\u0644 \u0644\u0648\u0688 \u06a9\u0631\u0627\u0646\u0627 \u06c1\u06d2"),
+    _hi("My card", "\u0645\u06cc\u0631\u0627 \u06a9\u0627\u0631\u0688", "Show my card", "\u0645\u06cc\u0631\u0627 \u06a9\u0627\u0631\u0688 \u062f\u06a9\u06be\u0627\u0626\u06cc\u06ba"),
+    _hi("Freeze my card", "\u06a9\u0627\u0631\u0688 \u0628\u0646\u062f \u06a9\u0631\u06cc\u06ba", "Freeze my card", "\u0645\u06cc\u0631\u0627 \u06a9\u0627\u0631\u0688 \u0628\u0646\u062f \u06a9\u0631\u06cc\u06ba"),
+    _hi("My pockets", "\u0645\u06cc\u0631\u06cc \u067e\u0627\u06a9\u0679\u0633", "Show my pockets", "\u0645\u06cc\u0631\u06cc \u067e\u0627\u06a9\u0679\u0633 \u062f\u06a9\u06be\u0627\u0626\u06cc\u06ba"),
+    _hi("Money requests", "\u0631\u0642\u0645 \u06a9\u06cc \u062f\u0631\u062e\u0648\u0627\u0633\u062a\u06cc\u06ba", "Who owes me money?", "\u0645\u062c\u06be\u06d2 \u06a9\u0633 \u0646\u06d2 \u067e\u06cc\u0633\u06d2 \u062f\u06cc\u0646\u06d2 \u06c1\u06cc\u06ba\u061f"),
+    _hi("My QR code", "\u0645\u06cc\u0631\u0627 QR \u06a9\u0648\u0688", "Show my QR code", "\u0645\u06cc\u0631\u0627 QR \u06a9\u0648\u0688 \u062f\u06a9\u06be\u0627\u0626\u06cc\u06ba"),
+    _hi("Statements", "\u0627\u0633\u0679\u06cc\u0679\u0645\u0646\u0679", "Show my statements", "\u0645\u06cc\u0631\u06cc \u0627\u0633\u0679\u06cc\u0679\u0645\u0646\u0679\u0633 \u062f\u06a9\u06be\u0627\u0626\u06cc\u06ba"),
+    _hi("Switch language", "\u0632\u0628\u0627\u0646 \u0628\u062f\u0644\u06cc\u06ba", "Switch to Urdu", "\u0627\u0646\u06af\u0631\u06cc\u0632\u06cc \u0645\u06cc\u06ba \u0628\u062f\u0644\u06cc\u06ba"),
+]
+
+
+async def help(client: BackendClient) -> Result:
+    """What the assistant can do, as a tappable list of example intents."""
+    return _ok(
+        "Shown a help card listing what PAYO can do: "
+        + ", ".join(i.label.en for i in HELP_INTENTS)
+        + ". Say one short warm sentence inviting the user to tap one.",
+        HelpCard(intents=HELP_INTENTS),
+    )
+
+
+async def pocket_withdraw(client: BackendClient, pocket_id: str, amount_paisa: int) -> Result:
+    try:
+        action = await client.pocket_move(pocket_id, "withdraw", amount_paisa)
+    except BackendError as e:
+        return _fail(e)
+    return _ok(
+        _confirm_text(f"Prepared taking {_rs(amount_paisa)} out of the pocket", action),
+        confirmation_from_action(action),
+    )
 
 
 # ---- write tools: each creates a PendingAction and returns a confirmation card ----
@@ -399,8 +827,7 @@ async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str
                 return await send_money(client, amount_paisa, institution_id=by_name, identifier=identifier)
         return _fail(e)
     return _ok(
-        f"Prepared transfer of {_rs(amount_paisa)} — a confirmation card is shown; "
-        "the user must tap confirm and enter their PIN. Do not claim the money was sent.",
+        _confirm_text(f"Prepared transfer of {_rs(amount_paisa)}", action),
         confirmation_from_action(action),
     )
 
@@ -411,7 +838,7 @@ async def pay_bill(client: BackendClient, bill_id: str) -> Result:
     except BackendError as e:
         return _fail(e)
     return _ok(
-        "Prepared the bill payment — confirmation card shown; user must confirm with PIN.",
+        _confirm_text("Prepared the bill payment", action),
         confirmation_from_action(action),
     )
 
@@ -422,7 +849,7 @@ async def recharge(client: BackendClient, telco_id: str, phone: str, amount_pais
     except BackendError as e:
         return _fail(e)
     return _ok(
-        f"Prepared recharge of {_rs(amount_paisa)} — confirmation card shown; user must confirm with PIN.",
+        _confirm_text(f"Prepared recharge of {_rs(amount_paisa)}", action),
         confirmation_from_action(action),
     )
 
@@ -446,7 +873,7 @@ async def pocket_deposit(client: BackendClient, pocket_id: str, amount_paisa: in
     except BackendError as e:
         return _fail(e)
     return _ok(
-        f"Prepared deposit of {_rs(amount_paisa)} into the pocket — confirmation card shown (no PIN needed).",
+        _confirm_text(f"Prepared deposit of {_rs(amount_paisa)} into the pocket", action),
         confirmation_from_action(action),
     )
 
@@ -457,12 +884,8 @@ async def request_money(client: BackendClient, from_phone: str, amount_paisa: in
     except BackendError as e:
         return _fail(e)
     r = data["request"]
-    return _ok(f"Money request of {_rs(r['amountPaisa'])} sent to {r['counterparty']['name']} — they approve it in their app.")
-
-
-async def freeze_card(client: BackendClient, frozen: bool = True) -> Result:
-    try:
-        card = await client.freeze_card(frozen)
-    except BackendError as e:
-        return _fail(e)
-    return _ok(f"Card is now {'FROZEN ❄️' if card['frozen'] else 'active again'}.")
+    return _ok(
+        f"Money request of {_rs(r['amountPaisa'])} sent to {r['counterparty']['name']} - "
+        "they approve it in their own app.",
+        RequestCard(**_request_fields(r)),
+    )

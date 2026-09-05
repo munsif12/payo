@@ -380,3 +380,26 @@ async def test_send_money_accepts_institution_name_and_maps_it_to_an_id(fake_bac
     assert cards[-1]["kind"] == "confirmation"
     transfer = body_of([r for r in fake_backend.requests if r.url.path == "/api/v1/transfers"][-1])
     assert transfer["to"]["institutionId"] == "easypaisa"
+
+
+async def test_tts_uses_the_turn_language_not_the_ui_language(fake_backend, wired_app):
+    """Urdu-script input under an English UI replies in Urdu — so the voice and the Urdu
+    number-words pass must be asked for with 'ur', not the UI's 'en'."""
+    wire_routes(fake_backend)
+    calls = []
+
+    class RecordingTts:
+        is_stub = True
+
+        async def synthesize(self, text, language):
+            calls.append((text, language))
+            return "aud1"
+
+    wired_app.state.model_override = scripted([AIMessage(content="آپ کا بیلنس 81800 روپے ہے۔")])
+    wired_app.state.tts = RecordingTts()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wired_app), base_url="http://test") as client:
+        res = await client.post("/converse", json={"text": "میرا بیلنس کیا ہے؟", "language": "en"},
+                                headers={"Authorization": "Bearer jwt1"})
+    assert res.status_code == 200
+    assert calls and calls[-1][1] == "ur"
+    wired_app.state.tts = StubTts()

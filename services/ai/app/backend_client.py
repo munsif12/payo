@@ -45,9 +45,21 @@ class BackendClient:
     async def post(self, path: str, json: dict[str, Any] | None = None) -> Any:
         return await self._unwrap(await self._client.post(path, json=json or {}))
 
+    async def patch(self, path: str, json: dict[str, Any] | None = None) -> Any:
+        return await self._unwrap(await self._client.patch(path, json=json or {}))
+
+    async def delete(self, path: str) -> Any:
+        return await self._unwrap(await self._client.delete(path))
+
     # -- typed helpers used by tools & conversation --
     async def me(self) -> Any:
         return await self.get("/me")
+
+    async def update_me(self, body: dict[str, Any]) -> Any:
+        return await self.patch("/me", body)
+
+    async def transaction(self, txn_id: str) -> Any:
+        return await self.get(f"/transactions/{txn_id}")
 
     async def transactions(self, **params: Any) -> Any:
         return await self.get("/transactions", params={k: v for k, v in params.items() if v is not None})
@@ -115,8 +127,29 @@ class BackendClient:
     async def pocket_move(self, pocket_id: str, op: str, amount_paisa: int) -> Any:
         return await self.post(f"/pockets/{pocket_id}/{op}", {"amountPaisa": amount_paisa})
 
-    async def requests(self) -> Any:
-        return await self.get("/requests")
+    async def requests(self, direction: str | None = None) -> Any:
+        return await self.get("/requests", params={"direction": direction} if direction else None)
+
+    async def approve_request(self, request_id: str) -> Any:
+        return await self.post(f"/requests/{request_id}/approve")
+
+    async def decline_request(self, request_id: str) -> Any:
+        return await self.post(f"/requests/{request_id}/decline")
+
+    async def delete_recipient(self, recipient_id: str) -> Any:
+        return await self.delete(f"/recipients/{recipient_id}")
+
+    async def delete_saved_biller(self, saved_biller_id: str) -> Any:
+        return await self.delete(f"/saved-billers/{saved_biller_id}")
+
+    async def cancel_action(self, action_id: str) -> Any:
+        return await self.post(f"/actions/{action_id}/cancel")
+
+    async def my_qr(self) -> Any:
+        return await self.get("/qr/mine")
+
+    async def statements(self) -> Any:
+        return await self.get("/statements")
 
     async def create_request(self, from_phone: str, amount_paisa: int, note: str | None = None) -> Any:
         body: dict[str, Any] = {"fromPhone": from_phone, "amountPaisa": amount_paisa}
@@ -127,8 +160,13 @@ class BackendClient:
     async def card(self) -> Any:
         return await self.get("/cards/mine")
 
-    async def freeze_card(self, frozen: bool) -> Any:
-        return await self.post("/cards/mine/freeze", {"frozen": frozen})
+    async def freeze_card(self, frozen: bool = True) -> Any:
+        # The backend freeze route accepts only {"frozen": true}; unfreezing is a
+        # PIN-gated pending action (see unfreeze_card).
+        return await self.post("/cards/mine/freeze", {"frozen": True})
+
+    async def unfreeze_card(self) -> Any:
+        return await self.post("/cards/mine/unfreeze")
 
     async def generate_statement(self, year: int, month: int | None = None) -> Any:
         body: dict[str, Any] = {"year": year}

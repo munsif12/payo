@@ -19,6 +19,7 @@ import uuid
 from typing import Protocol
 
 from .config import settings
+from .urdu_numbers import urdu_number_words
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +30,10 @@ SILENT_MP3 = bytes.fromhex("fffb9064") + bytes(414)
 
 CARTESIA_MODEL_ID = "sonic-3.6"
 _SENTENCE_END = re.compile(r"[.!?।۔]\s")
+# A rupee amount written in digits: an optional ₨/Rs, digits with optional , separators and
+# an optional .00 decimal, immediately followed by روپے (that trailing word is what makes it
+# unambiguously an amount rather than a date, phone number, or reference).
+_URDU_RUPEES_RE = re.compile(r"(?:₨|Rs\.?\s*)?(\d[\d,]*)(?:\.(\d{1,2}))?\s*(روپے)")
 
 
 class TtsProvider(Protocol):
@@ -49,9 +54,24 @@ def _store(data: bytes) -> str:
     return audio_id
 
 
-def trim_for_tts(text: str, max_chars: int) -> str:
-    """Collapse whitespace and cap length, preferring a sentence boundary."""
+def urdu_amounts_to_words(text: str) -> str:
+    """Rewrite «81800 روپے» as «اکیاسی ہزار آٹھ سو روپے» so the Urdu voice never reads
+    digits. Amounts with paisa, or above 99,99,999, are left alone (see urdu_numbers)."""
+    def repl(m: re.Match[str]) -> str:
+        if m.group(2) and int(m.group(2).ljust(2, "0")):  # not a whole-rupee amount
+            return m.group(0)
+        words = urdu_number_words(int(m.group(1).replace(",", "")))
+        return m.group(0) if words is None else f"{words} {m.group(3)}"
+
+    return _URDU_RUPEES_RE.sub(repl, text)
+
+
+def trim_for_tts(text: str, max_chars: int, language: str = "en") -> str:
+    """Collapse whitespace and cap length, preferring a sentence boundary. For Urdu, rupee
+    amounts written in digits are first spelled out in words (spec §5)."""
     text = " ".join(text.split())
+    if language == "ur":
+        text = urdu_amounts_to_words(text)
     if len(text) <= max_chars:
         return text
     head = text[:max_chars]
@@ -74,7 +94,7 @@ class CartesiaTts:
     is_stub = False
 
     async def synthesize(self, text: str, language: str) -> str:
-        speech = trim_for_tts(text, settings.tts_max_chars)
+        speech = trim_for_tts(text, settings.tts_max_chars, language)
         if not speech:
             return _store(SILENT_MP3)
         try:
@@ -94,6 +114,12 @@ class CartesiaTts:
                 voice={"mode": "id", "id": voice_for(language)},
                 language=language,
                 output_format={"container": "mp3", "sample_rate": 44100, "bit_rate": 128000},
+                # Urdu: the owner-picked "warm" delivery (U0 spike) — float speed + emotion
+                # live in generation_config on sonic-3+, not the Literal `speed` kwarg.
+                **(
+                    {"generation_config": {"speed": settings.cartesia_ur_speed, "emotion": settings.cartesia_ur_emotion}}
+                    if language == "ur" else {}
+                ),
             )
             chunks = [chunk async for chunk in stream]
             return b"".join(chunks)

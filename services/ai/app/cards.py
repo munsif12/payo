@@ -23,6 +23,9 @@ class ConfirmationCard(BaseModel):
     feePaisa: int
     requiresPin: bool
     expiresAt: str
+    # The app opens the PIN sheet immediately for cards produced in chat (spec §1.3);
+    # the card stays behind it with its Confirm button so a cancelled sheet can be retried.
+    autoOpenPin: bool = True
 
 
 class SuccessCard(BaseModel):
@@ -160,11 +163,186 @@ class BalanceCard(BaseModel):
     balancePaisa: int
 
 
+# ---- v5 card kinds (spec §4.2) ----
+
+
+class ReceiptCard(BaseModel):
+    kind: Literal["receipt"] = "receipt"
+    txn: Txn
+    shareText: Bilingual
+
+
+class SpendingCategory(BaseModel):
+    category: str
+    label: Bilingual
+    totalPaisa: int
+    count: int
+    share: float  # 0..1 of totalOutPaisa
+
+
+class SpendingCompare(BaseModel):
+    period: Bilingual
+    totalOutPaisa: int
+    deltaPaisa: int  # current - previous
+    deltaPct: float | None = None  # None when the previous period spent nothing
+
+
+class SpendingCard(BaseModel):
+    kind: Literal["spending"] = "spending"
+    period: Bilingual
+    totalOutPaisa: int
+    totalInPaisa: int
+    byCategory: list[SpendingCategory]
+    compare: SpendingCompare | None = None
+
+
+class AccountCard(BaseModel):
+    kind: Literal["account"] = "account"
+    name: str
+    urduName: str | None = None
+    phone: str
+    memberSince: str
+    balancePaisa: int
+    language: str
+
+
+class ProfileCard(BaseModel):
+    kind: Literal["profile"] = "profile"
+    name: str
+    urduName: str | None = None
+    language: str
+    applied: list[Literal["name", "urduName", "language"]]
+
+
+class HelpIntent(BaseModel):
+    label: Bilingual
+    intent: Bilingual
+
+
+class HelpCard(BaseModel):
+    kind: Literal["help"] = "help"
+    intents: list[HelpIntent]
+
+
+class CardCard(BaseModel):
+    """The user's virtual debit card — last-4 only. `pan`/`cvv` never appear here."""
+    kind: Literal["card"] = "card"
+    last4: str
+    maskedPan: str
+    expiry: str
+    frozen: bool
+    holder: str
+
+
+class StatementSummary(BaseModel):
+    statementId: str
+    period: Bilingual
+    totalInPaisa: int
+    totalOutPaisa: int
+    downloadUrl: str
+
+
+class StatementsCard(BaseModel):
+    kind: Literal["statements"] = "statements"
+    items: list[StatementSummary]
+
+
+class RecipientsCard(BaseModel):
+    kind: Literal["recipients"] = "recipients"
+    items: list[RecipientChip]
+
+
+class BillItem(BaseModel):
+    billId: str
+    biller: str
+    consumerName: str
+    amountPaisa: int
+    dueDate: str
+    month: str
+
+
+class BillsCard(BaseModel):
+    kind: Literal["bills"] = "bills"
+    items: list[BillItem]
+
+
+class BillersCard(BaseModel):
+    kind: Literal["billers"] = "billers"
+    items: list[BillerChip]
+
+
+class TelcoChip(BaseModel):
+    telcoId: str
+    name: str
+    urduName: str | None = None
+
+
+class TelcoChipsCard(BaseModel):
+    kind: Literal["telco_chips"] = "telco_chips"
+    prompt: Bilingual
+    telcos: list[TelcoChip]
+
+
+class PocketItem(BaseModel):
+    pocketId: str
+    name: str
+    urduName: str | None = None
+    emoji: str
+    balancePaisa: int
+    goalPaisa: int | None = None
+    progress: float  # 0..1
+
+
+class PocketsCard(BaseModel):
+    kind: Literal["pockets"] = "pockets"
+    items: list[PocketItem]
+
+
+class RequestCounterparty(BaseModel):
+    name: str
+    urduName: str | None = None
+    phone: str
+
+
+class RequestCard(BaseModel):
+    kind: Literal["request"] = "request"
+    requestId: str
+    direction: Literal["in", "out"]
+    counterparty: RequestCounterparty
+    amountPaisa: int
+    note: str | None = None
+    status: str
+
+
+class RequestItem(BaseModel):
+    requestId: str
+    direction: Literal["in", "out"]
+    counterparty: RequestCounterparty
+    amountPaisa: int
+    note: str | None = None
+    status: str
+
+
+class RequestsCard(BaseModel):
+    kind: Literal["requests"] = "requests"
+    items: list[RequestItem]
+
+
+class QrCard(BaseModel):
+    kind: Literal["qr"] = "qr"
+    payload: str
+    name: str
+    phone: str
+
+
 Card = Annotated[
     Union[
         ConfirmationCard, SuccessCard, TransactionsCard, StatementCard,
         InstitutionChipsCard, RecipientCard, RecipientChipsCard, BillerChipsCard,
         SavePromptCard, BillCard, PocketCard, BalanceCard,
+        ReceiptCard, SpendingCard, AccountCard, ProfileCard, HelpCard, CardCard,
+        StatementsCard, RecipientsCard, BillsCard, BillersCard, TelcoChipsCard,
+        PocketsCard, RequestCard, RequestsCard, QrCard,
     ],
     Field(discriminator="kind"),
 ]

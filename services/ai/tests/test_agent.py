@@ -93,7 +93,7 @@ async def test_agent_pay_a_bill_intent_lists_then_pays_single_due_bill(fake_back
         AIMessage(content="Please confirm on the card and enter your PIN."),
     ])
     reply, cards = await run_agent(client, [], "I want to pay a bill", "en", model=model)
-    assert [c["kind"] for c in cards] == ["bill", "confirmation"]
+    assert [c["kind"] for c in cards] == ["bills", "confirmation"]
     assert cards[-1]["actionId"] == "act11"
     assert "PIN" in reply
     await client.aclose()
@@ -500,3 +500,50 @@ async def test_all_guards_share_one_budget_of_at_most_three_invocations(fake_bac
     await client.aclose()
     assert cards == []
     assert len(model.received) == 1 + MAX_NUDGES == 3
+
+
+# ---- spoken_text: card turns are spoken, so bullets and markdown never survive ----
+
+def test_spoken_text_strips_bullets_and_markdown_from_a_listed_reply():
+    from app.agent import spoken_text
+
+    bulleted = (
+        "Here are your last five transactions:\n"
+        "* **142,928** to Meezan Savings\n"
+        "- 4,320 to K-Electric\n"
+        "• 1,500 to Bilal\n"
+        "1. 500 to Sara\n"
+        "2) 250 to _Jazz_\n"
+    )
+    spoken = spoken_text(bulleted)
+    assert "*" not in spoken and "_" not in spoken and "•" not in spoken
+    assert "\n" not in spoken
+    assert not spoken.startswith("-")
+    assert spoken.startswith("Here are your last five transactions:")
+    assert "142,928 to Meezan Savings" in spoken and "250 to Jazz" in spoken
+
+
+def test_spoken_text_keeps_urdu_quotes_dashes_and_plain_sentences_intact():
+    from app.agent import spoken_text
+
+    reply = "جی، یہ آپ کے پانچ لین دین ہیں — سب سے بڑا «میزان سیونگز» کو تھا۔"
+    assert spoken_text(reply) == reply
+    assert spoken_text("Sent 1,500 - the fee was zero.") == "Sent 1,500 - the fee was zero."
+
+
+async def test_run_agent_reply_is_speakable_even_when_the_model_bullets_a_card_turn(fake_backend):
+    """The app hides the text on card turns and speaks it, so a bulleted list must never
+    reach the token stream or TTS."""
+    from tests.fixtures_backend import TXN, wire_all
+
+    wire_all(fake_backend)
+    fake_backend.route("GET", "/api/v1/transactions", {"items": [TXN, TXN]})
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content="", tool_calls=[{"name": "list_transactions", "args": {"limit": 5}, "id": "t1"}]),
+        AIMessage(content="Your recent transactions:\n* 1,500 to Bilal Ahmed\n* 1,500 to Bilal Ahmed"),
+    ])
+    reply, cards = await run_agent(client, [], "show my recent transactions", "en", model=model)
+    assert cards[0]["kind"] == "transactions"
+    assert "*" not in reply and "\n" not in reply
+    await client.aclose()

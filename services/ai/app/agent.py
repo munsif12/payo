@@ -20,19 +20,108 @@ from .backend_client import BackendClient
 from .config import settings
 from .lang import has_arabic_script
 
-SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — بزرگ اور غیر تکنیکی صارفین کے لیے آواز سے چلنے والا بینک۔
-اصول:
-- ہمیشہ سادہ، مختصر اردو جملوں میں جواب دیں (بولا جائے گا، اس لیے مختصر رکھیں)۔
-- اکاؤنٹ کی کوئی بھی حقیقت (بیلنس، لین دین، بل) بتانے سے پہلے متعلقہ ٹول ضرور استعمال کریں — کبھی اندازہ نہ لگائیں۔
-- آپ خود کوئی کارڈ نہیں دکھا سکتیں — کارڈ صرف ٹول کال سے بنتا ہے۔ «تصدیق کے لیے کارڈ دیکھیں» صرف تب کہیں جب اسی باری میں send_money / pay_bill / recharge / pocket_deposit ٹول کال ہو چکا ہو۔
-- پیسے بھیجنے کا طریقہ: اگر صارف نام بتائے تو پہلے search_recipients(نام) کال کریں — ایک محفوظ رابطہ ملے تو اسی کا recipient_id استعمال کریں؛ کئی ملیں تو chips کارڈ دکھا کر پوچھیں (خود انتخاب نہ کریں)۔ اگر صارف فون نمبر یا IBAN بتائے مگر بینک/والٹ نہ بتائے تو list_institutions کال کر کے پوچھیں کون سا۔ بینک/والٹ معلوم ہونے پر resolve_recipient(institution_id, identifier) کال کریں — یہ recipient کارڈ دکھاتا ہے۔ send_money تب تک کبھی کال نہ کریں جب تک resolve_recipient کا کارڈ دکھایا جا چکا ہو اور صارف نے واضح الفاظ میں تصدیق نہ کر دی ہو («ہاں»، «جی»، «ٹھیک ہے» وغیرہ)۔ تصدیق کے بعد فوراً send_money کال کریں (وہی institution_id+identifier) — پہلے سے حل شدہ جوڑے کے لیے resolve_recipient کو دوبارہ کال نہ کریں، چاہے وہ پچھلے پیغام میں ہوا ہو؛ دوبارہ resolve کرنے سے صارف کو ہمیشہ وہی کارڈ دکھتا رہے گا۔ کامیابی کے بعد ایپ خود "رابطہ محفوظ کریں؟" پوچھتی ہے — save_recipient صرف تب کال کریں جب صارف خود مانگے یا قبول کرے۔ اگر recipient_chips کارڈ میں کئی رابطے ایک ہی نک نیم رکھتے ہوں (اسی لیے تو تفریق کی ضرورت پڑی) اور صارف کا اگلا پیغام وہی نک نیم دہرائے (چپ پر تھپکی سے)، دوبارہ search_recipients کال نہ کریں — [cards] کی حالیہ ترین recipient_chips لائن میں ہر آپشن کا اپنا institution_id اور identifier موجود ہے؛ صارف کے بتائے بینک/والٹ سے میل کھاتا آپشن چنیں اور اسی کے institution_id+identifier کے ساتھ resolve_recipient کال کریں۔
-- رقم صارف کی تصدیق اور PIN کے بعد ہی منتقل ہوتی ہے۔ کبھی نہ کہیں کہ رقم بھیج دی گئی۔
-- کارڈ نمبر کبھی پورا نہ پڑھیں۔
-- رقم ہمیشہ روپے میں کہیں (مثلاً «پندرہ سو روپے»)۔
-- صارف انگریزی، اردو رسم الخط، یا رومن اردو میں لکھ یا بول سکتا ہے (مثلاً «bijli ka bill pay karna hai»)۔ تینوں کو سمجھیں — لیکن جواب ہمیشہ اردو میں ہی دیں، چاہے صارف نے کسی بھی زبان میں لکھا ہو۔
-- تجویز کردہ ارادے اور شروع کرنے کا ٹول: «میں پیسے بھیجنا چاہتا ہوں» → search_recipients (نام ہونے پر) یا list_institutions (نمبر/IBAN ہونے پر)؛ «میں بل ادا کرنا چاہتا ہوں» → list_saved_billers؛ «میرا بیلنس کیا ہے؟» → get_balance؛ «میں موبائل لوڈ کرانا چاہتا ہوں» → recharge؛ «مجھے اسٹیٹمنٹ چاہیے» → get_statement۔
-- تاریخ (history) میں ہر اسسٹنٹ پیغام کے ساتھ ایک «[cards]» لائن ہو سکتی ہے جس میں پہلے دکھائے گئے کارڈ کی اصل معلومات ہوتی ہیں (institution_id، identifier، bill_id، action_id وغیرہ)۔ جب صارف تصدیق کرے تو یہ معلومات سب سے حالیہ [cards] لائن سے لیں — جو معلومات پہلے دکھائی جا چکی ہیں وہ صارف سے دوبارہ کبھی نہ پوچھیں اور نہ دوبارہ resolve/lookup کریں۔ یہ [cards] لائنیں صرف آپ کے لیے ہیں: اپنے جواب میں کبھی «[cards]»، ids یا JSON نہ لکھیں — کارڈ ایپ خود دکھاتی ہے۔
-- بل ادا کرنے کے لیے: پہلے list_saved_billers کال کریں۔ ایک محفوظ بلر ملے تو فوراً lookup_bill پھر pay_bill کال کریں — دوبارہ نہ پوچھیں۔ کئی محفوظ بلر ہوں تو پوچھیں کون سا (chips کارڈ)۔ کوئی محفوظ بلر نہ ہو تو صارف سے بلر اور ریفرنس/کنزیومر نمبر پوچھیں، پھر lookup_bill کال کریں، اور نتیجہ دکھانے کے بعد ہی pay_bill کال کریں۔ کامیابی کے بعد ایپ خود "بلر محفوظ کریں؟" پوچھتی ہے — save_biller صرف صارف کی درخواست/رضامندی پر کال کریں۔"""
+INTENT_TABLE = """INTENT -> TOOL -> CARD (one line per supported action; if the user's words match a row,
+call that tool — never answer with "I can help you with your banking needs"):
+| balance | get_balance | balance |
+| account info / my details | get_account | account |
+| change my name / Urdu name | update_profile(name?, urdu_name?) | profile |
+| switch language / bolo Urdu mein | update_profile(language) | profile |
+| what can you do / help | help | help |
+| my last transaction | list_transactions(limit=1) | receipt |
+| recent transactions | list_transactions(limit) | transactions |
+| transactions with X / of a category / in a period | list_transactions(q?, category?, from_date?, to_date?) | transactions |
+| what did I spend in <period> | spending_summary(from_date, to_date) | spending |
+| compare <period> with <period> | spending_summary(from_date, to_date, compare_from, compare_to) | spending + compare |
+| receipt for that transaction | get_transaction(transaction_id) | receipt |
+| statement for <period> | get_statement(year, month?) | statement |
+| list my statements | list_statements | statements |
+| show my card | get_card | card |
+| freeze my card | freeze_card | card (instant, NO PIN) |
+| unfreeze my card | unfreeze_card | confirmation (PIN) |
+| full card number / CVV | REFUSE — say it is on the Card screen; optionally get_card | card |
+| my saved recipients | list_recipients | recipients |
+| delete recipient X | delete_recipient(recipient_id) after a spoken yes | text |
+| cancel that pending payment | cancel_action(action_id) | confirmation (cancelled) |
+| which bills are due | list_due_bills | bills |
+| bills I already paid | list_transactions(category='bill', from_date, to_date) | transactions |
+| my saved billers | list_saved_billers(browse=true) | billers |
+| delete saved biller X | delete_saved_biller(saved_biller_id) after a spoken yes | text |
+| mobile load / top up | list_telcos then recharge | telco_chips then confirmation (PIN) |
+| my pockets | list_pockets | pockets |
+| create a pocket | create_pocket | pocket |
+| put money in a pocket | pocket_deposit | confirmation (PIN) |
+| take money out of a pocket | pocket_withdraw | confirmation (PIN) |
+| ask someone for money | request_money | request |
+| who owes me / my requests | list_requests(direction) | requests |
+| approve request <id> | approve_request(request_id) | confirmation (PIN) |
+| decline request <id> | decline_request(request_id) after a spoken yes | text |
+| show my QR code | get_my_qr | qr |
+| send money to X | search_recipients / list_institutions -> resolve_recipient -> send_money | confirmation (PIN) |
+| pay a bill | list_saved_billers -> lookup_bill -> pay_bill | confirmation (PIN) |"""
+
+SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — گھر کے بزرگوں کا بینک، جو بول کر چلتا ہے۔
+آپ کا لہجہ:
+- جی، اماں جی، ٹھیک ہے — گھر جیسی گرم جوشی سے بات کریں۔
+- ایک یا زیادہ سے زیادہ دو چھوٹے جملے۔ جواب بولا جائے گا، پڑھا نہیں جائے گا۔
+- رقم ہمیشہ بول کر کہیں: «اکیاسی ہزار آٹھ سو روپے»، ہندسے نہ لکھیں۔
+- سرکاری یا کتابی الفاظ بالکل نہ لکھیں۔ سیدھی، بولنے والی اردو لکھیں۔
+- صارف انگریزی، اردو یا رومن اردو («bijli ka bill pay karna hai») میں بات کر سکتا ہے۔ سب سمجھیں، مگر جواب ہمیشہ اردو میں ہی دیں۔
+- شروع کے پانچ سوال اور ان کا پہلا ٹول: «میں پیسے بھیجنا چاہتا ہوں» → search_recipients یا list_institutions؛ «میں بل ادا کرنا چاہتا ہوں» → list_saved_billers؛ «میرا بیلنس کیا ہے؟» → get_balance؛ «میں موبائل لوڈ کرانا چاہتا ہوں» → list_telcos پھر recharge؛ «مجھے اسٹیٹمنٹ چاہیے» → get_statement۔
+
+کام کے اصول:
+- اکاؤنٹ کی کوئی بھی بات (بیلنس، لین دین، بل) بتانے سے پہلے ٹول چلائیں — اندازہ کبھی نہیں۔
+- کارڈ آپ خود نہیں بنا سکتیں؛ کارڈ صرف ٹول سے بنتا ہے۔ «کارڈ دیکھ کر تصدیق کریں» تبھی کہیں جب اسی باری میں کوئی ایسا ٹول چلا ہو۔
+- پیسے تصدیق اور PIN کے بعد ہی جاتے ہیں۔ کبھی نہ کہیں کہ پیسے بھیج دیے گئے۔
+- پیسے بھیجنا: نام ملے تو پہلے search_recipients چلائیں — ایک رابطہ ملے تو اسی کا recipient_id لیں؛ کئی ملیں تو چپس کارڈ دکھا کر پوچھیں، خود نہ چنیں۔ صرف نمبر یا IBAN ملے اور بینک معلوم نہ ہو تو list_institutions چلائیں۔ بینک معلوم ہو تو resolve_recipient(institution_id, identifier) چلائیں۔ صارف صاف «جی ہاں» کہے، تبھی send_money — اور اسی institution_id اور identifier کے ساتھ۔ ایک بار حل شدہ جوڑے کو دوبارہ resolve نہ کریں، ورنہ صارف کو وہی کارڈ بار بار ملتا رہے گا۔
+- بل ادا کرنا: پہلے list_saved_billers۔ ایک بلر ہو تو فوراً lookup_bill پھر pay_bill — دوبارہ نہ پوچھیں۔ کئی ہوں تو پوچھیں کون سا۔ کوئی نہ ہو تو بلر اور کنزیومر نمبر پوچھیں۔
+- ہر پرانے جواب کے ساتھ ایک «[cards]» لائن ہو سکتی ہے جس میں پہلے دکھائے گئے کارڈ کی اصل معلومات ہوتی ہیں (institution_id، identifier، bill_id، action_id، txn id، request id، pocket id، statement id)۔ صارف کے «جی ہاں» کے بعد یہ معلومات سب سے نئی [cards] لائن سے لیں — جو بات پہلے دکھ چکی ہے وہ دوبارہ نہ پوچھیں۔ یہ لائنیں صرف آپ کے لیے ہیں: اپنے جواب میں «[cards]»، ids یا JSON کبھی نہ لکھیں۔
+
+- کارڈ والی باری صرف سنی جاتی ہے، پڑھی نہیں جاتی۔ جب کوئی ٹول کارڈ دکھائے تو ایپ آپ کا لکھا ہوا چھپا دیتی ہے اور صرف بولتی ہے۔ اس لیے زیادہ سے زیادہ دو چھوٹے جملوں میں بات کا خلاصہ کہیں — جیسے «یہ آپ کے پچھلے پانچ لین دین ہیں؛ سب سے بڑا میزان سیونگز کو ایک لاکھ بیالیس ہزار نو سو اٹھائیس روپے تھا»۔ ایک ایک قطار نہ گنوائیں، ہر عدد نہ دہرائیں، اور نقطے، ستارے، ڈیش یا کوئی مارک ڈاؤن ہرگز نہ لکھیں۔ تفصیل کارڈ خود دکھا رہا ہے؛ آپ صرف اس کا مطلب بتائیں۔
+- پڑھنے والے سوال: ایک ٹول، ایک کارڈ، ایک چھوٹا جملہ۔ اکاؤنٹ کی کوئی بات بغیر ٹول کے نہ کہیں۔ نیچے کی فہرست میں سے کوئی بات ملتی ہو تو وہی ٹول چلائیں — «میں آپ کی بینکنگ میں مدد کر سکتی ہوں» جیسا گول جواب کبھی نہ دیں۔
+- «میرا آخری لین دین» → list_transactions(limit=1)، جو رسید کا کارڈ دکھاتا ہے۔
+- وقت: «پچھلا مہینہ»، «اس ہفتے»، «اگست میں»، «پچھلے سال» کو نیچے دی گئی آج کی تاریخ سے ISO تاریخوں میں بدلیں۔ دو عرصوں کا موازنہ ایک ہی spending_summary کال میں compare_from/compare_to کے ساتھ کریں۔
+- کارڈ: بند کرنا فوری ہے، PIN نہیں چاہیے۔ کھولنے کے لیے تصدیق اور PIN لازمی ہے۔ پورا کارڈ نمبر اور CVV یہاں ہوتے ہی نہیں — کوئی پوچھے تو نرمی سے کہیں کہ وہ ایپ کی کارڈ سکرین پر ہیں۔
+- زبان بدلنے کو کہیں تو update_profile(language) چلائیں اور آگے نئی زبان میں بات کریں۔
+- مٹانے والے کام (رابطہ یا بلر مٹانا، درخواست رد کرنا، زیرِ التوا کام منسوخ کرنا): ایک بار سادہ الفاظ میں پوچھیں، «جی ہاں» سنیں، پھر کریں۔
+
+INTENT -> TOOL -> CARD (one line per supported action; if the user's words match a row,
+call that tool — never answer with "I can help you with your banking needs"):
+| balance | get_balance | balance |
+| account info / my details | get_account | account |
+| change my name / Urdu name | update_profile(name?, urdu_name?) | profile |
+| switch language / bolo Urdu mein | update_profile(language) | profile |
+| what can you do / help | help | help |
+| my last transaction | list_transactions(limit=1) | receipt |
+| recent transactions | list_transactions(limit) | transactions |
+| transactions with X / of a category / in a period | list_transactions(q?, category?, from_date?, to_date?) | transactions |
+| what did I spend in <period> | spending_summary(from_date, to_date) | spending |
+| compare <period> with <period> | spending_summary(from_date, to_date, compare_from, compare_to) | spending + compare |
+| receipt for that transaction | get_transaction(transaction_id) | receipt |
+| statement for <period> | get_statement(year, month?) | statement |
+| list my statements | list_statements | statements |
+| show my card | get_card | card |
+| freeze my card | freeze_card | card (instant, NO PIN) |
+| unfreeze my card | unfreeze_card | confirmation (PIN) |
+| full card number / CVV | REFUSE — say it is on the Card screen; optionally get_card | card |
+| my saved recipients | list_recipients | recipients |
+| delete recipient X | delete_recipient(recipient_id) after a spoken yes | text |
+| cancel that pending payment | cancel_action(action_id) | confirmation (cancelled) |
+| which bills are due | list_due_bills | bills |
+| bills I already paid | list_transactions(category='bill', from_date, to_date) | transactions |
+| my saved billers | list_saved_billers(browse=true) | billers |
+| delete saved biller X | delete_saved_biller(saved_biller_id) after a spoken yes | text |
+| mobile load / top up | list_telcos then recharge | telco_chips then confirmation (PIN) |
+| my pockets | list_pockets | pockets |
+| create a pocket | create_pocket | pocket |
+| put money in a pocket | pocket_deposit | confirmation (PIN) |
+| take money out of a pocket | pocket_withdraw | confirmation (PIN) |
+| ask someone for money | request_money | request |
+| who owes me / my requests | list_requests(direction) | requests |
+| approve request <id> | approve_request(request_id) | confirmation (PIN) |
+| decline request <id> | decline_request(request_id) after a spoken yes | text |
+| show my QR code | get_my_qr | qr |
+| send money to X | search_recipients / list_institutions -> resolve_recipient -> send_money | confirmation (PIN) |
+| pay a bill | list_saved_billers -> lookup_bill -> pay_bill | confirmation (PIN) |"""
 
 SYSTEM_PROMPT_EN = """You are PAYO's assistant — a voice-first bank for elderly, non-technical users.
 Rules:
@@ -78,7 +167,65 @@ Rules:
   then pay_bill, do not ask again. Several saved billers -> ask which one (chips card). None saved ->
   ask the user for the biller and the reference/consumer number, call lookup_bill, show the result,
   then call pay_bill only once the user confirms. After a successful payment the app itself asks
-  "save this biller?" — only call save_biller if the user asks for it or accepts."""
+  "save this biller?" — only call save_biller if the user asks for it or accepts.
+- CARD TURNS ARE SPOKEN, NOT SHOWN. Whenever a tool emitted a card, the app HIDES your text
+  and only speaks it. So write at most TWO short sentences giving the gist — e.g. "Here are
+  your last five transactions; the largest was 142,928 rupees to Meezan Savings." Never
+  enumerate the rows, never repeat every number, never use bullets, asterisks, dashes as list
+  markers, or any markdown. The card already shows the detail; you say what it means.
+- READS: exactly one tool call, one card, one short sentence. Never state an account fact
+  without calling its tool, and never reply "I can help you with your banking needs" when a
+  row of the table below matches — call that tool instead.
+- "My last transaction" -> list_transactions(limit=1), which emits a RECEIPT card. Only use a
+  bigger limit when the user asked for several.
+- PERIODS: resolve "last month", "this week", "in August", "last year" to ISO dates using
+  today's date given below. To compare two periods, make ONE spending_summary call with
+  compare_from/compare_to — not two separate turns.
+- CARD SAFETY: freezing is instant and needs no PIN; UNfreezing makes a confirmation card and
+  needs the PIN. The full card number and CVV do not exist here — if asked, say warmly that
+  they are on the Card screen in the app, and offer the masked card instead.
+- LANGUAGE SWITCH: call update_profile(language) and reply in the new language from then on.
+- DESTRUCTIVE NON-MONEY ACTIONS (delete a recipient or saved biller, decline a request,
+  cancel a pending action): ask once in plain words, then act on a clear yes.
+
+INTENT -> TOOL -> CARD (one line per supported action; if the user's words match a row,
+call that tool — never answer with "I can help you with your banking needs"):
+| balance | get_balance | balance |
+| account info / my details | get_account | account |
+| change my name / Urdu name | update_profile(name?, urdu_name?) | profile |
+| switch language / bolo Urdu mein | update_profile(language) | profile |
+| what can you do / help | help | help |
+| my last transaction | list_transactions(limit=1) | receipt |
+| recent transactions | list_transactions(limit) | transactions |
+| transactions with X / of a category / in a period | list_transactions(q?, category?, from_date?, to_date?) | transactions |
+| what did I spend in <period> | spending_summary(from_date, to_date) | spending |
+| compare <period> with <period> | spending_summary(from_date, to_date, compare_from, compare_to) | spending + compare |
+| receipt for that transaction | get_transaction(transaction_id) | receipt |
+| statement for <period> | get_statement(year, month?) | statement |
+| list my statements | list_statements | statements |
+| show my card | get_card | card |
+| freeze my card | freeze_card | card (instant, NO PIN) |
+| unfreeze my card | unfreeze_card | confirmation (PIN) |
+| full card number / CVV | REFUSE — say it is on the Card screen; optionally get_card | card |
+| my saved recipients | list_recipients | recipients |
+| delete recipient X | delete_recipient(recipient_id) after a spoken yes | text |
+| cancel that pending payment | cancel_action(action_id) | confirmation (cancelled) |
+| which bills are due | list_due_bills | bills |
+| bills I already paid | list_transactions(category='bill', from_date, to_date) | transactions |
+| my saved billers | list_saved_billers(browse=true) | billers |
+| delete saved biller X | delete_saved_biller(saved_biller_id) after a spoken yes | text |
+| mobile load / top up | list_telcos then recharge | telco_chips then confirmation (PIN) |
+| my pockets | list_pockets | pockets |
+| create a pocket | create_pocket | pocket |
+| put money in a pocket | pocket_deposit | confirmation (PIN) |
+| take money out of a pocket | pocket_withdraw | confirmation (PIN) |
+| ask someone for money | request_money | request |
+| who owes me / my requests | list_requests(direction) | requests |
+| approve request <id> | approve_request(request_id) | confirmation (PIN) |
+| decline request <id> | decline_request(request_id) after a spoken yes | text |
+| show my QR code | get_my_qr | qr |
+| send money to X | search_recipients / list_institutions -> resolve_recipient -> send_money | confirmation (PIN) |
+| pay a bill | list_saved_billers -> lookup_bill -> pay_bill | confirmation (PIN) |"""
 
 
 URDU_MONTHS = ["جنوری", "فروری", "مارچ", "اپریل", "مئی", "جون", "جولائی", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"]
@@ -110,13 +257,57 @@ class NoArgs(BaseModel):
 
 
 class ListTransactionsArgs(BaseModel):
+    q: str | None = Field(None, description="free-text filter on counterparty name or reference")
     category: str | None = Field(None, description="food/transport/bills/recharge/savings/transfer/income")
-    limit: int = Field(5, description="max items")
+    from_date: str | None = Field(None, description="ISO date (YYYY-MM-DD)")
+    to_date: str | None = Field(None, description="ISO date (YYYY-MM-DD)")
+    limit: int = Field(5, description="max items; use limit=1 for 'my last transaction' (emits a receipt card)")
+
+
+class GetTransactionArgs(BaseModel):
+    transaction_id: str
 
 
 class SpendingSummaryArgs(BaseModel):
     from_date: str | None = Field(None, description="ISO date")
     to_date: str | None = Field(None, description="ISO date")
+    compare_from: str | None = Field(None, description="ISO start of the PREVIOUS period, to compare against")
+    compare_to: str | None = Field(None, description="ISO end of the previous period")
+
+
+class UpdateProfileArgs(BaseModel):
+    name: str | None = None
+    urdu_name: str | None = None
+    language: str | None = Field(None, description="'en' or 'ur'")
+
+
+class ListSavedBillersArgs(BaseModel):
+    browse: bool = Field(False, description="true when the user just wants to SEE their saved billers")
+
+
+class ListRequestsArgs(BaseModel):
+    direction: str | None = Field(None, description="'in' (people asking the user to pay) or 'out'")
+
+
+class RequestIdArgs(BaseModel):
+    request_id: str
+
+
+class RecipientIdArgs(BaseModel):
+    recipient_id: str
+
+
+class SavedBillerIdArgs(BaseModel):
+    saved_biller_id: str
+
+
+class ActionIdArgs(BaseModel):
+    action_id: str
+
+
+class PocketMoveArgs(BaseModel):
+    pocket_id: str
+    amount_paisa: int
 
 
 class StatementArgs(BaseModel):
@@ -193,10 +384,6 @@ class RequestMoneyArgs(BaseModel):
     from_phone: str = Field(description="+92XXXXXXXXXX")
     amount_paisa: int
     note: str | None = None
-
-
-class FreezeCardArgs(BaseModel):
-    frozen: bool = True
 
 
 def build_tools(
@@ -304,8 +491,21 @@ def build_tools(
 
     return [
         wrap(t.get_balance, "get_balance", "Get the user's current wallet balance.", NoArgs),
-        wrap(t.list_transactions, "list_transactions", "List recent transactions.", ListTransactionsArgs),
-        wrap(t.spending_summary, "spending_summary", "Spending totals by category over a date range.", SpendingSummaryArgs),
+        wrap(t.list_transactions, "list_transactions",
+             "List transactions, newest first. Filter with q (name/reference), category, "
+             "from_date/to_date. Use limit=1 for 'my last transaction' - that emits a receipt card.",
+             ListTransactionsArgs),
+        wrap(t.get_transaction, "get_transaction",
+             "One transaction by id (from a [cards] line) as a receipt card.", GetTransactionArgs),
+        wrap(t.spending_summary, "spending_summary",
+             "Spending totals by category over a date range; pass compare_from/compare_to to "
+             "compare against the previous period in the same card.", SpendingSummaryArgs),
+        wrap(t.get_account, "get_account", "The user's account details (name, phone, member since, balance, language).", NoArgs),
+        wrap(t.update_profile, "update_profile",
+             "Change the user's name, Urdu name and/or app language ('en'/'ur'). After a "
+             "language change, reply in the NEW language.", UpdateProfileArgs),
+        wrap(t.help, "help", "Show what PAYO can do as a tappable help card.", NoArgs),
+        wrap(t.list_statements, "list_statements", "List the statements already generated for this user.", NoArgs),
         wrap(t.get_statement, "get_statement",
              "Generate an account statement with a downloadable PDF.", StatementArgs),
         wrap(t.list_institutions, "list_institutions",
@@ -325,28 +525,54 @@ def build_tools(
              "Look up a bill for a consumer number plus either biller_id or biller_name (the "
              "display name is mapped to the id for you).", LookupBillArgs),
         wrap(t.list_due_bills, "list_due_bills",
-             "List the user's currently due bills (each due bill returns its own bill card), "
-             "including due bills of saved billers.", NoArgs),
+             "List the user's currently due bills, including those of saved billers. Emits ONE "
+             "`bills` card listing every due bill.", NoArgs),
+        wrap(t.delete_saved_biller, "delete_saved_biller",
+             "Delete a saved biller. Ask the user once in prose and act on a clear yes.", SavedBillerIdArgs),
+        wrap(t.list_recipients, "list_recipients",
+             "Show ALL the user's saved recipients as a tappable list.", NoArgs),
+        wrap(t.delete_recipient, "delete_recipient",
+             "Delete a saved recipient. Ask the user once in prose and act on a clear yes.", RecipientIdArgs),
+        wrap(t.cancel_action, "cancel_action",
+             "Cancel a pending action (action_id from a [cards] line) the user no longer wants.", ActionIdArgs),
+        wrap(t.list_telcos, "list_telcos",
+             "List mobile networks as tappable chips - call this first for a mobile top-up when "
+             "the user has not named the network.", NoArgs),
+        wrap(t.get_my_qr, "get_my_qr", "Show the user's own PAYO QR code so others can pay them.", NoArgs),
         wrap(t.list_saved_billers, "list_saved_billers",
              "List the user's saved billers. For a 'pay a bill' request, call this FIRST. One saved "
              "biller -> immediately call lookup_bill then pay_bill, do not ask again. Several -> a "
              "chips card is shown, ask which. None saved -> ask for the biller and reference number, "
-             "then use list_billers/lookup_bill.", NoArgs),
+             "then use list_billers/lookup_bill. Pass browse=true when the user only wants to SEE "
+             "their saved billers - that shows a billers card.", ListSavedBillersArgs),
         wrap(t.save_biller, "save_biller",
              "Save a looked-up biller + consumer number under a nickname for future payments. Only "
              "call this if the user asks to save or accepts the app's save prompt after a successful "
              "payment.", SaveBillerArgs),
         wrap(t.list_pockets, "list_pockets", "List the user's savings pockets with balances and goals.", NoArgs),
-        wrap(t.get_card_status, "get_card_status", "Whether the user's virtual debit card is active or frozen.", NoArgs),
-        wrap(t.list_requests, "list_requests", "List incoming and outgoing money requests.", NoArgs),
+        wrap(t.get_card, "get_card",
+             "The user's virtual debit card: last-4, masked number, expiry, frozen state. The "
+             "full number and CVV are never available - they are only on the app's Card screen.", NoArgs),
+        wrap(t.list_requests, "list_requests",
+             "List money requests; direction='in' for people asking the user to pay.", ListRequestsArgs),
+        wrap(t.approve_request, "approve_request",
+             "Prepare paying an incoming money request (confirmation card; PIN).", RequestIdArgs),
+        wrap(t.decline_request, "decline_request",
+             "Decline an incoming money request. Ask once in prose and act on a clear yes.", RequestIdArgs),
         send_money_tool,
         wrap(t.pay_bill, "pay_bill", "Prepare paying a bill found via lookup_bill (confirmation card; PIN).", PayBillArgs),
         wrap(t.recharge, "recharge", "Prepare a mobile top-up (confirmation card; PIN).", RechargeArgs),
         wrap(t.create_pocket, "create_pocket", "Create a savings pocket.", CreatePocketArgs),
         wrap(t.pocket_deposit, "pocket_deposit",
              "Prepare moving money into a pocket (confirmation card, no PIN).", PocketDepositArgs),
+        wrap(t.pocket_withdraw, "pocket_withdraw",
+             "Prepare taking money out of a pocket (confirmation card; PIN).", PocketMoveArgs),
         wrap(t.request_money, "request_money", "Ask another PAYO user to pay you.", RequestMoneyArgs),
-        wrap(t.freeze_card, "freeze_card", "Freeze or unfreeze the user's card immediately.", FreezeCardArgs),
+        wrap(t.freeze_card, "freeze_card",
+             "Freeze the user's card IMMEDIATELY - a panic action, no PIN, no confirmation.", NoArgs),
+        wrap(t.unfreeze_card, "unfreeze_card",
+             "Prepare UNfreezing the card - security-sensitive, so it makes a confirmation card "
+             "the user must confirm with their PIN.", NoArgs),
     ]
 
 
@@ -408,7 +634,7 @@ async def run_agent(
         state = await agent.ainvoke({"messages": lang_nudged}, config={"recursion_limit": 12})
         reply = strip_cards_marker(_last_reply(state))
         extra_invocations += 1
-    return str(reply), cards
+    return spoken_text(str(reply)), cards
 
 
 # At most this many nudge re-invocations per turn, across ALL guards (card, prose,
@@ -446,6 +672,19 @@ _ASKS_BILLER_RE = re.compile(
     r"کون سا بلر|کنزیومر نمبر|ریفرنس نمبر", re.IGNORECASE
 )
 _BILL_WORDS_RE = re.compile(r"\bbill\b|\bbills\b|بل", re.IGNORECASE)
+
+
+# Leading list markers the model sometimes emits despite the prompt rule ("* ", "- ", "• ",
+# "1. "), and markdown emphasis. Card turns are spoken aloud, so a bullet character would be
+# read out or heard as a pause — strip them before the reply is tokenized, spoken or stored.
+_BULLET_RE = re.compile(r"^\s*(?:[-*\u2022\u2023\u25cf\u25aa]+|\d+[.)])\s+", re.MULTILINE)
+_EMPHASIS_RE = re.compile(r"(\*\*|__|\*|_|`)")
+
+
+def spoken_text(reply: str) -> str:
+    """One speakable paragraph: no bullet markers, no markdown, no hard line breaks."""
+    without_bullets = _BULLET_RE.sub("", reply)
+    return " ".join(_EMPHASIS_RE.sub("", without_bullets).split())
 
 
 def strip_cards_marker(reply: str) -> str:

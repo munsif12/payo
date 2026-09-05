@@ -59,7 +59,7 @@ async def test_lookup_bill_returns_bill_card(fake_backend):
     assert r["card"]["amountPaisa"] == 432000
 
 
-async def test_list_due_bills_returns_a_card_per_bill(fake_backend):
+async def test_list_due_bills_returns_one_bills_card(fake_backend):
     fake_backend.route("GET", "/api/v1/bills/due", {"items": [
         {
             "billId": "b1", "biller": {"id": "kel", "name": "K-Electric", "urduName": "کے الیکٹرک", "category": "electricity"},
@@ -71,13 +71,13 @@ async def test_list_due_bills_returns_a_card_per_bill(fake_backend):
         },
     ]})
     r = await tools.list_due_bills(await client_for(fake_backend))
-    assert isinstance(r["card"], list) and len(r["card"]) == 2
-    assert [c["kind"] for c in r["card"]] == ["bill", "bill"]
-    assert r["card"][0] == {
-        "kind": "bill", "billId": "b1", "biller": "K-Electric", "consumerName": "0400012345678",
+    assert r["card"]["kind"] == "bills"
+    assert len(r["card"]["items"]) == 2
+    assert r["card"]["items"][0] == {
+        "billId": "b1", "biller": "K-Electric", "consumerName": "0400012345678",
         "amountPaisa": 432000, "dueDate": "2026-09-10T00:00:00.000Z", "month": "2026-08",
     }
-    assert r["card"][1]["billId"] == "b2"
+    assert r["card"]["items"][1]["billId"] == "b2"
     assert "K-Electric" in r["text"] and "SSGC" in r["text"]
 
 
@@ -238,18 +238,21 @@ async def test_pay_bill_returns_confirmation(fake_backend):
 
 async def test_freeze_card_is_direct_no_pending(fake_backend):
     fake_backend.route("POST", "/api/v1/cards/mine/freeze", {"id": "cd", "pan": "4111 1162 7073 9405", "cvv": "102", "expiry": "09/29", "frozen": True})
-    r = await tools.freeze_card(await client_for(fake_backend), True)
-    assert r["card"] is None
+    r = await tools.freeze_card(await client_for(fake_backend))
+    assert r["card"]["kind"] == "card"
+    assert r["card"]["frozen"] is True
+    assert "pan" not in r["card"] and "cvv" not in r["card"]
     assert "FROZEN" in r["text"]
 
 
-async def test_list_pockets_returns_pocket_card(fake_backend):
+async def test_list_pockets_returns_pockets_card_with_progress(fake_backend):
     fake_backend.route("GET", "/api/v1/pockets", {"items": [
         {"id": "p1", "name": "Umrah Fund", "urduName": "عمرہ فنڈ", "emoji": "🕋", "balancePaisa": 12_200_000, "goalPaisa": 50_000_000},
     ]})
     r = await tools.list_pockets(await client_for(fake_backend))
-    assert r["card"]["kind"] == "pocket"
-    assert r["card"]["goalPaisa"] == 50_000_000
+    assert r["card"]["kind"] == "pockets"
+    assert r["card"]["items"][0]["goalPaisa"] == 50_000_000
+    assert r["card"]["items"][0]["progress"] == 0.244
 
 
 async def test_backend_error_becomes_error_text(fake_backend):
@@ -269,3 +272,112 @@ async def test_spending_summary_text(fake_backend):
     })
     r = await tools.spending_summary(await client_for(fake_backend))
     assert "food" in r["text"] and "19,029" in r["text"]
+
+
+# ---- v5 tools (spec §4.1) ----
+
+async def test_get_card_never_exposes_pan_or_cvv(fake_backend):
+    """Hard rule (spec §1.4): the full number and CVV must not reach the model or a card."""
+    from tests.fixtures_backend import CARD_DTO
+    fake_backend.route("GET", "/api/v1/cards/mine", CARD_DTO)
+    r = await tools.get_card(await client_for(fake_backend))
+    blob = str(r["card"]) + r["text"]
+    assert CARD_DTO["pan"] not in blob and CARD_DTO["pan"].replace(" ", "") not in blob
+    assert CARD_DTO["cvv"] not in str(r["card"])
+    assert "pan" not in r["card"] and "cvv" not in r["card"]
+    assert r["card"] == {
+        "kind": "card", "last4": "9405", "maskedPan": "•••• •••• •••• 9405",
+        "expiry": "09/29", "frozen": False, "holder": "AMMI JAAN",
+    }
+
+
+async def test_unfreeze_card_is_a_pin_gated_pending_action(fake_backend):
+    from tests.fixtures_backend import pending
+    fake_backend.route("POST", "/api/v1/cards/mine/unfreeze", pending("act_uf", "card_unfreeze", 0))
+    r = await tools.unfreeze_card(await client_for(fake_backend))
+    assert r["card"]["kind"] == "confirmation"
+    assert r["card"]["requiresPin"] is True
+    assert r["card"]["autoOpenPin"] is True
+
+
+async def test_list_transactions_limit_one_emits_a_receipt_card(fake_backend):
+    from tests.fixtures_backend import TXN
+    fake_backend.route("GET", "/api/v1/transactions", {"items": [TXN]})
+    r = await tools.list_transactions(await client_for(fake_backend), limit=1)
+    assert r["card"]["kind"] == "receipt"
+    assert r["card"]["txn"]["id"] == "txn1"
+    assert "PY123456" in r["card"]["shareText"]["en"]
+
+
+async def test_list_transactions_passes_the_q_filter_through(fake_backend):
+    from tests.fixtures_backend import TXN
+    fake_backend.route("GET", "/api/v1/transactions", {"items": [TXN, TXN]})
+    r = await tools.list_transactions(await client_for(fake_backend), q="Bilal", from_date="2026-08-01")
+    assert r["card"]["kind"] == "transactions"
+    params = fake_backend.requests[0].url.params
+    assert params["q"] == "Bilal" and params["from"] == "2026-08-01"
+
+
+async def test_spending_summary_fills_the_compare_block(fake_backend):
+    from tests.fixtures_backend import _spending_responder
+    fake_backend.route("GET", "/api/v1/transactions/spending-summary", responder=_spending_responder)
+    r = await tools.spending_summary(
+        await client_for(fake_backend), from_date="2026-08-01", to_date="2026-08-31",
+        compare_from="2026-07-01", compare_to="2026-07-31",
+    )
+    card = r["card"]
+    assert card["kind"] == "spending"
+    assert card["totalOutPaisa"] == 812000
+    assert card["compare"]["totalOutPaisa"] == 700000
+    assert card["compare"]["deltaPaisa"] == 112000          # current - previous
+    assert card["compare"]["deltaPct"] == 16.0              # rounded to 1 decimal
+    assert card["byCategory"][0]["share"] == round(412000 / 812000, 4)
+    assert card["byCategory"][0]["label"] == {"en": "Food", "ur": "کھانا"}
+
+
+async def test_spending_summary_compare_is_none_safe_when_the_previous_period_is_zero(fake_backend):
+    from tests.conftest import ok
+    zero = {"totalOutPaisa": 0, "totalInPaisa": 0, "byCategory": []}
+    now = {"totalOutPaisa": 5000, "totalInPaisa": 0, "byCategory": []}
+    calls = []
+
+    def responder(request):
+        calls.append(request)
+        return ok(zero if len(calls) > 1 else now)
+
+    fake_backend.route("GET", "/api/v1/transactions/spending-summary", responder=responder)
+    r = await tools.spending_summary(await client_for(fake_backend), from_date="2026-08-01",
+                                     compare_from="2026-07-01")
+    assert r["card"]["compare"]["deltaPaisa"] == 5000
+    assert "deltaPct" not in r["card"]  # excluded because it is None — undefined against zero
+
+
+async def test_update_profile_reports_exactly_what_changed(fake_backend):
+    fake_backend.route("PATCH", "/api/v1/me", {"id": "u1", "name": "Ammi Jaan", "urduName": "امی جان", "language": "en"})
+    r = await tools.update_profile(await client_for(fake_backend), language="en")
+    assert r["card"]["kind"] == "profile"
+    assert r["card"]["applied"] == ["language"]
+    assert r["card"]["language"] == "en"
+    assert body_of(fake_backend.requests[0]) == {"language": "en"}
+
+
+async def test_update_profile_with_nothing_to_change_is_an_error(fake_backend):
+    r = await tools.update_profile(await client_for(fake_backend))
+    assert r["card"] is None and r["text"].startswith("ERROR")
+
+
+async def test_help_returns_a_bilingual_help_card(fake_backend):
+    r = await tools.help(await client_for(fake_backend))
+    assert r["card"]["kind"] == "help"
+    assert len(r["card"]["intents"]) >= 10
+    for intent in r["card"]["intents"]:
+        assert intent["label"]["en"] and intent["label"]["ur"]
+        assert intent["intent"]["en"] and intent["intent"]["ur"]
+
+
+async def test_cancel_action_returns_a_cancelled_confirmation_that_does_not_open_the_pin_sheet(fake_backend):
+    from tests.fixtures_backend import pending
+    fake_backend.route("POST", "/api/v1/actions/act1/cancel", {**pending(), "status": "cancelled"})
+    r = await tools.cancel_action(await client_for(fake_backend), "act1")
+    assert r["card"]["kind"] == "confirmation"
+    assert r["card"]["autoOpenPin"] is False

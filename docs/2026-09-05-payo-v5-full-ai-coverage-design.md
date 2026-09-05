@@ -114,6 +114,11 @@ compare_from?, compare_to?)`, `list_statements`, `get_card` (returns last-4/expi
 ### 4.3 Prompt policy additions (both languages)
 - Reads: one tool call, one card, one short sentence. Never answer an account question
   without the tool; never say "I can help you with…" when a listed intent matches.
+- **Card turns are spoken, not shown (owner, 2026-09-06).** When a card is emitted the app
+  hides the assistant's text and only plays it. So the text must be a spoken summary of ≤ 2
+  short sentences — the gist an older listener needs ("Here are your last five; the largest
+  was Rs 142,928 to Meezan Savings") — and must NEVER enumerate the card's rows, repeat its
+  numbers one by one, or use bullets/markdown. Both languages.
 - "Last transaction" → `list_transactions(limit=1)` and emit `receipt`, not `transactions`.
 - Periods: resolve "last month", "this week", "in August", "last year" to ISO dates using
   `today` (already in the prompt). Compare → two summaries in one turn.
@@ -148,6 +153,9 @@ compare_from?, compare_to?)`, `list_statements`, `get_card` (returns last-4/expi
 
 ## 6. Mobile (`apps/mobile`)
 
+- **Card-only bubbles (owner, 2026-09-06):** an assistant message that carries one or more
+  cards renders the cards only — its text is not displayed (it is still received, persisted
+  and spoken via TTS). Applies to every card kind. Messages without cards show text as today.
 - New renderers in `CardView.tsx` for every §4.2 kind, kit components only; `spending` uses
   plain bars (no chart library); `qr` uses the existing QR renderer from `app/qr`.
 - `confirmation` with `autoOpenPin` → `openPinSheet(action)` immediately; on cancel the card
