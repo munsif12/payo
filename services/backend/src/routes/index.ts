@@ -19,11 +19,17 @@ import { listBillers } from '../controllers/billsController';
 import { listTelcos, createRecharge } from '../controllers/rechargesController';
 import { me } from '../controllers/authController';
 import { updateMe } from '../controllers/meController';
+import { getDigest } from '../controllers/digestController';
+import { guardianRoutes } from './guardianRoutes';
+import { approvalRoutes } from './approvalRoutes';
 
 export const apiRouter = Router();
 apiRouter.use('/auth', authRoutes);
 apiRouter.get('/me', requireAuth, handler(me));
 apiRouter.patch('/me', requireAuth, handler(updateMe));
+apiRouter.get('/me/digest', requireAuth, handler(getDigest));
+apiRouter.use('/guardian', requireAuth, guardianRoutes);
+apiRouter.use('/approvals', requireAuth, approvalRoutes);
 apiRouter.use('/actions', requireAuth, actionRoutes);
 apiRouter.use('/institutions', requireAuth, institutionRoutes);
 apiRouter.use('/recipients', requireAuth, recipientRoutes);

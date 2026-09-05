@@ -15,14 +15,31 @@ export async function createPendingAction(i: {
   userId: string; kind: string; payload: unknown; amountPaisa: number; feePaisa: number;
   summary: { en: string; ur: string }; lines: { label: { en: string; ur: string }; value: string }[];
   requiresPin?: boolean;
+  // Guardian / scam gates (v6). `expiryMs` widens the 2-minute window to 30 minutes when
+  // an approval or a check-in has to happen inside it.
+  approval?: { required: true; guardianId: string; status: 'waiting' } | undefined;
+  riskFlags?: string[] | undefined;
+  expiryMs?: number | undefined;
 }) {
-  return PendingAction.create({ ...i, expiresAt: new Date(Date.now() + EXPIRY_MS) });
+  const { expiryMs, ...rest } = i;
+  return PendingAction.create({ ...rest, expiresAt: new Date(Date.now() + (expiryMs ?? EXPIRY_MS)) });
 }
 
 export const toActionDto = (a: PADoc) => ({
   id: String(a._id), kind: a.kind, amountPaisa: a.amountPaisa, feePaisa: a.feePaisa,
   summary: a.summary, lines: a.lines, requiresPin: a.requiresPin,
   expiresAt: a.expiresAt.toISOString(), status: a.status,
+  cancelReason: a.cancelReason ?? null,
+  approval: a.approval
+    ? {
+      required: a.approval.required, guardianId: String(a.approval.guardianId), status: a.approval.status,
+      decidedAt: a.approval.decidedAt?.toISOString() ?? null,
+      reason: a.approval.reason ?? null,
+      remindedAt: a.approval.remindedAt?.toISOString() ?? null,
+    }
+    : null,
+  riskFlags: [...a.riskFlags],
+  checkIn: a.checkIn ? { answered: a.checkIn.answered, someoneAsked: a.checkIn.someoneAsked } : null,
 });
 
 export const txnDto = (t: TxnDoc) => ({
@@ -39,6 +56,13 @@ export async function executeAction(userId: string, actionId: string, pin: strin
   if (!found) throw new ApiError(404, 'NOT_FOUND', 'Action not found');
   if (found.status !== 'pending' || found.expiresAt < new Date())
     throw new ApiError(410, 'ACTION_GONE', 'Action expired or already handled');
+  // Guardian and scam gates sit BEFORE the PIN check and never replace it: an approved
+  // action still needs the payer's own PIN below. A declined/cancelled action has already
+  // fallen out above as 410 ACTION_GONE.
+  if (found.approval && found.approval.status === 'waiting')
+    throw new ApiError(403, 'APPROVAL_REQUIRED', 'Waiting for your trusted contact to approve');
+  if (found.riskFlags.length && !found.checkIn?.answered)
+    throw new ApiError(403, 'CHECKIN_REQUIRED', 'Answer the safety check first');
   if (found.requiresPin) {
     const user = await User.findById(userId);
     if (!user) throw new ApiError(401, 'INVALID_PIN', 'Wrong PIN');

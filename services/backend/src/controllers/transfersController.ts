@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { Recipient } from '../models';
+import { Account, Recipient, User } from '../models';
 import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { createPendingAction, toActionDto } from '../lib/pendingActions';
 import { feeFor } from '../config/fees';
 import { fmtRs } from '../lib/fmt';
 import { resolveRecipient, maskIdentifier } from '../lib/resolveRecipient';
+import { applyDueGuardianPending, evaluateSend, isNewRecipient, CLIENT_RISK_FLAGS } from '../lib/guardian';
 
 const resolveBodySchema = z.object({ institutionId: z.string(), identifier: z.string().min(1) });
 
@@ -23,6 +24,9 @@ const bodySchema = z.object({
   ]),
   amountPaisa: z.number().int().positive(),
   note: z.string().optional(),
+  // Conversation-pattern signals from the AI service. Allow-listed: the client may only
+  // assert `pressure_language`; `new_recipient_large` is the backend's to add.
+  riskFlags: z.array(z.enum(CLIENT_RISK_FLAGS)).optional(),
 });
 
 const LINE_TO = { en: 'To', ur: 'وصول کنندہ' };
@@ -30,7 +34,7 @@ const LINE_AMOUNT = { en: 'Amount', ur: 'رقم' };
 const LINE_FEE = { en: 'Fee', ur: 'فیس' };
 
 export async function createTransfer(req: Request, res: Response) {
-  const { to, amountPaisa } = bodySchema.parse(req.body);
+  const { to, amountPaisa, riskFlags: clientRiskFlags } = bodySchema.parse(req.body);
 
   let institutionId: string; let identifier: string; let recipientId: string | undefined;
   if ('recipientId' in to) {
@@ -62,9 +66,21 @@ export async function createTransfer(req: Request, res: Response) {
   ];
   if (feePaisa > 0) lines.push({ label: LINE_FEE, value: fmtRs(feePaisa) });
 
+  const [user, account] = await Promise.all([
+    User.findById(req.userId), Account.findOne({ userId: req.userId }),
+  ]);
+  if (!user || !account) throw new ApiError(404, 'NOT_FOUND', 'User not found');
+  await applyDueGuardianPending(user);
+  const risk = evaluateSend({
+    user, amountPaisa, balancePaisa: account.balancePaisa,
+    newRecipient: await isNewRecipient(req.userId, resolved.institution.id, resolved.identifier),
+    clientRiskFlags: clientRiskFlags ?? [],
+  });
+
   const action = await createPendingAction({
     userId: req.userId, kind, payload,
     amountPaisa, feePaisa,
+    approval: risk.approval, riskFlags: risk.riskFlags, expiryMs: risk.expiryMs,
     summary: {
       en: `Send ${fmtRs(amountPaisa)} to ${resolved.title}`,
       ur: `${resolved.title} کو ${fmtRs(amountPaisa)} بھیجیں`,

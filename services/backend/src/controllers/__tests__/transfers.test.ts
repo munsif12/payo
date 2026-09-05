@@ -14,6 +14,12 @@ async function executeAction(token: string, actionId: string, pin = '1234') {
     .set('Authorization', `Bearer ${token}`).send({ pin });
 }
 
+/** v6: a `new_recipient_large` send is gated by the scam check-in even with no guardian. */
+async function answerCheckIn(token: string, actionId: string, someoneAsked = false) {
+  return request(app).post(`/api/v1/actions/${actionId}/check-in`)
+    .set('Authorization', `Bearer ${token}`).send({ someoneAsked });
+}
+
 async function makePayo() {
   return Institution.create({ name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true });
 }
@@ -59,6 +65,7 @@ test('Bank: fee 2500, institution+masked identifier on the line, debit 502500 on
   expect(values).toMatch(/Meezan/);
   expect(values).toMatch(/\*\*\*\*6702/);
 
+  await answerCheckIn(a.token, create.body.data.id);
   await executeAction(a.token, create.body.data.id);
   expect(await balance(a.userId)).toBe(497_500);
 });
@@ -129,6 +136,7 @@ test('insufficient funds at execute → 400, recipient balance unchanged', async
   const create = await request(app).post('/api/v1/transfers')
     .set('Authorization', `Bearer ${a.token}`)
     .send({ to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: 5_000_000 });
+  await answerCheckIn(a.token, create.body.data.id);
   const exec = await executeAction(a.token, create.body.data.id);
   expect(exec.status).toBe(400);
   expect(await balance(a.userId)).toBe(1_000_000);

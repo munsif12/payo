@@ -89,9 +89,12 @@ test('verify-pin with a session token just checks the pin ({ valid: true })', as
 
 test('wrong OTP 5 times → 429 OTP_LOCKED', async () => {
   const r = await request(app).post('/api/v1/auth/request-otp').send({ phone: PHONE });
+  // Derive the guess from the issued code so it can never accidentally BE the issued code —
+  // the demo OTP is 6 random digits, so a hard-coded '000000' is a 1-in-a-million flake.
+  const wrong = r.body.data.demoOtp === '000000' ? '111111' : '000000';
   let last;
   for (let i = 0; i < 5; i++) {
-    last = await request(app).post('/api/v1/auth/verify-otp').send({ phone: PHONE, otp: '000000' });
+    last = await request(app).post('/api/v1/auth/verify-otp').send({ phone: PHONE, otp: wrong });
   }
   expect(last!.status).toBe(429);
   expect(last!.body.code).toBe('OTP_LOCKED');

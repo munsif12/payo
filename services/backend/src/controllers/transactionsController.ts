@@ -93,11 +93,18 @@ export interface SpendingSummary {
   txnCount: number;
 }
 
-export async function summarizeTransactions(userId: string, from?: Date, to?: Date): Promise<SpendingSummary> {
+/**
+ * `to` is INCLUSIVE by default (what GET /spending-summary?to= means). Pass
+ * `{ toExclusive: true }` for adjacent windows — a month baseline ending exactly where the
+ * next month starts must not count the transaction sitting on that boundary twice.
+ */
+export async function summarizeTransactions(
+  userId: string, from?: Date, to?: Date, opts: { toExclusive?: boolean } = {},
+): Promise<SpendingSummary> {
   const match: Record<string, unknown> = { userId: new Types.ObjectId(userId) };
   const range: Record<string, Date> = {};
   if (from) range.$gte = from;
-  if (to) range.$lte = to;
+  if (to) range[opts.toExclusive ? '$lt' : '$lte'] = to;
   if (Object.keys(range).length) match.createdAt = range;
 
   const rows = await Transaction.aggregate([

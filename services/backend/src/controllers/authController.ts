@@ -7,6 +7,7 @@ import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { signSession, signOtpToken } from '../lib/tokens';
 import { assertPinOk } from '../lib/pinAuth';
+import { applyDueGuardianPending, guardianSummary } from '../lib/guardian';
 
 const pinSchema = z.string().regex(/^\d{4}$/, 'PIN must be 4 digits');
 const phoneSchema = z.string().regex(/^\+92\d{10}$/, 'Phone must be +92XXXXXXXXXX');
@@ -22,6 +23,9 @@ export function publicUser(u: InstanceType<typeof User>) {
     id: String(u._id), name: u.name, urduName: u.urduName ?? undefined,
     email: u.email ?? undefined, phone: u.phone, avatar: u.avatar ?? undefined,
     language: u.language, pinSet: u.pinSet,
+    preferences: { proactiveGreeting: u.preferences.proactiveGreeting },
+    // Only what the payer needs to render "protected by …" — never the guardian's user id.
+    guardian: guardianSummary(u),
   };
 }
 
@@ -122,6 +126,7 @@ export async function me(req: Request, res: Response) {
     User.findById(req.userId), Account.findOne({ userId: req.userId }), Card.findOne({ userId: req.userId }),
   ]);
   if (!user || !account || !card) throw new ApiError(404, 'NOT_FOUND', 'User not found');
+  await applyDueGuardianPending(user);
   return ok(res, {
     user: publicUser(user),
     account: { id: String(account._id), balancePaisa: account.balancePaisa },
