@@ -43,7 +43,7 @@ export async function runSeed() {
   for (const [idx, su] of SEED_USERS.entries()) {
     const user = await User.create({
       name: su.name, urduName: su.urduName, email: su.email, phone: su.phone, pinHash, pinSet: true,
-      language: su.language,
+      language: su.language, dateOfBirth: new Date(`${su.dateOfBirth}T00:00:00.000Z`),
     });
     const rand = mulberry32(idx + 1);
     const panRest = String(Math.floor(rand() * 1e10)).padStart(10, '0');

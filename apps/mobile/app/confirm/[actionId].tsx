@@ -10,6 +10,7 @@ import { takeAction, markActionDone } from '../../src/store/pendingActionHolder'
 import { usePinSheet } from '../../src/pin/usePinSheet';
 import { useCancelActionMutation, useExecuteActionMutation, apiErr } from '../../src/api/client';
 import { formatPaisa } from '../../src/lib/money';
+import type { Txn } from '../../src/api/types';
 
 export default function ConfirmAction() {
   const { t } = useTranslation();
@@ -37,7 +38,7 @@ export default function ConfirmAction() {
   // already executed, so just return to where the user came from. In practice
   // card actions are only ever created from chat, which renders a `card` card
   // instead of routing here.
-  const goToSuccess = (transaction: { refNo: string; amountPaisa: number } | null, extras?: {
+  const goToSuccess = (transaction: Txn | null, extras?: {
     recipientSuggestion?: unknown;
     billerSuggestion?: unknown;
   }) => {
@@ -51,6 +52,10 @@ export default function ConfirmAction() {
         refNo: transaction.refNo,
         amountPaisa: String(transaction.amountPaisa),
         summary: summaryText,
+        // F2: the success screen speaks the outcome, and needs the transaction
+        // itself (type + counterparty) to word it — the same JSON-through-params
+        // hand-off the activity list already uses for /txn/[id].
+        txn: JSON.stringify(transaction),
         recipientSuggestion: extras?.recipientSuggestion ? JSON.stringify(extras.recipientSuggestion) : undefined,
         billerSuggestion: extras?.billerSuggestion ? JSON.stringify(extras.billerSuggestion) : undefined,
       },

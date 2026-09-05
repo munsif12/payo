@@ -6,6 +6,7 @@ import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { resolveRecipient } from '../lib/resolveRecipient';
 import { escapeRegExp } from '../lib/fmt';
+import { logoUrlFor } from '../lib/logos';
 
 type RecipientDoc = InstanceType<typeof Recipient>;
 
@@ -18,7 +19,10 @@ async function recipientDto(r: RecipientDoc) {
   if (!institution) return null;
   return {
     id: String(r._id), nickname: r.nickname,
-    institution: { id: String(institution._id), name: institution.name, urduName: institution.urduName, kind: institution.kind },
+    institution: {
+      id: String(institution._id), name: institution.name, urduName: institution.urduName, kind: institution.kind,
+      domain: institution.domain, logoUrl: logoUrlFor(institution.domain),
+    },
     identifier: r.identifier, title: r.title,
     linkedUserId: r.linkedUserId ? String(r.linkedUserId) : undefined,
     lastUsedAt: r.lastUsedAt.toISOString(),

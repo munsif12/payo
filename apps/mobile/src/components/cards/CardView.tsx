@@ -10,7 +10,7 @@ import {
   Sparkles, TrendingUp, Users, Zap, type LucideIcon,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { Text, Card as NewCard, Button, Input, Pill, Avatar, ListRow, useIsUrdu } from '../../ui';
+import { Text, Card as NewCard, Button, Input, Pill, Avatar, InstitutionLogo, ListRow, useIsUrdu } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { space, radius, touch } from '../../theme/tokens';
 import { usePressScale } from '../../motion/usePressScale';
@@ -27,6 +27,7 @@ import { maskIdentifier } from '../../lib/mask';
 import i18n, { applyLanguage } from '../../i18n';
 import type { PendingAction, CardSummary, RecipientSuggestion, BillerSuggestion } from '../../api/types';
 import type { ChatCard, ChatMessage } from '../../voice/useConverse';
+import { useOutcomeSpeech } from '../../voice/OutcomeSpeechProvider';
 import {
   claimAutoOpenPin, releaseAutoOpen, buildResultCards, showConfirmationAmount,
 } from './confirmationPolicy';
@@ -105,6 +106,7 @@ function ConfirmationCardView({ card, onAppendLocal, live }: {
   const { t } = useTranslation();
   const urdu = useIsUrdu();
   const { openPinSheet } = usePinSheet();
+  const { speak } = useOutcomeSpeech();
   const [execute] = useExecuteActionMutation();
   const summary = card.summary as { en: string; ur: string };
   const done = useActionDone(String(card.actionId));
@@ -129,6 +131,9 @@ function ConfirmationCardView({ card, onAppendLocal, live }: {
           const res = await execute({ id: action.id }).unwrap();
           markActionDone(action.id);
           onAppendLocal?.({ role: 'assistant', text: '', cards: buildResultCards(summary, res, res.recipientSuggestion, res.billerSuggestion) });
+          // F2: the cards appear silently otherwise. Spoken for the no-PIN path
+          // too — the outcome is the same one, it just needed no PIN to reach.
+          speak(res, action);
         } catch (e) {
           onAppendLocal?.({ role: 'error', text: apiErr(e).message, cards: [] });
         }
@@ -136,6 +141,7 @@ function ConfirmationCardView({ card, onAppendLocal, live }: {
       }
       const res = await openPinSheet(action);
       onAppendLocal?.({ role: 'assistant', text: '', cards: buildResultCards(summary, res, res.recipientSuggestion, res.billerSuggestion) });
+      speak(res, action);
     } catch (e) {
       // openPinSheet rejects with 'cancelled' (sheet dismissed/swiped away) or
       // 'busy' (a sheet is already open for another action) — an execute
@@ -201,13 +207,17 @@ function BalanceCardView({ card }: { card: ChatCard }) {
   );
 }
 
-function ChipRow({ label, detail, onPress, testID }: {
+function ChipRow({ label, detail, logo, onPress, testID }: {
   label: string;
   detail?: string;
+  /** F1: the institution / biller mark, rendered before the label inside the chip.
+   *  The chip keeps its ≥44pt height either way — the 24pt mark fits inside it. */
+  logo?: React.ReactNode;
   onPress: () => void;
   testID?: string;
 }) {
   const { c } = useTheme();
+  const urdu = useIsUrdu();
   const { style, onPressIn, onPressOut } = usePressScale();
   return (
     <AnimatedPressable
@@ -229,8 +239,20 @@ function ChipRow({ label, detail, onPress, testID }: {
         style,
       ]}
     >
-      <Text variant="sub" weight={600}>{label}</Text>
-      {detail ? <Text variant="foot">{detail}</Text> : null}
+      {logo ? (
+        <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.s }}>
+          {logo}
+          <View style={{ flexShrink: 1 }}>
+            <Text variant="sub" weight={600}>{label}</Text>
+            {detail ? <Text variant="foot">{detail}</Text> : null}
+          </View>
+        </View>
+      ) : (
+        <>
+          <Text variant="sub" weight={600}>{label}</Text>
+          {detail ? <Text variant="foot">{detail}</Text> : null}
+        </>
+      )}
     </AnimatedPressable>
   );
 }
@@ -253,6 +275,7 @@ function RecipientChipsCardView({ card, onChipTap }: Props) {
             testID={`chip-recipient-${r.recipientId}`}
             label={r.nickname}
             detail={`${r.title} · ${r.institutionName} · ${maskIdentifier(r.identifier)}`}
+            logo={<InstitutionLogo size={24} shape="circle" name={r.institutionName} code={r.institutionId} logoUrl={r.institutionLogoUrl} />}
             onPress={() => onChipTap?.(`${r.nickname} at ${r.institutionName}`)}
           />
         ))}
@@ -274,6 +297,7 @@ function InstitutionChipsCardView({ card, onChipTap }: Props) {
             key={inst.institutionId}
             testID={`chip-institution-${inst.institutionId}`}
             label={urdu && inst.urduName ? inst.urduName : inst.name}
+            logo={<InstitutionLogo size={24} shape="circle" name={inst.name} code={inst.institutionId} logoUrl={inst.logoUrl} />}
             onPress={() => onChipTap?.(inst.name)}
           />
         ))}
@@ -299,6 +323,7 @@ function BillerChipsCardView({ card, onChipTap }: Props) {
               testID={`chip-biller-${key}`}
               label={label}
               detail={b.consumerNo ? ltrIsolate(b.consumerNo) : undefined}
+              logo={<InstitutionLogo size={24} shape="rounded" name={b.name} code={b.billerId} logoUrl={b.logoUrl} />}
               onPress={() => onChipTap?.(label)}
             />
           );
@@ -316,7 +341,13 @@ function RecipientCardView({ card, onChipTap }: Props) {
 
   return (
     <NewCard style={{ marginTop: space.s, gap: space.m, alignItems: 'center' }}>
-      <Avatar name={c.title} size={48} />
+      <InstitutionLogo
+        size={40}
+        shape="circle"
+        name={c.title}
+        code={institution?.id}
+        logoUrl={institution?.logoUrl}
+      />
       <Text variant="hl" center>{c.title}</Text>
       <Text variant="foot" center>
         {urdu && institution?.urduName ? institution.urduName : institution?.name} · {ltrIsolate(maskIdentifier(c.identifier))}
@@ -334,6 +365,13 @@ function BillCardView({ card }: { card: ChatCard }) {
   const { t } = useTranslation();
   return (
     <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.xs }}>
+      <InstitutionLogo
+        size={40}
+        shape="rounded"
+        name={String(card.biller)}
+        logoUrl={typeof card.billerLogoUrl === 'string' ? card.billerLogoUrl : undefined}
+        style={{ marginBottom: space.xs }}
+      />
       <Text variant="hl" center>{String(card.biller)} · {String(card.consumerName)}</Text>
       <Text variant="money" style={{ fontSize: 32, lineHeight: 38 }}>{ltrIsolate(formatPaisa(Number(card.amountPaisa)))}</Text>
       <Text variant="foot" center>
@@ -398,12 +436,19 @@ function StatementDownload({ statementId: _statementId }: { statementId: string 
 function TxnsCardView({ card }: { card: ChatCard }) {
   const urdu = useIsUrdu();
   const { c } = useTheme();
-  const items = (card.items as { id: string; direction: string; amountPaisa: number; counterparty: { name: string; urduName?: string }; createdAt: string }[]).slice(0, 5);
+  const items = (card.items as { id: string; direction: string; amountPaisa: number; counterparty: { name: string; urduName?: string; institutionLogoUrl?: string }; createdAt: string }[]).slice(0, 5);
   return (
     <NewCard style={{ marginTop: space.s, gap: space.s }}>
       {items.map((txn) => (
-        <View key={txn.id} style={{ flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
-          <Text variant="foot">{urdu && txn.counterparty.urduName ? txn.counterparty.urduName : txn.counterparty.name}</Text>
+        <View key={txn.id} style={{ flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.s }}>
+          <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.s, flexShrink: 1 }}>
+            {/* Only where the counterparty's institution actually has a mark — a
+                person-to-person row keeps its plain name, with no initials disc. */}
+            {txn.counterparty.institutionLogoUrl ? (
+              <InstitutionLogo size={24} shape="circle" name={txn.counterparty.name} logoUrl={txn.counterparty.institutionLogoUrl} />
+            ) : null}
+            <Text variant="foot">{urdu && txn.counterparty.urduName ? txn.counterparty.urduName : txn.counterparty.name}</Text>
+          </View>
           <Text variant="foot" color={txn.direction === 'in' ? c.green : c.ink}>
             {ltrIsolate((txn.direction === 'in' ? '+' : '−') + formatPaisa(txn.amountPaisa))}
           </Text>
@@ -572,7 +617,9 @@ function ReceiptCardView({ card }: { card: ChatCard }) {
   return (
     <NewCard style={{ marginTop: space.s, gap: space.m }}>
       <View style={{ alignItems: 'center', gap: space.s }}>
-        <Avatar name={name} size={56} />
+        {txn.counterparty.institutionLogoUrl
+          ? <InstitutionLogo size={40} shape="circle" name={name} logoUrl={txn.counterparty.institutionLogoUrl} />
+          : <Avatar name={name} size={56} />}
         <Text variant="hl" center>{headline}</Text>
         <Text variant="money" style={{ fontSize: 30, lineHeight: 36 }} color={amountColor}>
           {ltrIsolate(sign + formatPaisa(txn.amountPaisa))}
@@ -888,7 +935,7 @@ function RecipientsCardView({ card, onChipTap }: Props) {
         <ListRow
           key={r.recipientId}
           testID={`chat-recipient-${r.recipientId}`}
-          left={<Avatar name={r.title} size={36} />}
+          left={<InstitutionLogo size={32} shape="circle" name={r.title} code={r.institutionId} logoUrl={r.institutionLogoUrl} />}
           title={r.nickname}
           subtitle={`${r.institutionName} · ${ltrIsolate(maskIdentifier(r.identifier))}`}
           showChevron
@@ -911,6 +958,7 @@ function BillsCardView({ card, onChipTap }: Props) {
         <ListRow
           key={b.billId}
           testID={`chat-bill-${b.billId}`}
+          left={<InstitutionLogo size={32} shape="rounded" name={b.biller} logoUrl={b.billerLogoUrl} />}
           title={`${b.biller} · ${b.consumerName}`}
           subtitle={ltrIsolate(`${t('bills.dueDate')} ${String(b.dueDate).slice(0, 10)}`)}
           right={<Text variant="hl">{ltrIsolate(formatPaisa(b.amountPaisa))}</Text>}
@@ -936,6 +984,7 @@ function BillersCardView({ card, onChipTap }: Props) {
           <ListRow
             key={b.savedBillerId ?? b.billerId}
             testID={`chat-biller-${b.savedBillerId ?? b.billerId}`}
+            left={<InstitutionLogo size={32} shape="rounded" name={b.name} code={b.billerId} logoUrl={b.logoUrl} />}
             title={label}
             subtitle={b.consumerNo ? ltrIsolate(b.consumerNo) : undefined}
             showChevron
@@ -1178,6 +1227,7 @@ function CheckInCardView({ card, onAppendLocal, live }: {
   const bi = useBilingual();
   const shape = card as unknown as CheckInCardShape;
   const { openPinSheet } = usePinSheet();
+  const { speak } = useOutcomeSpeech();
   const [checkIn] = useCheckInActionMutation();
   const [execute] = useExecuteActionMutation();
   const { data: me } = useMeQuery();
@@ -1210,10 +1260,12 @@ function CheckInCardView({ card, onAppendLocal, live }: {
         const res = await execute({ id: action.id }).unwrap();
         markActionDone(action.id);
         onAppendLocal?.({ role: 'assistant', text: '', cards: buildResultCards(action.summary, res, res.recipientSuggestion, res.billerSuggestion) });
+        speak(res, action);
         return;
       }
       const res = await openPinSheet(action);
       onAppendLocal?.({ role: 'assistant', text: '', cards: buildResultCards(action.summary, res, res.recipientSuggestion, res.billerSuggestion) });
+      speak(res, action);
     } catch (e) {
       // A dismissed PIN sheet is not an error, and the check-in answer stands —
       // only surface a real failure, and only re-arm the buttons when the
@@ -1310,6 +1362,7 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
   const bi = useBilingual();
   const shape = card as unknown as WaitingApprovalCardShape;
   const { openPinSheet } = usePinSheet();
+  const { speak } = useOutcomeSpeech();
   const [remind, { isLoading: reminding }] = useRemindGuardianMutation();
   const [outcome, setOutcome] = useState<ApprovalOutcome>('waiting');
   const [reason, setReason] = useState<string | null>(null);
@@ -1336,6 +1389,8 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
   onAppendRef.current = onAppendLocal;
   const openRef = useRef(openPinSheet);
   openRef.current = openPinSheet;
+  const speakRef = useRef(speak);
+  speakRef.current = speak;
 
   const openSheet = useCallback((action: PendingAction) =>
     openRef.current(action)
@@ -1344,6 +1399,7 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
           role: 'assistant', text: '',
           cards: buildResultCards(action.summary, res, res.recipientSuggestion, res.billerSuggestion),
         });
+        speakRef.current(res, action);
       })
       .catch((e: Error) => {
         // Same contract as the confirmation card: 'busy' means no sheet was ever
@@ -1485,6 +1541,7 @@ function ApprovalRow({ item, separator }: { item: ApprovalItemShape; separator: 
   const urdu = useIsUrdu();
   const bi = useBilingual();
   const { openPinSheet } = usePinSheet();
+  const { speak } = useOutcomeSpeech();
   const [approve] = useApproveApprovalMutation();
   const [decline, { isLoading: declining }] = useDeclineApprovalMutation();
   const [settled, setSettled] = useState<'approved' | 'declined' | null>(null);
@@ -1507,6 +1564,9 @@ function ApprovalRow({ item, separator }: { item: ApprovalItemShape; separator: 
         execute: async (pin) => { await approve({ id: item.actionId, pin }).unwrap(); },
       });
       setSettled('approved');
+      // Guardian mode resolves with no transaction — the payer still has to
+      // type their own PIN, and outcomeSpeech words it that way.
+      speak({ transaction: null }, { ...asAction, payerName: item.payerName });
     } catch (e) {
       const message = (e as Error)?.message;
       if (message !== 'cancelled' && message !== 'busy') setError(apiErr(e).message);

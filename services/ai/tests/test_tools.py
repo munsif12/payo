@@ -656,3 +656,76 @@ def test_flagged_action_fixture_keeps_the_check_in_ahead_of_the_approval():
     assert tools._needs_check_in(FLAGGED_ACTION) is True
     assert tools._waiting_for_approval(FLAGGED_ACTION) is True
     assert tools._needs_check_in(FLAGGED_ACTION_CHECKED_IN) is False
+
+
+# ---- logoUrl/domain pass-through (institution + biller logos, spec roadmap 2026-09-01) ----
+
+EASYPAISA_WITH_LOGO = {**EASYPAISA, "logoUrl": "https://www.google.com/s2/favicons?domain=easypaisa.com.pk&sz=128"}
+KEL_WITH_LOGO = {
+    "id": "kel", "name": "K-Electric", "urduName": "کے الیکٹرک", "category": "electricity",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=ke.com.pk&sz=128",
+}
+
+
+async def test_list_institutions_passes_through_logo_url(fake_backend):
+    fake_backend.route("GET", "/api/v1/institutions", {"items": [
+        {**EASYPAISA_WITH_LOGO, "popular": True},
+    ]})
+    r = await tools.list_institutions(await client_for(fake_backend))
+    assert r["card"]["institutions"][0]["logoUrl"] == EASYPAISA_WITH_LOGO["logoUrl"]
+
+
+async def test_resolve_recipient_passes_through_institution_logo_url(fake_backend):
+    fake_backend.route("POST", "/api/v1/transfers/resolve", {
+        "title": "Bilal Ahmed", "institution": EASYPAISA_WITH_LOGO, "identifier": "+923001110002",
+        "linkedUserId": "u2",
+    })
+    r = await tools.resolve_recipient(await client_for(fake_backend), "easypaisa", "+923001110002")
+    assert r["card"]["institution"]["logoUrl"] == EASYPAISA_WITH_LOGO["logoUrl"]
+
+
+async def test_search_recipients_passes_through_institution_logo_url(fake_backend):
+    fake_backend.route("GET", "/api/v1/recipients", {"items": [
+        {"id": "r1", "nickname": "Munsif", "title": "Munsif Ali", "institution": EASYPAISA_WITH_LOGO, "identifier": "+923001110003"},
+        {"id": "r2", "nickname": "Munsif", "title": "Munsif Khan", "institution": EASYPAISA_WITH_LOGO, "identifier": "+923001110004"},
+    ]})
+    r = await tools.search_recipients(await client_for(fake_backend), "munsif")
+    assert r["card"]["recipients"][0]["institutionLogoUrl"] == EASYPAISA_WITH_LOGO["logoUrl"]
+
+
+async def test_list_recipients_passes_through_institution_logo_url(fake_backend):
+    fake_backend.route("GET", "/api/v1/recipients", {"items": [
+        {"id": "r1", "nickname": "Munsif", "title": "Munsif Ali", "institution": EASYPAISA_WITH_LOGO, "identifier": "+923001110003"},
+    ]})
+    r = await tools.list_recipients(await client_for(fake_backend))
+    assert r["card"]["items"][0]["institutionLogoUrl"] == EASYPAISA_WITH_LOGO["logoUrl"]
+
+
+async def test_lookup_bill_passes_through_biller_logo_url(fake_backend):
+    fake_backend.route("POST", "/api/v1/bills/lookup", {
+        "billId": "b1", "consumerName": "Ammi Jaan", "amountPaisa": 432000,
+        "dueDate": "2026-09-10T00:00:00.000Z", "month": "2026-08",
+    })
+    fake_backend.route("GET", "/api/v1/billers", {"items": [KEL_WITH_LOGO]})
+    r = await tools.lookup_bill(await client_for(fake_backend), "kel", "0400012345678")
+    assert r["card"]["billerLogoUrl"] == KEL_WITH_LOGO["logoUrl"]
+
+
+async def test_list_due_bills_passes_through_biller_logo_url(fake_backend):
+    fake_backend.route("GET", "/api/v1/bills/due", {"items": [
+        {
+            "billId": "b1", "biller": KEL_WITH_LOGO,
+            "consumerNo": "0400012345678", "amountPaisa": 432000, "dueDate": "2026-09-10T00:00:00.000Z", "month": "2026-08",
+        },
+    ]})
+    r = await tools.list_due_bills(await client_for(fake_backend))
+    assert r["card"]["items"][0]["billerLogoUrl"] == KEL_WITH_LOGO["logoUrl"]
+
+
+async def test_list_saved_billers_passes_through_biller_logo_url(fake_backend):
+    fake_backend.route("GET", "/api/v1/saved-billers", {"items": [
+        {"id": "sb1", "nickname": "Bijli", "biller": KEL_WITH_LOGO, "consumerNo": "0400012345678"},
+        {"id": "sb2", "nickname": "Gas", "biller": {"id": "ssgc", "name": "SSGC", "urduName": "ایس ایس جی سی"}, "consumerNo": "1122334455"},
+    ]})
+    r = await tools.list_saved_billers(await client_for(fake_backend))
+    assert r["card"]["billers"][0]["logoUrl"] == KEL_WITH_LOGO["logoUrl"]

@@ -1,13 +1,13 @@
 import request from 'supertest';
 import { createApp } from '../../app';
 import { createVerifiedUser } from '../../testUtils/factories';
-import { Account, Institution, PendingAction } from '../../models';
+import { Account, Institution, PendingAction, User } from '../../models';
 
 const app = createApp();
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 const makePayo = () =>
-  Institution.create({ name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true });
+  Institution.create({ name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true, domain: 'payo.app' });
 
 async function setGuardian(payerToken: string, guardianPhone: string) {
   const res = await request(app).put('/api/v1/guardian').set(auth(payerToken))
@@ -20,6 +20,13 @@ const send = (token: string, body: Record<string, unknown>) =>
 
 const execute = (token: string, id: string, pin = '1234') =>
   request(app).post(`/api/v1/actions/${id}/execute`).set(auth(token)).send({ pin });
+
+/** Ages a user past 60 so the senior-only money-pattern check-in applies to them. */
+const makeSenior = (userId: string) =>
+  User.updateOne({ _id: userId }, { dateOfBirth: new Date('1955-04-01T00:00:00.000Z') });
+
+// A first payment to someone new only reaches the guardian at ₨20,000 or more.
+const OVER_NEW_RECIPIENT_APPROVAL = 2_000_000;
 
 test('no guardian set → no approval, no risk flags, 2-minute expiry', async () => {
   const a = await createVerifiedUser(app);
@@ -43,7 +50,7 @@ test('new recipient with a guardian → approval waiting, 30-minute expiry, exec
   const payo = await makePayo();
   await setGuardian(a.token, g.user.phone);
 
-  const res = await send(a.token, { to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: 50_000 });
+  const res = await send(a.token, { to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: OVER_NEW_RECIPIENT_APPROVAL });
   expect(res.status).toBe(201);
   expect(res.body.data.approval).toMatchObject({ required: true, status: 'waiting', guardianId: g.userId });
   const ttl = new Date(res.body.data.expiresAt).getTime() - Date.now();
@@ -76,7 +83,7 @@ test('a recipient already paid before never needs approval; saved-but-never-paid
   expect(again.body.data.approval).toBeNull();
   expect((await execute(a.token, again.body.data.id)).status).toBe(200);
 
-  const toSaved = await send(a.token, { to: { recipientId: saved.body.data.id }, amountPaisa: 10_000 });
+  const toSaved = await send(a.token, { to: { recipientId: saved.body.data.id }, amountPaisa: OVER_NEW_RECIPIENT_APPROVAL });
   expect(toSaved.body.data.approval).toMatchObject({ status: 'waiting' });
 });
 
@@ -104,6 +111,7 @@ test('backend adds new_recipient_large; check-in gates execute even with no guar
   const a = await createVerifiedUser(app);
   const b = await createVerifiedUser(app);
   const payo = await makePayo();
+  await makeSenior(a.userId); // the money-pattern check-in is a senior-only courtesy
 
   // Balance is 1,000,000 — 300,000 is 30% of it and the recipient is new.
   const res = await send(a.token, { to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: 300_000 });
@@ -152,6 +160,7 @@ test('check-in "yes, someone asked" cancels the action with reason scam_checkin 
   const a = await createVerifiedUser(app);
   const b = await createVerifiedUser(app);
   const payo = await makePayo();
+  await makeSenior(a.userId);
   const res = await send(a.token, { to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: 300_000 });
 
   const yes = await request(app).post(`/api/v1/actions/${res.body.data.id}/check-in`)
@@ -172,7 +181,7 @@ test('GET /actions/:id returns the own DTO with approval/riskFlags/checkIn; anot
   const g = await createVerifiedUser(app);
   const payo = await makePayo();
   await setGuardian(a.token, g.user.phone);
-  const res = await send(a.token, { to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: 50_000 });
+  const res = await send(a.token, { to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: OVER_NEW_RECIPIENT_APPROVAL });
 
   const got = await request(app).get(`/api/v1/actions/${res.body.data.id}`).set(auth(a.token));
   expect(got.status).toBe(200);
@@ -190,7 +199,7 @@ test('POST /actions/:id/remind is rate-limited to once a minute', async () => {
   const g = await createVerifiedUser(app);
   const payo = await makePayo();
   await setGuardian(a.token, g.user.phone);
-  const res = await send(a.token, { to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: 50_000 });
+  const res = await send(a.token, { to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: OVER_NEW_RECIPIENT_APPROVAL });
   const id = res.body.data.id;
 
   const first = await request(app).post(`/api/v1/actions/${id}/remind`).set(auth(a.token)).send({});

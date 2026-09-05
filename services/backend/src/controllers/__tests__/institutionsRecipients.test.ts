@@ -7,10 +7,10 @@ const app = createApp();
 
 async function seedInstitutions() {
   return Institution.create([
-    { name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true },
-    { name: 'Easypaisa', urduName: 'ایزی پیسہ', kind: 'wallet', code: 'EASYPAISA', popular: true },
-    { name: 'Meezan Bank', urduName: 'میزان بینک', kind: 'bank', code: 'MEEZAN', popular: true },
-    { name: 'Sindh Bank', urduName: 'سندھ بینک', kind: 'bank', code: 'SINDHBANK', popular: false },
+    { name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true, domain: 'payo.app' },
+    { name: 'Easypaisa', urduName: 'ایزی پیسہ', kind: 'wallet', code: 'EASYPAISA', popular: true, domain: 'easypaisa.com.pk' },
+    { name: 'Meezan Bank', urduName: 'میزان بینک', kind: 'bank', code: 'MEEZAN', popular: true, domain: 'meezanbank.com' },
+    { name: 'Sindh Bank', urduName: 'سندھ بینک', kind: 'bank', code: 'SINDHBANK', popular: false, domain: 'sindhbank.com.pk' },
   ]);
 }
 
@@ -22,6 +22,8 @@ test('GET /institutions returns popular first then alphabetical, and q filters',
   expect(all.status).toBe(200);
   expect(all.body.data.items).toHaveLength(4);
   expect(all.body.data.items[0].popular).toBe(true);
+  expect(all.body.data.items[0].domain).toBeTruthy();
+  expect(all.body.data.items[0].logoUrl).toBe(`https://www.google.com/s2/favicons?domain=${all.body.data.items[0].domain}&sz=128`);
   const popularNames = all.body.data.items.filter((i: { popular: boolean }) => i.popular).map((i: { name: string }) => i.name);
   expect(popularNames).toEqual([...popularNames].sort());
   expect(all.body.data.items.at(-1).popular).toBe(false);
@@ -45,6 +47,8 @@ test('POST /transfers/resolve: PAYO phone resolves to real user; wallet/bank res
   expect(payoResolve.status).toBe(200);
   expect(payoResolve.body.data.title).toBe(b.user.name);
   expect(payoResolve.body.data.linkedUserId).toBe(b.userId);
+  expect(payoResolve.body.data.institution.domain).toBe('payo.app');
+  expect(payoResolve.body.data.institution.logoUrl).toBe('https://www.google.com/s2/favicons?domain=payo.app&sz=128');
 
   const walletResolve = await request(app).post('/api/v1/transfers/resolve')
     .set('Authorization', `Bearer ${a.token}`).send({ institutionId: String(easypaisa!._id), identifier: '03135468810' });
@@ -78,6 +82,7 @@ test('recipients: create resolves + stores, search, ownership-scoped list, dupli
   expect(created.status).toBe(201);
   expect(created.body.data.title).toBe(b.user.name);
   expect(created.body.data.linkedUserId).toBe(b.userId);
+  expect(created.body.data.institution.logoUrl).toBe('https://www.google.com/s2/favicons?domain=payo.app&sz=128');
 
   const dup = await request(app).post('/api/v1/recipients')
     .set('Authorization', `Bearer ${a.token}`)

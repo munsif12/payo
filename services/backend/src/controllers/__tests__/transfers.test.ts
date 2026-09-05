@@ -14,20 +14,14 @@ async function executeAction(token: string, actionId: string, pin = '1234') {
     .set('Authorization', `Bearer ${token}`).send({ pin });
 }
 
-/** v6: a `new_recipient_large` send is gated by the scam check-in even with no guardian. */
-async function answerCheckIn(token: string, actionId: string, someoneAsked = false) {
-  return request(app).post(`/api/v1/actions/${actionId}/check-in`)
-    .set('Authorization', `Bearer ${token}`).send({ someoneAsked });
-}
-
 async function makePayo() {
-  return Institution.create({ name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true });
+  return Institution.create({ name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true, domain: 'payo.app' });
 }
 async function makeEasypaisa() {
-  return Institution.create({ name: 'Easypaisa', urduName: 'ایزی پیسہ', kind: 'wallet', code: 'EASYPAISA', popular: true });
+  return Institution.create({ name: 'Easypaisa', urduName: 'ایزی پیسہ', kind: 'wallet', code: 'EASYPAISA', popular: true, domain: 'easypaisa.com.pk' });
 }
 async function makeMeezan() {
-  return Institution.create({ name: 'Meezan Bank', urduName: 'میزان بینک', kind: 'bank', code: 'MEEZAN', popular: true });
+  return Institution.create({ name: 'Meezan Bank', urduName: 'میزان بینک', kind: 'bank', code: 'MEEZAN', popular: true, domain: 'meezanbank.com' });
 }
 
 test('P2P: A sends ₨1,500 to B by phone via PAYO institution — both balances move, out/in txns exist', async () => {
@@ -65,9 +59,10 @@ test('Bank: fee 2500, institution+masked identifier on the line, debit 502500 on
   expect(values).toMatch(/Meezan/);
   expect(values).toMatch(/\*\*\*\*6702/);
 
-  await answerCheckIn(a.token, create.body.data.id);
-  await executeAction(a.token, create.body.data.id);
+  const exec = await executeAction(a.token, create.body.data.id);
   expect(await balance(a.userId)).toBe(497_500);
+  expect(exec.body.data.transaction.counterparty.institutionLogoUrl)
+    .toBe('https://www.google.com/s2/favicons?domain=meezanbank.com&sz=128');
 });
 
 test('Wallet (non-PAYO): debit only, no fee, deterministic fake title', async () => {
@@ -136,7 +131,6 @@ test('insufficient funds at execute → 400, recipient balance unchanged', async
   const create = await request(app).post('/api/v1/transfers')
     .set('Authorization', `Bearer ${a.token}`)
     .send({ to: { institutionId: String(payo._id), identifier: b.user.phone }, amountPaisa: 5_000_000 });
-  await answerCheckIn(a.token, create.body.data.id);
   const exec = await executeAction(a.token, create.body.data.id);
   expect(exec.status).toBe(400);
   expect(await balance(a.userId)).toBe(1_000_000);

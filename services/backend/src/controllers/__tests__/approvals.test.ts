@@ -7,7 +7,7 @@ const app = createApp();
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 const makePayo = () =>
-  Institution.create({ name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true });
+  Institution.create({ name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true, domain: 'payo.app' });
 
 async function scenario() {
   const payer = await createVerifiedUser(app);
@@ -16,8 +16,11 @@ async function scenario() {
   const payo = await makePayo();
   await request(app).put('/api/v1/guardian').set(auth(payer.token))
     .send({ phone: guardian.user.phone, pin: '1234' });
+  // A first payment to someone new only reaches the guardian at ₨20,000 or more, so the
+  // payer needs a balance that can actually settle it once approved.
+  await Account.updateOne({ userId: payer.userId }, { balancePaisa: 20_000_000 });
   const action = await request(app).post('/api/v1/transfers').set(auth(payer.token))
-    .send({ to: { institutionId: String(payo._id), identifier: payee.user.phone }, amountPaisa: 50_000 });
+    .send({ to: { institutionId: String(payo._id), identifier: payee.user.phone }, amountPaisa: 2_000_000 });
   expect(action.status).toBe(201);
   return { payer, guardian, payee, actionId: action.body.data.id as string };
 }
@@ -29,7 +32,7 @@ test('GET /approvals lists waiting actions for the guardian with payer details',
   expect(res.body.data.items).toHaveLength(1);
   expect(res.body.data.items[0]).toMatchObject({
     payer: { name: payer.user.name, phone: payer.user.phone },
-    amountPaisa: 50_000, riskFlags: [],
+    amountPaisa: 2_000_000, riskFlags: [],
   });
   expect(res.body.data.items[0].summary.en).toContain('Send');
   expect(res.body.data.items[0].createdAt).toBeTruthy();
@@ -61,7 +64,7 @@ test('guardian approves with their own PIN; the payer then still needs their own
   const exec = await request(app).post(`/api/v1/actions/${actionId}/execute`)
     .set(auth(payer.token)).send({ pin: '1234' });
   expect(exec.status).toBe(200);
-  expect(await Account.findOne({ userId: payer.userId }).then(a => a!.balancePaisa)).toBe(950_000);
+  expect(await Account.findOne({ userId: payer.userId }).then(a => a!.balancePaisa)).toBe(18_000_000);
 });
 
 test('guardian declines with a reason → action cancelled, payer gets 410', async () => {

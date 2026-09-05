@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Zap, Flame, Wifi, Droplet, Smartphone, Receipt } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { Screen, Text, Card, ListRow, Avatar, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, ListRow, InstitutionLogo, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
 import {
@@ -101,9 +101,13 @@ export default function Billers() {
         {dueBill ? (
           <Card style={{ borderWidth: 1.5, borderColor: c.amber, gap: space.m }}>
             <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m }}>
-              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.redTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Zap size={22} color={c.red} strokeWidth={2.2} />
-              </View>
+              {dueBill.biller.logoUrl ? (
+                <InstitutionLogo size={40} shape="rounded" name={dueBill.biller.name} code={dueBill.biller.code ?? dueBill.biller.id} logoUrl={dueBill.biller.logoUrl} />
+              ) : (
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.redTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Zap size={22} color={c.red} strokeWidth={2.2} />
+                </View>
+              )}
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text variant="hl" numberOfLines={1}>{urdu ? dueBill.biller.urduName : dueBill.biller.name}</Text>
                 <Text variant="foot" numberOfLines={1}>{t('bills.dueCard.consumer', { last4: dueBill.consumerNo.slice(-4), month: dueBill.month })}</Text>
@@ -141,7 +145,7 @@ export default function Billers() {
                 testID={`saved-biller-${sb.id}`}
                 onPress={() => onTapSaved(sb)}
                 onLongPress={() => onDeleteSaved(sb)}
-                left={<Avatar name={sb.nickname} />}
+                left={<InstitutionLogo size={40} shape="rounded" name={sb.nickname} code={sb.biller.code ?? sb.biller.id} logoUrl={sb.biller.logoUrl} />}
                 title={sb.nickname}
                 subtitle={ltrIsolate(`${urdu ? sb.biller.urduName ?? sb.biller.name : sb.biller.name} · ${sb.consumerNo}`)}
                 showChevron
@@ -165,9 +169,15 @@ export default function Billers() {
                     paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.separator,
                   }}
                 >
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: bg, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Icon size={22} color={color} strokeWidth={2.2} />
-                  </View>
+                  {b.logoUrl ? (
+                    <InstitutionLogo size={40} shape="rounded" name={b.name} code={b.code ?? b.id} logoUrl={b.logoUrl} />
+                  ) : (
+                    // No mark for this biller — the category icon is a better
+                    // fallback here than initials, and it is what shipped before.
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: bg, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={22} color={color} strokeWidth={2.2} />
+                    </View>
+                  )}
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text variant="hl" numberOfLines={1}>{urdu ? b.urduName : b.name}</Text>
                     <Text variant="foot" numberOfLines={1}>{t(`bills.category.${b.category ?? 'other'}`, { defaultValue: b.category ?? '' })}</Text>

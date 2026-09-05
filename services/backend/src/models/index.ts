@@ -16,3 +16,4 @@ export { OtpCode } from './OtpCode';
 export { ChatSession } from './ChatSession';
 export { ChatMessage } from './ChatMessage';
 export { GuardianNotice } from './GuardianNotice';
+export { CheckInClearance } from './CheckInClearance';

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Institution } from '../models';
 import { ok } from '../lib/respond';
 import { escapeRegExp } from '../lib/fmt';
+import { logoUrlFor } from '../lib/logos';
 
 export async function listInstitutions(req: Request, res: Response) {
   const { q } = z.object({ q: z.string().optional() }).parse(req.query);
@@ -13,6 +14,7 @@ export async function listInstitutions(req: Request, res: Response) {
   return ok(res, {
     items: items.map(i => ({
       id: String(i._id), name: i.name, urduName: i.urduName, kind: i.kind, code: i.code, popular: i.popular,
+      domain: i.domain, logoUrl: logoUrlFor(i.domain),
     })),
   });
 }

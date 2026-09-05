@@ -94,3 +94,45 @@ def test_every_v6_card_kind_keeps_its_ids_in_history():
         assert line, f"{kind} card has no facts line"
         for needle in needles:
             assert needle in line, f"{kind} lost {needle} in history: {line}"
+
+
+def test_a_check_in_turn_gets_a_risk_line_naming_the_recipient_and_the_time():
+    """The `[risk]` line is what carries the scoped sticky flag across turns: which flags,
+    which recipient they were about, and when — so an unrelated later send stays ungated
+    and the flag expires. Without it the backstop in agent.py has nothing to read."""
+    from app.agent import risk_context_from_history
+    from app.conversation import _history_from_messages
+
+    items = [
+        {"role": "user", "text": "someone called and said my account will be blocked", "cards": []},
+        {"role": "assistant", "text": "Send to Sara Malik at PAYO?", "cards": [{
+            "kind": "recipient", "title": "Sara Malik", "identifier": "03001110004",
+            "institution": {"id": "payo", "name": "PAYO"}}],
+         "createdAt": "2026-09-06T09:00:00.000Z"},
+        {"role": "user", "text": "yes, continue", "cards": []},
+        {"role": "assistant", "text": "Did someone ask you to send this?", "cards": [{
+            "kind": "check_in", "actionId": "act_flag", "prompt": {"en": "?", "ur": "؟"},
+            "riskFlags": ["pressure_language"]}],
+         "createdAt": "2026-09-06T09:01:00.000Z"},
+    ]
+    history = _history_from_messages(items)
+    assert "[risk] pressure_language target=payo/03001110004 at=2026-09-06T09:01:00.000Z" \
+        in history[-1].content
+
+    context = risk_context_from_history(history)
+    assert context.identifier == "03001110004" and context.institution_id == "payo"
+    assert context.detected_at.isoformat() == "2026-09-06T09:01:00+00:00"
+    assert context.matches("payo", "+923001110004")
+    assert not context.matches("easypaisa", "03001110002")
+
+
+def test_turns_without_a_check_in_card_get_no_risk_line():
+    from app.conversation import _history_from_messages
+
+    items = [
+        {"role": "user", "text": "send 5000 to Bilal", "cards": []},
+        {"role": "assistant", "text": "Please confirm.", "cards": [
+            {"kind": "confirmation", "actionId": "act1", "amountPaisa": 500000}],
+         "createdAt": "2026-09-06T09:00:00.000Z"},
+    ]
+    assert "[risk]" not in "".join(m.content for m in _history_from_messages(items))

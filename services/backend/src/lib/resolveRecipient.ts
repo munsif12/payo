@@ -1,6 +1,7 @@
 import { Institution, User } from '../models';
 import { ApiError } from './apiError';
 import { resolveFakeTitle } from './fakeTitles';
+import { logoUrlFor } from './logos';
 
 const PHONE_LOCAL_RE = /^0\d{10}$/;
 const PHONE_INTL_RE = /^\+92\d{10}$/;
@@ -28,7 +29,9 @@ export function maskIdentifier(identifier: string): string {
   return `****${identifier.slice(-4)}`;
 }
 
-export interface InstitutionDto { id: string; name: string; urduName: string; kind: 'wallet' | 'bank' }
+export interface InstitutionDto {
+  id: string; name: string; urduName: string; kind: 'wallet' | 'bank'; domain: string; logoUrl: string;
+}
 
 export interface ResolvedRecipient {
   title: string;
@@ -50,6 +53,7 @@ export async function resolveRecipient(
   const institutionDto: InstitutionDto = {
     id: String(institution._id), name: institution.name, urduName: institution.urduName,
     kind: institution.kind as 'wallet' | 'bank',
+    domain: institution.domain, logoUrl: logoUrlFor(institution.domain),
   };
 
   if (institution.kind === 'wallet') {

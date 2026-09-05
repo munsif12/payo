@@ -7,7 +7,9 @@ import { createPendingAction, toActionDto } from '../lib/pendingActions';
 import { feeFor } from '../config/fees';
 import { fmtRs } from '../lib/fmt';
 import { resolveRecipient, maskIdentifier } from '../lib/resolveRecipient';
-import { applyDueGuardianPending, evaluateSend, isNewRecipient, CLIENT_RISK_FLAGS } from '../lib/guardian';
+import {
+  applyDueGuardianPending, evaluateSend, isNewRecipient, isCheckInCleared, scopedRiskFlags, CLIENT_RISK_FLAGS,
+} from '../lib/guardian';
 
 const resolveBodySchema = z.object({ institutionId: z.string(), identifier: z.string().min(1) });
 
@@ -27,6 +29,9 @@ const bodySchema = z.object({
   // Conversation-pattern signals from the AI service. Allow-listed: the client may only
   // assert `pressure_language`; `new_recipient_large` is the backend's to add.
   riskFlags: z.array(z.enum(CLIENT_RISK_FLAGS)).optional(),
+  // The recipient the AI's pressure detection was actually about. Scopes the flag so a
+  // sticky signal cannot follow the user onto an unrelated send.
+  riskTarget: z.object({ institutionId: z.string(), identifier: z.string().min(1) }).optional(),
 });
 
 const LINE_TO = { en: 'To', ur: 'وصول کنندہ' };
@@ -34,7 +39,7 @@ const LINE_AMOUNT = { en: 'Amount', ur: 'رقم' };
 const LINE_FEE = { en: 'Fee', ur: 'فیس' };
 
 export async function createTransfer(req: Request, res: Response) {
-  const { to, amountPaisa, riskFlags: clientRiskFlags } = bodySchema.parse(req.body);
+  const { to, amountPaisa, riskFlags: clientRiskFlags, riskTarget } = bodySchema.parse(req.body);
 
   let institutionId: string; let identifier: string; let recipientId: string | undefined;
   if ('recipientId' in to) {
@@ -57,6 +62,7 @@ export async function createTransfer(req: Request, res: Response) {
   const payload = {
     institutionId: resolved.institution.id, institutionName: resolved.institution.name,
     institutionUrduName: resolved.institution.urduName, institutionKind: resolved.institution.kind,
+    institutionLogoUrl: resolved.institution.logoUrl,
     identifier: resolved.identifier, title: resolved.title, linkedUserId: resolved.linkedUserId, recipientId,
   };
 
@@ -74,7 +80,10 @@ export async function createTransfer(req: Request, res: Response) {
   const risk = evaluateSend({
     user, amountPaisa, balancePaisa: account.balancePaisa,
     newRecipient: await isNewRecipient(req.userId, resolved.institution.id, resolved.identifier),
-    clientRiskFlags: clientRiskFlags ?? [],
+    clientRiskFlags: scopedRiskFlags(clientRiskFlags ?? [], riskTarget, {
+      institutionId: resolved.institution.id, identifier: resolved.identifier,
+    }),
+    checkInCleared: await isCheckInCleared(req.userId, resolved.institution.id, resolved.identifier),
   });
 
   const action = await createPendingAction({

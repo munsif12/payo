@@ -105,12 +105,17 @@ class BackendClient:
         return await self.post("/bills/pay", {"billId": bill_id})
 
     async def create_transfer(self, to: dict[str, Any], amount_paisa: int, note: str | None = None,
-                              risk_flags: list[str] | None = None) -> Any:
+                              risk_flags: list[str] | None = None,
+                              risk_target: dict[str, str] | None = None) -> Any:
         body: dict[str, Any] = {"to": to, "amountPaisa": amount_paisa}
         if note:
             body["note"] = note
         if risk_flags:
             body["riskFlags"] = risk_flags
+            # The recipient those flags were raised about: the backend applies them only
+            # when this transfer's recipient matches, so an unrelated send stays ungated.
+            if risk_target:
+                body["riskTarget"] = risk_target
         return await self.post("/transfers", body)
 
     async def create_recharge(self, telco_id: str, phone: str, amount_paisa: int) -> Any:

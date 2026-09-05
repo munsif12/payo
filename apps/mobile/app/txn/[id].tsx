@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Check, Download } from 'lucide-react-native';
-import { Screen, Text, Card, Button, Avatar, Pill, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, Button, Avatar, InstitutionLogo, Pill, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
 import { formatPaisa } from '../../src/lib/money';
@@ -49,7 +49,11 @@ export default function Receipt() {
       </View>
 
       <View style={{ alignItems: 'center', gap: 10, paddingBottom: space.l }}>
-        <Avatar name={name} size={64} />
+        {txn.counterparty.institutionLogoUrl ? (
+          <InstitutionLogo size={40} shape="circle" name={name} logoUrl={txn.counterparty.institutionLogoUrl} />
+        ) : (
+          <Avatar name={name} size={64} />
+        )}
         <Text variant="hl">{headline}</Text>
         <Text variant="money" color={amountColor}>{ltrIsolate(sign + formatPaisa(txn.amountPaisa))}</Text>
         <Pill

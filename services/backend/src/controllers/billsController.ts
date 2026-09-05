@@ -7,10 +7,16 @@ import { ok } from '../lib/respond';
 import { createPendingAction, toActionDto } from '../lib/pendingActions';
 import { djb2, resolveFakeTitle } from '../lib/fakeTitles';
 import { fmtRs } from '../lib/fmt';
+import { logoUrlFor } from '../lib/logos';
 
 export async function listBillers(_req: Request, res: Response) {
   const items = await Biller.find().sort({ name: 1 });
-  return ok(res, { items: items.map(b => ({ id: String(b._id), name: b.name, urduName: b.urduName, category: b.category })) });
+  return ok(res, {
+    items: items.map(b => ({
+      id: String(b._id), name: b.name, urduName: b.urduName, category: b.category,
+      domain: b.domain, logoUrl: logoUrlFor(b.domain),
+    })),
+  });
 }
 
 /**
@@ -65,7 +71,10 @@ export async function listDueBills(req: Request, res: Response) {
       if (!biller) throw new ApiError(404, 'NOT_FOUND', 'Biller not found');
       return {
         billId: String(b._id),
-        biller: { id: String(biller._id), name: biller.name, urduName: biller.urduName, category: biller.category },
+        biller: {
+          id: String(biller._id), name: biller.name, urduName: biller.urduName, category: biller.category,
+          domain: biller.domain, logoUrl: logoUrlFor(biller.domain),
+        },
         consumerNo: b.consumerNo, amountPaisa: b.amountPaisa,
         dueDate: b.dueDate.toISOString(), month: b.month,
       };

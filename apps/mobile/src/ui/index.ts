@@ -8,6 +8,8 @@ export type { ListRowProps } from './ListRow';
 export { Chip } from './Chip';
 export { Pill } from './Pill';
 export { Avatar } from './Avatar';
+export { InstitutionLogo, pickLogoSource } from './InstitutionLogo';
+export type { InstitutionLogoProps, InstitutionLogoSize, LogoOverrides, LogoSource } from './InstitutionLogo';
 export { Input } from './Input';
 export type { InputProps } from './Input';
 export { Keypad } from './Keypad';

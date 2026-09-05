@@ -7,7 +7,7 @@ const app = createApp();
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 const makePayo = () =>
-  Institution.create({ name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true });
+  Institution.create({ name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true, domain: 'payo.app' });
 
 const kinds = (body: { data: { items: { kind: string }[] } }) => body.data.items.map(i => i.kind);
 
@@ -52,7 +52,7 @@ test('digest collects received money, a due bill, a pending request and a waitin
   await request(app).post(`/api/v1/actions/${send.body.data.id}/execute`).set(auth(payer.token)).send({ pin: '1234' });
 
   // bill due (via a saved biller)
-  const biller = await Biller.create({ name: 'K-Electric', urduName: 'کے الیکٹرک', category: 'electricity' });
+  const biller = await Biller.create({ name: 'K-Electric', urduName: 'کے الیکٹرک', category: 'electricity', domain: 'ke.com.pk' });
   await SavedBiller.create({ userId: me.userId, nickname: 'Home', billerId: biller._id, consumerNo: '0400012345678', consumerName: 'Ammi' });
 
   // incoming money request
@@ -62,7 +62,7 @@ test('digest collects received money, a due bill, a pending request and a waitin
   // an approval waiting on me as guardian
   await request(app).put('/api/v1/guardian').set(auth(payer.token)).send({ phone: me.user.phone, pin: '1234' });
   await request(app).post('/api/v1/transfers').set(auth(payer.token))
-    .send({ to: { institutionId: String(payo._id), identifier: payee.user.phone }, amountPaisa: 40_000 });
+    .send({ to: { institutionId: String(payo._id), identifier: payee.user.phone }, amountPaisa: 2_000_000 });
 
   const res = await request(app).get('/api/v1/me/digest').set(auth(me.token));
   expect(res.status).toBe(200);
@@ -171,7 +171,7 @@ test('a Remind raises a reminder notice in the guardian digest', async () => {
   await request(app).put('/api/v1/guardian').set(auth(payer.token))
     .send({ phone: guardian.user.phone, pin: '1234' });
   const action = await request(app).post('/api/v1/transfers').set(auth(payer.token))
-    .send({ to: { institutionId: String(payo._id), identifier: payee.user.phone }, amountPaisa: 40_000 });
+    .send({ to: { institutionId: String(payo._id), identifier: payee.user.phone }, amountPaisa: 2_000_000 });
 
   const before = await request(app).get('/api/v1/me/digest').set(auth(guardian.token));
   expect(before.body.data.items.filter((i: { kind: string }) => i.kind === 'guardian_notice')).toHaveLength(0);

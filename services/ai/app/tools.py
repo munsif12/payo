@@ -334,7 +334,10 @@ async def list_institutions(client: BackendClient, query: str | None = None) -> 
     else:
         matches = [i for i in items if i.get("popular")]
     chips = [
-        InstitutionChip(institutionId=i["id"], name=i["name"], urduName=i.get("urduName"), kind=i["kind"])
+        InstitutionChip(
+            institutionId=i["id"], name=i["name"], urduName=i.get("urduName"), kind=i["kind"],
+            logoUrl=i.get("logoUrl"),
+        )
         for i in matches
     ]
     card = InstitutionChipsCard(
@@ -363,7 +366,10 @@ async def resolve_recipient(client: BackendClient, institution_id: str, identifi
     inst = data["institution"]
     card = RecipientCard(
         title=data["title"],
-        institution=InstitutionRef(id=inst["id"], name=inst["name"], urduName=inst.get("urduName"), kind=inst["kind"]),
+        institution=InstitutionRef(
+            id=inst["id"], name=inst["name"], urduName=inst.get("urduName"), kind=inst["kind"],
+            logoUrl=inst.get("logoUrl"),
+        ),
         identifier=data["identifier"],
         linkedUserId=data.get("linkedUserId"),
         prompt=Bilingual(en=f"Send to {data['title']}?", ur=f"{data['title']} کو بھیجیں؟"),
@@ -397,6 +403,7 @@ async def search_recipients(client: BackendClient, query: str) -> Result:
         RecipientChip(
             recipientId=r["id"], nickname=r["nickname"], title=r["title"],
             institutionId=r["institution"]["id"], institutionName=r["institution"]["name"],
+            institutionLogoUrl=r["institution"].get("logoUrl"),
             identifier=r["identifier"],
         )
         for r in items
@@ -452,9 +459,11 @@ async def lookup_bill(client: BackendClient, biller_id: str | None = None, consu
         billers = await client.billers()
     except BackendError as e:
         return _fail(e)
-    biller_name = next((b["name"] for b in billers["items"] if b["id"] == biller_id), "Biller")
+    biller_dict = next((b for b in billers["items"] if b["id"] == biller_id), None)
+    biller_name = biller_dict["name"] if biller_dict else "Biller"
     card = BillCard(
-        billId=bill["billId"], biller=biller_name, consumerName=bill["consumerName"],
+        billId=bill["billId"], biller=biller_name, billerLogoUrl=biller_dict.get("logoUrl") if biller_dict else None,
+        consumerName=bill["consumerName"],
         amountPaisa=bill["amountPaisa"], dueDate=bill["dueDate"], month=bill["month"],
     )
     return _ok(
@@ -474,7 +483,7 @@ async def list_due_bills(client: BackendClient) -> Result:
         return _ok("No bills currently due.")
     bills = [
         BillItem(
-            billId=b["billId"], biller=b["biller"]["name"],
+            billId=b["billId"], biller=b["biller"]["name"], billerLogoUrl=b["biller"].get("logoUrl"),
             consumerName=b.get("consumerName") or b["consumerNo"],
             amountPaisa=b["amountPaisa"], dueDate=b["dueDate"], month=b["month"],
         )
@@ -495,6 +504,7 @@ def _biller_chip(b: dict[str, Any]) -> BillerChip:
     return BillerChip(
         savedBillerId=b["id"], billerId=b["biller"]["id"], name=b["biller"]["name"],
         urduName=b["biller"].get("urduName"), consumerNo=b["consumerNo"],
+        logoUrl=b["biller"].get("logoUrl"),
     )
 
 
@@ -703,6 +713,7 @@ async def list_recipients(client: BackendClient) -> Result:
         RecipientChip(
             recipientId=r["id"], nickname=r["nickname"], title=r["title"],
             institutionId=r["institution"]["id"], institutionName=r["institution"]["name"],
+            institutionLogoUrl=r["institution"].get("logoUrl"),
             identifier=r["identifier"],
         )
         for r in items
@@ -909,11 +920,14 @@ async def pocket_withdraw(client: BackendClient, pocket_id: str, amount_paisa: i
 async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str | None = None,
                      institution_id: str | None = None, identifier: str | None = None,
                      institution_name: str | None = None,
-                     risk_flags: list[str] | None = None) -> Result:
+                     risk_flags: list[str] | None = None,
+                     risk_target: dict[str, str] | None = None) -> Result:
     """Prepare a transfer.
 
     `risk_flags` carries the AI service's own per-turn signal (`pressure_language`, see the
-    prompt rule) to the backend, which adds its money-pattern flags on top. What comes back
+    prompt rule) to the backend, which adds its money-pattern flags on top. `risk_target`
+    names the recipient those flags were raised about, so the backend applies them only to
+    that payment — a later, unrelated send must not inherit the check-in. What comes back
     decides the card, in this order (spec §1.7-§1.9):
       risk-flagged and not yet answered -> `check_in` (asked before anything else);
       approval waiting                  -> `waiting_approval` (the PIN sheet does NOT open);
@@ -939,7 +953,8 @@ async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str
             "risk_flags."
         )
     try:
-        action = await client.create_transfer(to, amount_paisa, risk_flags=risk_flags)
+        action = await client.create_transfer(to, amount_paisa, risk_flags=risk_flags,
+                                              risk_target=risk_target)
     except BackendError as e:
         # Same fallback as resolve_recipient: a later turn may only have the institution's
         # display name to offer as institution_id, not its id — retry once by name.
@@ -947,7 +962,8 @@ async def send_money(client: BackendClient, amount_paisa: int, recipient_id: str
             by_name = await _institution_id_by_name(client, institution_id)
             if by_name and by_name != institution_id:
                 return await send_money(client, amount_paisa, institution_id=by_name,
-                                        identifier=identifier, risk_flags=risk_flags)
+                                        identifier=identifier, risk_flags=risk_flags,
+                                        risk_target=risk_target)
         return _fail(e)
     return await _action_gate_result(client, action, f"Prepared transfer of {_rs(amount_paisa)}")
 

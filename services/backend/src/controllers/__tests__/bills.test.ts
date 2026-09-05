@@ -7,7 +7,7 @@ const app = createApp();
 const CONSUMER_NO = '0400012345678';
 
 async function makeBiller() {
-  return Biller.create({ name: 'K-Electric', urduName: 'کے الیکٹرک', category: 'electricity' });
+  return Biller.create({ name: 'K-Electric', urduName: 'کے الیکٹرک', category: 'electricity', domain: 'ke.com.pk' });
 }
 
 async function executeAction(token: string, actionId: string) {
@@ -90,6 +90,8 @@ test('unknown bill → 404; billers list works', async () => {
   const billers = await request(app).get('/api/v1/billers').set('Authorization', `Bearer ${token}`);
   expect(billers.body.data.items).toHaveLength(1);
   expect(billers.body.data.items[0].category).toBe('electricity');
+  expect(billers.body.data.items[0].domain).toBe('ke.com.pk');
+  expect(billers.body.data.items[0].logoUrl).toBe('https://www.google.com/s2/favicons?domain=ke.com.pk&sz=128');
 });
 
 test('lookup stamps bill.userId; GET /bills/due is scoped per user', async () => {
@@ -106,6 +108,7 @@ test('lookup stamps bill.userId; GET /bills/due is scoped per user', async () =>
   expect(dueA.body.data.items).toHaveLength(1);
   expect(dueA.body.data.items[0].billId).toBe(lookup.body.data.billId);
   expect(dueA.body.data.items[0].biller.name).toBe('K-Electric');
+  expect(dueA.body.data.items[0].biller.logoUrl).toBe('https://www.google.com/s2/favicons?domain=ke.com.pk&sz=128');
 
   const dueB = await request(app).get('/api/v1/bills/due').set('Authorization', `Bearer ${tokenB}`);
   expect(dueB.body.data.items).toHaveLength(0);

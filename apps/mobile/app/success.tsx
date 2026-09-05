@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Switch, View } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -12,7 +12,8 @@ import { useReducedMotion } from '../src/motion/useReducedMotion';
 import { SUCCESS_CHECK_MS, SUCCESS_TEXT_MS, RISE_TRANSLATE_Y, EASE_OUT } from '../src/motion/config';
 import { formatPaisa } from '../src/lib/money';
 import { useCreateRecipientMutation, useCreateSavedBillerMutation, apiErr } from '../src/api/client';
-import type { RecipientSuggestion, BillerSuggestion } from '../src/api/types';
+import type { RecipientSuggestion, BillerSuggestion, Txn } from '../src/api/types';
+import { useOutcomeSpeech } from '../src/voice/OutcomeSpeechProvider';
 
 const easeInOut = Easing.inOut(Easing.ease);
 const easeOut = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
@@ -27,8 +28,8 @@ export default function Success() {
   const { c } = useTheme();
   const urdu = useIsUrdu();
   const router = useRouter();
-  const { refNo, amountPaisa, summary, recipientSuggestion: recipientSuggestionRaw, billerSuggestion: billerSuggestionRaw } =
-    useLocalSearchParams<{ refNo: string; amountPaisa: string; summary?: string; recipientSuggestion?: string; billerSuggestion?: string }>();
+  const { refNo, amountPaisa, summary, txn: txnRaw, recipientSuggestion: recipientSuggestionRaw, billerSuggestion: billerSuggestionRaw } =
+    useLocalSearchParams<{ refNo: string; amountPaisa: string; summary?: string; txn?: string; recipientSuggestion?: string; billerSuggestion?: string }>();
   const reducedMotion = useReducedMotion();
   const checkProgress = useSharedValue(reducedMotion ? 1 : 0);
   // Text block rises SUCCESS_TEXT_MS after the check lands at SUCCESS_CHECK_MS
@@ -47,6 +48,19 @@ export default function Success() {
   const [error, setError] = useState<string | null>(null);
   const [createRecipient] = useCreateRecipientMutation();
   const [createSavedBiller] = useCreateSavedBillerMutation();
+
+  // F2: the classic (non-chat) flows land here after the PIN sheet, and until now
+  // said nothing out loud. Spoken once per mount — `spokenRef` rather than the
+  // effect's own dependency list, because Strict Mode runs mount effects twice
+  // and paying twice as much for TTS is not the kind of echo anyone wants.
+  const { speak } = useOutcomeSpeech();
+  const spokenRef = useRef(false);
+  const txn = useMemo(() => parseJson<Txn>(txnRaw), [txnRaw]);
+  useEffect(() => {
+    if (spokenRef.current || !txn) return;
+    spokenRef.current = true;
+    speak({ transaction: txn }, { kind: 'classic', amountPaisa: txn.amountPaisa });
+  }, [txn, speak]);
 
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});

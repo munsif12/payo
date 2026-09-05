@@ -8,7 +8,11 @@ const refNo = customAlphabet('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 10);
 export interface PostTxnInput {
   userId: string; type: string; direction: 'in' | 'out';
   amountPaisa: number; feePaisa: number;
-  counterparty: { name: string; urduName?: string | undefined; detail: string }; category: string;
+  counterparty: {
+    name: string; urduName?: string | undefined; detail: string;
+    institutionId?: string | undefined; institutionLogoUrl?: string | undefined;
+  };
+  category: string;
 }
 
 export async function postTransaction(session: ClientSession, i: PostTxnInput) {

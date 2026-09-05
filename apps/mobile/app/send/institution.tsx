@@ -3,7 +3,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Search } from 'lucide-react-native';
-import { Screen, Text, Input, ListRow, Avatar, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Input, ListRow, InstitutionLogo, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
 import { useInstitutionsQuery, useResolveRecipientMutation, apiErr } from '../../src/api/client';
@@ -62,7 +62,7 @@ export default function InstitutionPicker() {
       key={inst.id}
       testID={`institution-${inst.name.replace(/\s/g, '-')}`}
       onPress={() => onPick(inst)}
-      left={<Avatar name={inst.name} bg={c.amberTint} color={c.onAmber} />}
+      left={<InstitutionLogo size={40} shape="circle" name={inst.name} code={inst.code ?? inst.id} logoUrl={inst.logoUrl} />}
       title={urdu && inst.urduName ? inst.urduName : inst.name}
       subtitle={resolvingId === inst.id && resolving ? t('common.loading') : undefined}
       showChevron

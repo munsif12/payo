@@ -14,6 +14,7 @@ import { useVoiceLoop, type VoiceLoopHandlers } from '../../src/voice/useVoiceLo
 import { usePinSheet } from '../../src/pin/usePinSheet';
 import { useHomeGreeting, type Suggestion } from '../../src/home/useHomeGreeting';
 import { useHomeDigest } from '../../src/home/useHomeDigest';
+import { useRegisterOutcomePlayer } from '../../src/voice/OutcomeSpeechProvider';
 import { formatPaisa } from '../../src/lib/money';
 import { ltrIsolate } from '../../src/lib/bidi';
 
@@ -41,6 +42,10 @@ export default function Home() {
   // The proactive digest (spec §1 C): fetched + spoken on focus, rendered under
   // the greeting bubble. Null whenever the setting is off or the 4 h rule says no.
   const digestCard = useHomeDigest(playAudio);
+  // F2: the post-PIN outcome sentence plays through THIS player, so the
+  // hands-free loop sees `speaking` → audioStarted and onSpeechEnd →
+  // audioEnded and re-arms the mic afterwards, exactly as the digest does.
+  useRegisterOutcomePlayer(playAudio);
   const recorder = useRecorder((result) => loopRef.current?.onRecordingFinished(result));
   const { recording } = recorder;
   const { isOpen: pinSheetOpen } = usePinSheet();

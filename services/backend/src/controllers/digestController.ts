@@ -6,6 +6,7 @@ import { ok } from '../lib/respond';
 import { ensureDueBill } from './billsController';
 import { summarizeTransactions } from './transactionsController';
 import { wardsOf } from '../lib/guardian';
+import { logoUrlFor } from '../lib/logos';
 
 const DEFAULT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const ANOMALY_RATIO = 1.5;
@@ -34,6 +35,8 @@ async function billDueItems(userId: string) {
     biller: {
       id: String(b.billerId), name: billerMap.get(String(b.billerId))?.name ?? '?',
       urduName: billerMap.get(String(b.billerId))?.urduName ?? undefined,
+      domain: billerMap.get(String(b.billerId))?.domain,
+      logoUrl: billerMap.get(String(b.billerId))?.domain ? logoUrlFor(billerMap.get(String(b.billerId))!.domain) : undefined,
     },
     consumerNo: b.consumerNo, amountPaisa: b.amountPaisa, dueDate: b.dueDate.toISOString(),
   }));

@@ -3,6 +3,12 @@
 // Keep field names/optionality in lockstep with that file — do not invent
 // fields here that cards.py doesn't have.
 
+// LOGOS (F1): every model carrying an institution or biller also carries an
+// optional logo url — `logoUrl` on the institution/biller itself, and the
+// explicit `institutionLogoUrl` / `billerLogoUrl` where the model is named after
+// something else (a recipient is a person; a bill is not its biller). Optional
+// everywhere: no mark means the initials Avatar.
+
 export interface Bilingual {
   en: string;
   ur: string;
@@ -13,6 +19,8 @@ export interface InstitutionRef {
   name: string;
   urduName?: string;
   kind: 'wallet' | 'bank';
+  /** F1: the institution's mark. Optional — absent means initials. */
+  logoUrl?: string;
 }
 
 export interface InstitutionChip {
@@ -20,6 +28,8 @@ export interface InstitutionChip {
   name: string;
   urduName?: string;
   kind: 'wallet' | 'bank';
+  /** F1: the institution's mark. Optional — absent means initials. */
+  logoUrl?: string;
 }
 
 export interface InstitutionChipsCard {
@@ -44,6 +54,8 @@ export interface RecipientChip {
   institutionId: string;
   institutionName: string;
   identifier: string;
+  /** F1: the RECIPIENT'S INSTITUTION mark (a recipient has no logo of its own). */
+  institutionLogoUrl?: string;
 }
 
 export interface RecipientChipsCard {
@@ -58,6 +70,8 @@ export interface BillerChip {
   name: string;
   urduName?: string;
   consumerNo?: string;
+  /** F1: the biller's mark. Optional — absent means the category icon/initials. */
+  logoUrl?: string;
 }
 
 export interface BillerChipsCard {
@@ -107,6 +121,9 @@ export interface TxnCounterparty {
   name: string;
   urduName?: string;
   detail: string;
+  /** F1: the counterparty's INSTITUTION mark — named for what it is, since the
+   *  counterparty itself (a person) never has a logo. */
+  institutionLogoUrl?: string;
 }
 
 export interface Txn {
@@ -144,6 +161,8 @@ export interface BillCard {
   amountPaisa: number;
   dueDate: string;
   month: string;
+  /** F1: the biller's mark, for the card header. */
+  billerLogoUrl?: string;
 }
 
 export interface PocketCard {
@@ -262,6 +281,8 @@ export interface BillItem {
   amountPaisa: number;
   dueDate: string;
   month: string;
+  /** F1: the biller's mark. */
+  billerLogoUrl?: string;
 }
 
 export interface BillsCard {

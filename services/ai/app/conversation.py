@@ -246,15 +246,56 @@ def cards_context_line(cards: list[dict[str, Any]] | None) -> str:
 HISTORY_WINDOW_TURNS = 12
 
 
+def risk_facts_line(flags: list[str], institution_id: str | None, identifier: str | None,
+                    at: str | None) -> str:
+    """`[risk] ...` line for the assistant turn that showed a check_in card.
+
+    It records WHICH flags, WHICH recipient they were raised about, and WHEN — the three
+    things `agent.RiskContext` needs to re-arm the check-in for that one payment without
+    dragging every later, unrelated send into it (owner call). Model-facing only, like
+    `[cards]`; the persisted message text stays clean.
+    """
+    if not flags or not identifier:
+        return ""
+    line = f"[risk] {','.join(flags)} target={institution_id or ''}/{normalize_identifier(identifier)}"
+    return f"{line} at={at}" if at else line
+
+
+def _risk_lines_by_index(items: list[dict[str, Any]]) -> dict[int, str]:
+    """The `[risk]` line for each message that carried a check_in card, keyed by position.
+
+    The target is the recipient most recently shown BEFORE that card — the send being
+    flagged — and the timestamp is that message's own createdAt, so the 30-minute expiry is
+    measured from the real detection time rather than from when the history was rebuilt.
+    Scanned over the FULL history: the recipient card may pre-date the model's window.
+    """
+    lines: dict[int, str] = {}
+    institution_id = identifier = None
+    for index, m in enumerate(items):
+        for card in m.get("cards") or []:
+            if card.get("kind") == "recipient":
+                institution_id = (card.get("institution") or {}).get("id") or institution_id
+                identifier = card.get("identifier") or identifier
+            elif card.get("kind") == "check_in":
+                line = risk_facts_line(card.get("riskFlags") or [], institution_id, identifier,
+                                       m.get("createdAt"))
+                if line:
+                    lines[index] = line
+    return lines
+
+
 def _history_from_messages(items: list[dict[str, Any]]) -> list[BaseMessage]:
     history: list[BaseMessage] = []
-    for m in items[-HISTORY_WINDOW_TURNS:]:
+    risk_lines = _risk_lines_by_index(items)
+    offset = max(len(items) - HISTORY_WINDOW_TURNS, 0)
+    for index, m in enumerate(items[-HISTORY_WINDOW_TURNS:], start=offset):
         if m["role"] == "user":
             history.append(HumanMessage(content=m["text"]))
         else:
             line = cards_context_line(m.get("cards"))
             text = f"{m['text']}\n{line}" if line else m["text"]
-            history.append(AIMessage(content=text))
+            risk = risk_lines.get(index)
+            history.append(AIMessage(content=f"{text}\n{risk}" if risk else text))
     return history
 
 

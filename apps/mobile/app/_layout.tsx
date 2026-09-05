@@ -18,6 +18,7 @@ import { useTheme } from '../src/theme/useTheme';
 import { store, RootState } from '../src/store';
 import { hydrated, loadStoredAuth } from '../src/store/authSlice';
 import { PinSheetProvider } from '../src/pin/usePinSheet';
+import { OutcomeSpeechProvider } from '../src/voice/OutcomeSpeechProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -83,9 +84,13 @@ export default function RootLayout() {
 
   return (
     <Provider store={store}>
-      <PinSheetProvider>
-        <RootShell />
-      </PinSheetProvider>
+      {/* Outside PinSheetProvider: the sheet's own consumers (the chat cards)
+          speak the outcome, and the provider only holds the player + the token. */}
+      <OutcomeSpeechProvider>
+        <PinSheetProvider>
+          <RootShell />
+        </PinSheetProvider>
+      </OutcomeSpeechProvider>
     </Provider>
   );
 }

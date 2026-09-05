@@ -29,7 +29,7 @@ test('pending action defaults', async () => {
 
 test('bill accepts userId', async () => {
   const u = await User.create({ name: 'A', phone: '+920000000005' });
-  const biller = await Biller.create({ name: 'K-Electric', urduName: 'کے الیکٹرک', category: 'electricity' });
+  const biller = await Biller.create({ name: 'K-Electric', urduName: 'کے الیکٹرک', category: 'electricity', domain: 'ke.com.pk' });
   const bill = await Bill.create({
     billerId: biller._id, consumerNo: '1234567890', consumerName: 'A',
     amountPaisa: 1000, dueDate: new Date(), month: '2026-09', userId: u._id,

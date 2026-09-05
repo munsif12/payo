@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ChevronLeft, Wallet as WalletIcon, Zap, Smartphone, PiggyBank, ArrowLeftRight, type LucideIcon,
 } from 'lucide-react-native';
-import { Screen, Text, Card, Chip, Avatar, useIsUrdu } from '../src/ui';
+import { Screen, Text, Card, Chip, Avatar, InstitutionLogo, useIsUrdu } from '../src/ui';
 import { useTheme } from '../src/theme/useTheme';
 import { space } from '../src/theme/tokens';
 import { useTransactionsQuery } from '../src/api/client';
@@ -189,7 +189,10 @@ export default function Activity() {
                 paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.separator,
               }}
             >
-              {Icon ? (
+              {txn.counterparty.institutionLogoUrl ? (
+                // A real mark beats both the type icon and the initials disc.
+                <InstitutionLogo size={40} shape="circle" name={name} logoUrl={txn.counterparty.institutionLogoUrl} />
+              ) : Icon ? (
                 <View style={{
                   width: 44, height: 44, borderRadius: 22, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: txn.type === 'bill' ? c.redTint : c.amberTint,

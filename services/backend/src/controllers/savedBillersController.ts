@@ -5,6 +5,7 @@ import { SavedBiller, Biller } from '../models';
 import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { ensureDueBill } from './billsController';
+import { logoUrlFor } from '../lib/logos';
 
 type SavedBillerDoc = InstanceType<typeof SavedBiller>;
 
@@ -15,7 +16,10 @@ async function savedBillerDto(sb: SavedBillerDoc) {
   if (!biller) return null;
   return {
     id: String(sb._id), nickname: sb.nickname,
-    biller: { id: String(biller._id), name: biller.name, urduName: biller.urduName, category: biller.category },
+    biller: {
+      id: String(biller._id), name: biller.name, urduName: biller.urduName, category: biller.category,
+      domain: biller.domain, logoUrl: logoUrlFor(biller.domain),
+    },
     consumerNo: sb.consumerNo, consumerName: sb.consumerName,
   };
 }

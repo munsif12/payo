@@ -12,7 +12,7 @@ export interface Txn {
   type: 'p2p' | 'bank_transfer' | 'bill' | 'recharge' | 'pocket_deposit' | 'pocket_withdraw' | 'request_settlement';
   direction: 'in' | 'out';
   amountPaisa: number; feePaisa: number;
-  counterparty: { name: string; urduName?: string; detail: string };
+  counterparty: { name: string; urduName?: string; detail: string; institutionLogoUrl?: string; domain?: string };
   category: string; status: 'completed'; refNo: string; createdAt: string;
 }
 
@@ -72,7 +72,7 @@ export interface DigestItemDto {
   amountPaisa?: number;
   from?: { name: string; urduName?: string; detail?: string; phone?: string };
   payer?: { name: string; phone: string };
-  biller?: { id: string; name: string; urduName?: string };
+  biller?: { id: string; name: string; urduName?: string; code?: string; logoUrl?: string; domain?: string };
   summary?: { en: string; ur: string };
   category?: string;
   thisMonthPaisa?: number;
@@ -137,15 +137,21 @@ export interface BillLookup {
   billId: string; consumerName: string; amountPaisa: number; dueDate: string; month: string;
 }
 
-export interface NamedItem { id: string; name: string; urduName: string; category?: string }
+export interface NamedItem {
+  id: string; name: string; urduName: string; category?: string;
+  /** F1 logos — optional; absent means the category icon. */
+  code?: string; logoUrl?: string; domain?: string;
+}
 
 export interface InstitutionDto {
   id: string; name: string; urduName: string; kind: 'wallet' | 'bank'; code?: string; popular: boolean;
+  /** F1 logos — optional. */
+  logoUrl?: string; domain?: string;
 }
 
 export interface ResolvedRecipient {
   title: string;
-  institution: { id: string; name: string; urduName?: string; kind: 'wallet' | 'bank' };
+  institution: { id: string; name: string; urduName?: string; kind: 'wallet' | 'bank'; code?: string; logoUrl?: string; domain?: string };
   identifier: string;
   linkedUserId?: string;
 }
@@ -160,18 +166,18 @@ export interface BillerSuggestion {
 
 export interface RecipientDto {
   id: string; nickname: string; title: string;
-  institution: { id: string; name: string; urduName?: string; kind: 'wallet' | 'bank' };
+  institution: { id: string; name: string; urduName?: string; kind: 'wallet' | 'bank'; code?: string; logoUrl?: string; domain?: string };
   identifier: string; linkedUserId?: string; lastUsedAt?: string;
 }
 
 export interface SavedBillerDto {
   id: string; nickname: string;
-  biller: { id: string; name: string; urduName?: string; category?: string };
+  biller: { id: string; name: string; urduName?: string; category?: string; code?: string; logoUrl?: string; domain?: string };
   consumerNo: string; consumerName: string;
 }
 
 export interface DueBill {
   billId: string;
-  biller: { id: string; name: string; urduName: string; category?: string };
+  biller: { id: string; name: string; urduName: string; category?: string; code?: string; logoUrl?: string; domain?: string };
   consumerNo: string; amountPaisa: number; dueDate: string; month: string;
 }

@@ -3,7 +3,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Search } from 'lucide-react-native';
-import { Screen, Text, Input, ListRow, Avatar, Button, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Input, ListRow, InstitutionLogo, Button, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
 import { useRecipientsQuery, useDeleteRecipientMutation } from '../../src/api/client';
@@ -95,7 +95,7 @@ export default function SendIdentifier() {
                 testID={`saved-recipient-${r.id}`}
                 onPress={() => goAmountForRecipient(r)}
                 onLongPress={() => onDelete(r)}
-                left={<Avatar name={r.nickname} />}
+                left={<InstitutionLogo size={40} shape="circle" name={r.nickname} code={r.institution.code ?? r.institution.id} logoUrl={r.institution.logoUrl} />}
                 title={r.nickname}
                 subtitle={ltrIsolate(`${r.title} · ${urdu && r.institution.urduName ? r.institution.urduName : r.institution.name} · ${maskIdentifier(r.identifier)}`)}
                 showChevron

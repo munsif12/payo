@@ -6,7 +6,8 @@ caller's BackendClient and a card sink, so cards surface to the app while the
 model only sees text.
 """
 import re
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Annotated, Any, Sequence
 
@@ -455,7 +456,7 @@ def build_tools(
     client: BackendClient,
     cards_sink: list[dict[str, Any]],
     resolved_pairs: set[tuple[str, str]] | None = None,
-    sticky_risk_flags: set[str] | None = None,
+    risk_context: "RiskContext | None" = None,
 ) -> list[StructuredTool]:
     """Wrap app.tools as LangChain tools; text goes to the model, cards to the sink."""
 
@@ -482,11 +483,30 @@ def build_tools(
     # resolve_recipient or from the caller's chat history.
     resolved_pairs = {(inst, normalize_identifier(ident)) for inst, ident in (resolved_pairs or ())}
 
-    # Backstop for the pressure-language rule (spec §1.7): a flag the CONVERSATION has
-    # already earned sticks to every later send in the window, whether or not the model
-    # remembers to pass it. Seeded from history by run_agent, and topped up in-turn from
-    # any check_in card this turn produced.
-    sticky_risk_flags: set[str] = set(sticky_risk_flags or ())
+    # Backstop for the pressure-language rule (spec §1.7): a flag this conversation already
+    # earned re-arms the check-in even when the model forgets to pass it — but ONLY for the
+    # recipient the pressure was about, and only until the flag expires. `live_risk` is a
+    # one-slot cell so a check_in card produced THIS turn also covers a repeat send in the
+    # same turn. Seeded from history by run_agent.
+    live_risk: list[RiskContext | None] = [risk_context]
+
+    def _sticky_for(institution_id: str | None, identifier: str | None) -> RiskContext | None:
+        context = live_risk[0]
+        if context and context.is_live() and context.matches(institution_id, identifier):
+            return context
+        return None
+
+    async def _identifier_of_recipient(recipient_id: str) -> tuple[str | None, str | None]:
+        """A saved recipient's institution+identifier, so a recipient_id send can be matched
+        against the risk target too. Only worth a call while a risk context is live."""
+        try:
+            data = await client.recipients()
+        except Exception:
+            return None, None
+        for item in data.get("items", []):
+            if item.get("id") == recipient_id:
+                return (item.get("institution") or {}).get("id"), item.get("identifier")
+        return None, None
 
 
     async def resolve_recipient_runner(institution_id: str, identifier: str) -> str:
@@ -525,11 +545,25 @@ def build_tools(
                         "resolve_recipient(institution_id, identifier) first, show the recipient card, "
                         "and get the user's confirmation before trying send_money again."
                     )
-        flags = sorted(set(risk_flags or ()) | sticky_risk_flags)
+        # What the model passed always stands. What the CONVERSATION earned is added only
+        # when this send goes to the recipient that pressure was about (owner call): an
+        # unrelated payment must not inherit the check-in or the guardian's approval.
+        target_institution, target_identifier = institution_id, identifier
+        if recipient_id and live_risk[0] and live_risk[0].is_live():
+            target_institution, target_identifier = await _identifier_of_recipient(recipient_id)
+        sticky = _sticky_for(target_institution, target_identifier)
+        flags = sorted(set(risk_flags or ()) | (sticky.flags if sticky else frozenset()))
+        risk_target = (
+            sticky.as_target() if sticky
+            else {k: v for k, v in {"institutionId": target_institution,
+                                    "identifier": normalize_identifier(target_identifier or "")}.items() if v}
+            if flags else None
+        )
         result = await t.send_money(
             client, amount_paisa=amount_paisa, recipient_id=recipient_id,
             institution_id=institution_id, identifier=identifier,
             institution_name=institution_name, risk_flags=flags or None,
+            risk_target=risk_target or None,
         )
         # A recipient_id the backend has never heard of. Live smoke (V16-ur): right after
         # resolving a recipient the model passed the INSTITUTION's id as recipient_id, the
@@ -547,7 +581,14 @@ def build_tools(
         if card:
             cards_sink.append(card)
             if card.get("kind") == "check_in":
-                sticky_risk_flags.update(card.get("riskFlags") or ())
+                # Remember what this turn just flagged, and for whom, so a repeat send in
+                # the same turn is still covered without waiting for the next `[risk]` line.
+                live_risk[0] = RiskContext(
+                    flags=frozenset(card.get("riskFlags") or ()),
+                    institution_id=target_institution,
+                    identifier=normalize_identifier(target_identifier or "") or None,
+                    detected_at=datetime.now(timezone.utc),
+                )
         return result["text"]
 
     resolve_recipient_tool = StructuredTool.from_function(
@@ -715,7 +756,7 @@ async def run_agent(
     reject a same-turn confirmation because its own bookkeeping is per-call.
     """
     cards: list[dict[str, Any]] = []
-    sticky_risk_flags = risk_flags_in_history(history)
+    risk_context = risk_context_from_history(history)
 
     def turn_already_acted() -> bool:
         """A tool ran or a card was emitted this turn, so the turn is finished. Re-invoking
@@ -746,7 +787,7 @@ async def run_agent(
 
     model = model or build_model()
     agent = create_react_agent(
-        model, build_tools(client, cards, resolved_pairs, sticky_risk_flags))
+        model, build_tools(client, cards, resolved_pairs, risk_context))
     messages: list[BaseMessage] = [SystemMessage(content=system_prompt(language)), *history, HumanMessage(content=user_text)]
     state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
     reply = strip_cards_marker(_last_reply(state))
@@ -758,7 +799,7 @@ async def run_agent(
     # for you" and called nothing — so no check_in card appeared and the user had nothing to
     # decide on. The flag belongs on send_money; the explanation belongs after the answer.
     if not turn_already_acted() and _refuses_a_flagged_send(
-            user_text, history, resolved_pairs, sticky_risk_flags):
+            user_text, history, resolved_pairs, risk_context):
         nudged = [*state["messages"],
                   HumanMessage(content=_nudge(PRESSURE_SEND_NUDGE, PRESSURE_SEND_NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
@@ -1182,29 +1223,89 @@ def _has_confirmed_send_context(history: Sequence[BaseMessage], user_text: str,
 
 def _refuses_a_flagged_send(user_text: str, history: Sequence[BaseMessage],
                             resolved_pairs: set[tuple[str, str]] | None,
-                            sticky_risk_flags: set[str]) -> bool:
+                            risk_context: "RiskContext | None") -> bool:
     """A pressured send the model answered with words instead of a flagged send_money."""
-    if not (sticky_risk_flags or has_pressure_language(_recent_user_text(history, user_text))):
+    live = bool(risk_context and risk_context.is_live())
+    if not (live or has_pressure_language(_recent_user_text(history, user_text))):
         return False
     return _has_confirmed_send_context(history, user_text, resolved_pairs)
 
 
-# The risk flags a `check_in` card carried earlier in this conversation, read back out of
-# the `[cards]` facts line that card left in the model-facing history.
-_CARDS_CHECK_IN_FLAGS_RE = re.compile(r"check_in:[^|\n]*?risk_flags=([^\s|]+)")
+# How long a detected scam pressure signal keeps arming the check-in. The risk belongs to
+# ONE payment the user was pressured into, not to their whole afternoon: a grocery payment
+# ten minutes later must not inherit the check-in and the guardian's approval.
+RISK_TARGET_TTL = timedelta(minutes=30)
+
+# The `[risk]` facts line conversation.py leaves on the assistant turn that showed a
+# check_in card: which flags, which recipient they were about, and when they were detected.
+_RISK_LINE_RE = re.compile(
+    r"\[risk\]\s+(?P<flags>[^\s\[]+)"
+    r"(?:\s+target=(?P<institution>[^/\s]*)/(?P<identifier>\S*))?"
+    r"(?:\s+at=(?P<at>\S+))?"
+)
 
 
-def risk_flags_in_history(history: Sequence[BaseMessage]) -> set[str]:
-    """Risk flags this conversation has already earned, from every check_in card in the
-    window. The model is asked to pass `pressure_language` itself, but a scam turn must not
-    become un-flagged just because a later turn's model call forgot it — so send_money
-    re-applies whatever is found here (see build_tools)."""
-    flags: set[str] = set()
-    for message in history:
-        if isinstance(message, AIMessage):
-            for found in _CARDS_CHECK_IN_FLAGS_RE.finditer(_content_text(message.content)):
-                flags.update(f for f in found.group(1).split(",") if f)
-    return flags
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat((value or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+@dataclass(frozen=True)
+class RiskContext:
+    """A pressure signal this conversation already earned, and the ONE recipient it was
+    about. Scoped and time-boxed on purpose: the sticky flag re-arms the check-in for that
+    payment only, and only for RISK_TARGET_TTL — an unrelated send must not inherit the
+    check-in and the guardian's approval."""
+
+    flags: frozenset[str]
+    institution_id: str | None
+    identifier: str | None  # canonical form (normalize_identifier)
+    detected_at: datetime | None  # None = unknown; treated as live, never as expired
+
+    def is_live(self, now: datetime | None = None) -> bool:
+        if not self.flags or not self.identifier:
+            return False  # no target means nothing to re-arm; a bare flag is not sticky
+        if self.detected_at is None:
+            return True
+        return (now or datetime.now(timezone.utc)) - self.detected_at <= RISK_TARGET_TTL
+
+    def matches(self, institution_id: str | None, identifier: str | None) -> bool:
+        """Is this send going to the recipient the pressure was about? The institution is
+        compared only when both sides know it — a turn often carries the identifier alone."""
+        if not identifier or normalize_identifier(identifier) != self.identifier:
+            return False
+        return not (self.institution_id and institution_id
+                    and self.institution_id != institution_id)
+
+    def as_target(self) -> dict[str, str]:
+        """`riskTarget` for the backend: it applies the flag only if the recipient matches."""
+        target = {"identifier": self.identifier or ""}
+        if self.institution_id:
+            target["institutionId"] = self.institution_id
+        return target
+
+
+def risk_context_from_history(history: Sequence[BaseMessage]) -> RiskContext | None:
+    """The most recent `[risk]` line in the model-facing history. The model is asked to pass
+    `pressure_language` itself; this is the backstop for the turn where it forgets — scoped
+    to the payment the pressure was actually about."""
+    for message in reversed(list(history)):
+        if not isinstance(message, AIMessage):
+            continue
+        found = None
+        for found in _RISK_LINE_RE.finditer(_content_text(message.content)):
+            pass  # the newest line on this message wins
+        if found:
+            return RiskContext(
+                flags=frozenset(f for f in found.group("flags").split(",") if f),
+                institution_id=found.group("institution") or None,
+                identifier=normalize_identifier(found.group("identifier") or "") or None,
+                detected_at=_parse_iso_datetime(found.group("at")),
+            )
+    return None
 
 
 def _pending_action_id(history: Sequence[BaseMessage]) -> str | None:

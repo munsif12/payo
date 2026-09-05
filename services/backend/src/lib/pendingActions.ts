@@ -45,7 +45,10 @@ export const toActionDto = (a: PADoc) => ({
 export const txnDto = (t: TxnDoc) => ({
   id: String(t._id), type: t.type, direction: t.direction, amountPaisa: t.amountPaisa,
   feePaisa: t.feePaisa,
-  counterparty: { name: t.counterparty!.name, urduName: t.counterparty!.urduName ?? undefined, detail: t.counterparty!.detail },
+  counterparty: {
+    name: t.counterparty!.name, urduName: t.counterparty!.urduName ?? undefined, detail: t.counterparty!.detail,
+    institutionLogoUrl: t.counterparty!.institutionLogoUrl ?? undefined,
+  },
   category: t.category, status: t.status, refNo: t.refNo,
   createdAt: (t as unknown as { createdAt: Date }).createdAt.toISOString(),
 });

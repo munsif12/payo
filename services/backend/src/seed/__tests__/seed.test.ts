@@ -34,6 +34,11 @@ test('seed builds the Contract 4 demo world', async () => {
 
   expect(await Institution.countDocuments()).toBe(SEED_INSTITUTIONS.length);
   expect(await Biller.countDocuments()).toBe(SEED_BILLERS.length);
+  // Every institution and biller must carry a real domain — logoUrl is derived from it.
+  const institutions = await Institution.find();
+  expect(institutions.every(i => typeof i.get('domain') === 'string' && i.get('domain').length > 0)).toBe(true);
+  const billers = await Biller.find();
+  expect(billers.every(b => typeof b.get('domain') === 'string' && b.get('domain').length > 0)).toBe(true);
   expect(await Telco.countDocuments()).toBe(4);
   // v3: no recipients or saved billers are pre-seeded.
   expect(await Recipient.countDocuments()).toBe(0);

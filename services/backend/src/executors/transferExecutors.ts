@@ -6,6 +6,7 @@ import { User } from '../models';
 
 interface TransferPayload {
   institutionId: string; institutionName: string; institutionUrduName: string; institutionKind: 'wallet' | 'bank';
+  institutionLogoUrl?: string;
   identifier: string; title: string; linkedUserId?: string; recipientId?: string;
 }
 
@@ -22,7 +23,8 @@ registerExecutor('send_money', async (session, a) => {
 
   const out = await postTransaction(session, {
     userId: String(a.userId), type: 'p2p', direction: 'out', amountPaisa: a.amountPaisa, feePaisa: a.feePaisa,
-    counterparty: { name: p.title, detail: p.identifier }, category: 'transfer',
+    counterparty: { name: p.title, detail: p.identifier, institutionId: p.institutionId, institutionLogoUrl: p.institutionLogoUrl },
+    category: 'transfer',
   });
   await postTransaction(session, {
     userId: String(recipient._id), type: 'p2p', direction: 'in', amountPaisa: a.amountPaisa, feePaisa: 0,
@@ -37,7 +39,11 @@ const debitOnly: Executor = async (session, a) => {
   const type = p.institutionKind === 'bank' ? 'bank_transfer' : 'p2p';
   return postTransaction(session, {
     userId: String(a.userId), type, direction: 'out', amountPaisa: a.amountPaisa, feePaisa: a.feePaisa,
-    counterparty: { name: p.title, detail: `${p.institutionName} ${maskIdentifier(p.identifier)}` }, category: 'transfer',
+    counterparty: {
+      name: p.title, detail: `${p.institutionName} ${maskIdentifier(p.identifier)}`,
+      institutionId: p.institutionId, institutionLogoUrl: p.institutionLogoUrl,
+    },
+    category: 'transfer',
   });
 };
 registerExecutor('send_money_bank', debitOnly);

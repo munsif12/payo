@@ -8,9 +8,16 @@ Everything not mentioned here stays as built. Demo config: `GUARDIAN_COOLING_MS 
 ### A. Trusted contact ("guardian")
 1. A user may nominate **one guardian**: another PAYO user, by phone. Set/change/remove from
    More → Settings and from chat ("make Bilal my trusted contact").
-2. **Approval is needed only for a send to a NEW recipient** (no completed send to that
-   institution+identifier before) **or above the hard ceiling** (default Rs 1,00,000). Saved
-   recipients the user has paid before never need approval.
+2. **Approval is needed above the hard ceiling** (default Rs 1,00,000) **or for a NEW
+   recipient (no completed send to that institution+identifier before) when the amount is
+   ≥ Rs 20,000** (owner amendment 2026-09-06: a Rs 1,000 send to someone new needs only the
+   PIN). Saved recipients the user has paid before never need approval.
+2a. **Age-based check-in (owner amendment 2026-09-06).** `dateOfBirth` on the profile;
+   `senior = age ≥ 60`. Everyone gets the check-in on pressure language. Seniors also get it
+   for a new recipient ≥ Rs 20,000 / ≥ 25 % of balance — but not again for the same recipient
+   within 24 h after answering "No". Non-seniors additionally only for a new recipient at or
+   above the ceiling. The pressure flag is scoped to the recipient named in the suspicious
+   message and expires after 30 minutes; other sends are unaffected.
 3. **Tightening is instant; loosening cools.** Setting a FIRST guardian, lowering the ceiling:
    PIN, immediate. Removing the guardian, **replacing an existing guardian** (review finding:
    an instant swap to a colluding account would defeat the feature), or raising the ceiling:

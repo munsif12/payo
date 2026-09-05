@@ -39,6 +39,7 @@ class TxnCounterparty(BaseModel):
     name: str
     urduName: str | None = None
     detail: str
+    institutionLogoUrl: str | None = None
 
 
 class Txn(BaseModel):
@@ -73,6 +74,7 @@ class InstitutionRef(BaseModel):
     name: str
     urduName: str | None = None
     kind: Literal["wallet", "bank"]
+    logoUrl: str | None = None
 
 
 class InstitutionChip(BaseModel):
@@ -80,6 +82,7 @@ class InstitutionChip(BaseModel):
     name: str
     urduName: str | None = None
     kind: Literal["wallet", "bank"]
+    logoUrl: str | None = None
 
 
 class InstitutionChipsCard(BaseModel):
@@ -103,6 +106,7 @@ class RecipientChip(BaseModel):
     title: str
     institutionId: str
     institutionName: str
+    institutionLogoUrl: str | None = None
     identifier: str
 
 
@@ -118,6 +122,7 @@ class BillerChip(BaseModel):
     name: str
     urduName: str | None = None
     consumerNo: str | None = None
+    logoUrl: str | None = None
 
 
 class BillerChipsCard(BaseModel):
@@ -142,6 +147,7 @@ class BillCard(BaseModel):
     kind: Literal["bill"] = "bill"
     billId: str
     biller: str
+    billerLogoUrl: str | None = None
     consumerName: str
     amountPaisa: int
     dueDate: str
@@ -255,6 +261,7 @@ class RecipientsCard(BaseModel):
 class BillItem(BaseModel):
     billId: str
     biller: str
+    billerLogoUrl: str | None = None
     consumerName: str
     amountPaisa: int
     dueDate: str

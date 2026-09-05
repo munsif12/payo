@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { createApp } from '../../app';
 import { createVerifiedUser } from '../../testUtils/factories';
-import { Account, Institution, MoneyRequest } from '../../models';
+import { Account, Institution, MoneyRequest, User } from '../../models';
 
 const app = createApp();
 
@@ -10,7 +10,7 @@ const app = createApp();
 // after every test, so re-create it before each one; upsert keeps it idempotent.
 const ensurePayo = () => Institution.findOneAndUpdate(
   { code: 'PAYO' },
-  { $setOnInsert: { name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true } },
+  { $setOnInsert: { name: 'PAYO', urduName: 'پیو', kind: 'wallet', code: 'PAYO', popular: true, domain: 'payo.app' } },
   { upsert: true, new: true },
 );
 beforeEach(() => ensurePayo());
@@ -104,6 +104,9 @@ const makePayo = () =>
 
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
+const makeSenior = (userId: string) =>
+  User.updateOne({ _id: userId }, { dateOfBirth: new Date('1955-04-01T00:00:00.000Z') });
+
 async function requestFrom(requesterToken: string, payerPhone: string, amountPaisa: number) {
   const create = await request(app).post('/api/v1/requests').set(auth(requesterToken))
     .send({ fromPhone: payerPhone, amountPaisa });
@@ -119,7 +122,8 @@ test('settlement to a never-paid requester with a guardian → approval waiting,
   await request(app).put('/api/v1/guardian').set(auth(payer.token))
     .send({ phone: guardian.user.phone, pin: '1234' });
 
-  const reqId = await requestFrom(requester.token, payer.user.phone, 50_000);
+  // A first payment to someone new reaches the guardian at ₨20,000 or more.
+  const reqId = await requestFrom(requester.token, payer.user.phone, 2_000_000);
   const approve = await request(app).post(`/api/v1/requests/${reqId}/approve`).set(auth(payer.token));
   expect(approve.status).toBe(201);
   expect(approve.body.data.approval).toMatchObject({ status: 'waiting', guardianId: guardian.userId });
@@ -162,6 +166,7 @@ test('a large settlement to a new requester is check-in gated even with no guard
   await makePayo();
   const requester = await createVerifiedUser(app);
   const payer = await createVerifiedUser(app);
+  await makeSenior(payer.userId); // the money-pattern check-in is a senior-only courtesy
   const reqId = await requestFrom(requester.token, payer.user.phone, 300_000);
   const approve = await request(app).post(`/api/v1/requests/${reqId}/approve`).set(auth(payer.token));
   expect(approve.body.data.riskFlags).toEqual(['new_recipient_large']);

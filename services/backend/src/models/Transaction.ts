@@ -13,6 +13,10 @@ const transactionSchema = new Schema({
     name: { type: String, required: true },
     urduName: String,
     detail: { type: String, required: true },
+    // Only set for institution-based sends (bank/wallet transfers) — lets the DTO surface
+    // the institution's logo without a join at read time.
+    institutionId: String,
+    institutionLogoUrl: String,
   },
   category: { type: String, required: true },
   status: { type: String, required: true, default: 'completed', enum: ['completed'] },

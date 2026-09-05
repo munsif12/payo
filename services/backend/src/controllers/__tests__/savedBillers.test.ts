@@ -7,7 +7,7 @@ const app = createApp();
 const CONSUMER_NO = '0400012345678';
 
 async function makeBiller() {
-  return Biller.create({ name: 'K-Electric', urduName: 'کے الیکٹرک', category: 'electricity' });
+  return Biller.create({ name: 'K-Electric', urduName: 'کے الیکٹرک', category: 'electricity', domain: 'ke.com.pk' });
 }
 
 test('POST /saved-billers does the lookup, stores consumerName, 409 on duplicate', async () => {
@@ -20,6 +20,7 @@ test('POST /saved-billers does the lookup, stores consumerName, 409 on duplicate
   expect(created.status).toBe(201);
   expect(created.body.data.consumerName).toBeTruthy();
   expect(created.body.data.biller.name).toBe('K-Electric');
+  expect(created.body.data.biller.logoUrl).toBe('https://www.google.com/s2/favicons?domain=ke.com.pk&sz=128');
   expect(await Bill.countDocuments({ consumerNo: CONSUMER_NO })).toBe(1);
 
   const dup = await request(app).post('/api/v1/saved-billers')

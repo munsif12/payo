@@ -8,6 +8,7 @@ import { ok } from '../lib/respond';
 import { signSession, signOtpToken } from '../lib/tokens';
 import { assertPinOk } from '../lib/pinAuth';
 import { applyDueGuardianPending, guardianSummary } from '../lib/guardian';
+import { ageOn } from '../lib/risk';
 
 const pinSchema = z.string().regex(/^\d{4}$/, 'PIN must be 4 digits');
 const phoneSchema = z.string().regex(/^\+92\d{10}$/, 'Phone must be +92XXXXXXXXXX');
@@ -23,6 +24,10 @@ export function publicUser(u: InstanceType<typeof User>) {
     id: String(u._id), name: u.name, urduName: u.urduName ?? undefined,
     email: u.email ?? undefined, phone: u.phone, avatar: u.avatar ?? undefined,
     language: u.language, pinSet: u.pinSet,
+    // Date only (no time) — a birthday has no clock, and the client must not have to strip
+    // a spurious midnight off it. `age` is derived here so every surface agrees on it.
+    dateOfBirth: u.dateOfBirth ? u.dateOfBirth.toISOString().slice(0, 10) : undefined,
+    age: ageOn(u.dateOfBirth) ?? undefined,
     preferences: { proactiveGreeting: u.preferences.proactiveGreeting },
     // Only what the payer needs to render "protected by …" — never the guardian's user id.
     guardian: guardianSummary(u),

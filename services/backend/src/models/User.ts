@@ -13,6 +13,9 @@ const userSchema = new Schema({
   pinLockedUntil: Date,
   avatar: String,
   language: { type: String, enum: ['ur', 'en'], default: 'en' },
+  // Drives the age-dependent scam check-in (see src/lib/risk.ts). Optional: an account
+  // created by phone alone has not given one yet, and absence must never imply "senior".
+  dateOfBirth: Date,
 
   // The one nominated trusted contact. Denormalised phone/name so an approvals list or a
   // guardian card never needs a second read just to render who it is.

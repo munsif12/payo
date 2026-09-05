@@ -6,7 +6,7 @@ import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { createPendingAction, toActionDto } from '../lib/pendingActions';
 import { fmtRs } from '../lib/fmt';
-import { applyDueGuardianPending, evaluateSend, isNewRecipient } from '../lib/guardian';
+import { applyDueGuardianPending, evaluateSend, isNewRecipient, isCheckInCleared } from '../lib/guardian';
 
 type MRDoc = InstanceType<typeof MoneyRequest>;
 
@@ -70,6 +70,7 @@ export async function approveRequest(req: Request, res: Response) {
     user: payer, amountPaisa: r.amountPaisa, balancePaisa: account.balancePaisa,
     newRecipient: await isNewRecipient(req.userId, institutionId, requester.phone),
     clientRiskFlags: [],
+    checkInCleared: await isCheckInCleared(req.userId, institutionId, requester.phone),
   });
 
   const action = await createPendingAction({

@@ -6,7 +6,7 @@ import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { executeAction, txnDto, toActionDto } from '../lib/pendingActions';
 import { publicCardDto } from './cardsController';
-import { SEND_KINDS, applyDueGuardianPending, noticeGuardian } from '../lib/guardian';
+import { SEND_KINDS, applyDueGuardianPending, noticeGuardian, recordCheckInClearance } from '../lib/guardian';
 
 const REMIND_COOLDOWN_MS = 60 * 1000;
 
@@ -41,6 +41,13 @@ export async function checkIn(req: Request, res: Response) {
     action.cancelReason = 'scam_checkin';
   }
   await action.save();
+
+  // "My own idea" clears this recipient for 24 h (see CHECK_IN_CLEARANCE_MS) so a retry
+  // of the same send is not met with the same question. A "yes" clears nothing.
+  const p = action.payload as { institutionId?: string; identifier?: string };
+  if (!someoneAsked && p?.institutionId !== undefined && p?.identifier)
+    await recordCheckInClearance(req.userId, p.institutionId, p.identifier);
+
   return ok(res, toActionDto(action));
 }
 

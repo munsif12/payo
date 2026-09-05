@@ -25,6 +25,7 @@ import argparse
 import asyncio
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +41,24 @@ from app.agent import build_model, run_agent  # noqa: E402
 from app.backend_client import BackendClient  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.agent import normalize_identifier  # noqa: E402
-from app.conversation import cards_context_line  # noqa: E402
+from app.conversation import cards_context_line, risk_facts_line  # noqa: E402
+
+
+def risk_line_for(cards: list[dict[str, Any]], session_cards: list[dict[str, Any]]) -> str:
+    """The `[risk]` line /converse would leave on this turn: a check_in card, plus the
+    recipient most recently shown in the session. Without it the harness would exercise a
+    history the real request path never produces."""
+    check_in = next((c for c in cards if c.get("kind") == "check_in"), None)
+    if not check_in:
+        return ""
+    recipient = next((c for c in reversed(session_cards + cards)
+                      if c.get("kind") == "recipient"), {})
+    return risk_facts_line(
+        check_in.get("riskFlags") or [],
+        (recipient.get("institution") or {}).get("id"),
+        recipient.get("identifier"),
+        datetime.now(timezone.utc).isoformat(),
+    )
 
 
 def resolved_pairs_from_cards(cards: list[dict[str, Any]]) -> set[tuple[str, str]]:
@@ -460,12 +478,16 @@ async def main() -> int:
             if not ok:
                 print(f"      expected tool={tool} card={kind}; reply: {' '.join(str(reply).split())[:200]}")
         # remember this turn so a chained row can act on the ids it produced
+        turn_cards = cards if isinstance(cards, list) else []
         sessions[(language, row_id)] = [
             *history,
             HumanMessage(content=utterance),
-            AIMessage(content=f"{reply}\n{cards_context_line(cards)}".strip()),
+            AIMessage(content="\n".join(part for part in [
+                str(reply), cards_context_line(turn_cards),
+                risk_line_for(turn_cards, parent_cards),
+            ] if part).strip()),
         ]
-        session_cards[(language, row_id)] = [*parent_cards, *(cards if isinstance(cards, list) else [])]
+        session_cards[(language, row_id)] = [*parent_cards, *turn_cards]
 
     left = await cancel_pending_actions(jwt, pending_actions, args.verbose)
     if any(r[0].startswith("V") for r in rows):
