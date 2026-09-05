@@ -632,6 +632,14 @@ async def run_agent(
     """
     cards: list[dict[str, Any]] = []
 
+    def turn_already_acted() -> bool:
+        """A tool ran or a card was emitted this turn, so the turn is finished. Re-invoking
+        it makes the model ACT AGAIN — live regression: "switch to english" called
+        update_profile('en'), the reply was (correctly) English, the Urdu-language nudge
+        fired anyway, and the second invocation called update_profile('ur'), emitting a
+        second profile card that flipped the app back to Urdu."""
+        return bool(cards) or _called_a_tool(state)
+
     # Pre-route: "cancel that" / «منسوخ کر دو» right after a confirmation card. Live UR:
     # the model routed this to `help`, leaving the pending action alive. There is nothing
     # to decide here — the action_id is in the history's own [cards] line — so cancel it
@@ -655,7 +663,7 @@ async def run_agent(
     # Guard: the model must not promise a card it never created. If it talks about a
     # card/confirmation but no tool produced one, re-prompt exactly once with the
     # tool context intact so it performs the action instead of narrating it.
-    if not cards and _mentions_card(reply):
+    if not turn_already_acted() and _mentions_card(reply):
         nudged = [*state["messages"], HumanMessage(content=_nudge(NUDGE, NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
         reply = strip_cards_marker(_last_reply(state))
@@ -667,7 +675,7 @@ async def run_agent(
     # dead end. If no tool ran this turn and the ask is one of those, re-prompt once.
     # A prose chips-ask gets another attempt while budget remains: one nudge is often not
     # enough (live: the model re-asked «کس نیٹ ورک پر لوڈ کرانا ہے؟» verbatim).
-    while extra_invocations < MAX_NUDGES and not _called_a_tool(state):
+    while extra_invocations < MAX_NUDGES and not turn_already_acted():
         prose_nudge = _prose_ask_nudge(user_text, reply, language)
         if not prose_nudge:
             break
@@ -679,7 +687,7 @@ async def run_agent(
     # Guard: echoing the PREVIOUS answer. Live: after a spending card, "what can you do"
     # was answered with the spending sentence verbatim and no tool ran — the user's new
     # message went unanswered and the app showed nothing.
-    if extra_invocations < MAX_NUDGES and not _called_a_tool(state) and _echoes_history(reply, history):
+    if extra_invocations < MAX_NUDGES and not turn_already_acted() and _echoes_history(reply, history):
         nudged = [*state["messages"],
                   HumanMessage(content=_nudge(ECHO_NUDGE, ECHO_NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
@@ -690,7 +698,7 @@ async def run_agent(
     # five transactions." with no tool call this turn (seen live; in a chained session the
     # model sometimes just repeats the PREVIOUS turn's answer). The app hides the text and
     # shows the card, so this leaves the user with an empty turn.
-    if extra_invocations < MAX_NUDGES and not cards and not _called_a_tool(state) and _announces_data(reply):
+    if extra_invocations < MAX_NUDGES and not turn_already_acted() and _announces_data(reply):
         base = _nudge(ANNOUNCE_NUDGE, ANNOUNCE_NUDGE_UR, language)
         tool_hint = announced_tool(reply)
         if tool_hint:
@@ -704,8 +712,8 @@ async def run_agent(
     # Guard: the generic "I can help you with your banking needs…" non-answer. The spec
     # treats it as a defect: a listed intent matched, so a tool must run. Seen live on a
     # bare "help" / «مدد».
-    if extra_invocations < MAX_NUDGES and not _called_a_tool(state) and (
-        _is_generic_nonanswer(reply) or (_asks_for_help(user_text) and not cards)
+    if extra_invocations < MAX_NUDGES and not turn_already_acted() and (
+        _is_generic_nonanswer(reply) or _asks_for_help(user_text)
     ):
         nudged = [*state["messages"],
                   HumanMessage(content=_nudge(GENERIC_NONANSWER_NUDGE, GENERIC_NONANSWER_NUDGE_UR, language))]
@@ -714,7 +722,11 @@ async def run_agent(
         extra_invocations += 1
 
     # If the model's whole reply WAS the imitated marker, sanitizing left nothing to speak.
-    if not reply and extra_invocations < MAX_NUDGES:
+    # With a card already on screen there is nothing to re-decide — say one fixed line
+    # rather than re-invoking a turn that has already acted.
+    if not reply and cards:
+        reply = HERE_YOU_GO.get(language, HERE_YOU_GO["en"])
+    if not reply and extra_invocations < MAX_NUDGES and not turn_already_acted():
         nudged = [*state["messages"],
                   HumanMessage(content=_nudge(NO_MARKER_NUDGE, NO_MARKER_NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
@@ -723,7 +735,10 @@ async def run_agent(
 
     # Guard: the reply-language rule is a hard requirement. If the UI language is Urdu
     # and the final reply carries no Arabic-script characters, re-prompt — budget allowing.
-    if language == "ur" and not has_arabic_script(reply) and extra_invocations < MAX_NUDGES:
+    # An English reply is CORRECT right after update_profile(language='en') — which is
+    # exactly the case this guard used to break.
+    if (language == "ur" and not has_arabic_script(reply)
+            and extra_invocations < MAX_NUDGES and not turn_already_acted()):
         lang_nudged = [*state["messages"], HumanMessage(content=URDU_LANGUAGE_NUDGE)]
         state = await agent.ainvoke({"messages": lang_nudged}, config={"recursion_limit": 12})
         reply = strip_cards_marker(_last_reply(state))
@@ -792,6 +807,9 @@ BILLER_NUDGE = (
 )
 # Spoken confirmation for the deterministic cancel pre-route — no model call needed for
 # one fixed sentence.
+# Spoken filler when a card exists but sanitizing left no sentence to say.
+HERE_YOU_GO = {"en": "Here you go.", "ur": "جی، یہ حاضر ہے۔"}
+
 CANCELLED_REPLY = {
     "en": "That is cancelled. Nothing was paid or changed.",
     "ur": "جی، وہ منسوخ کر دیا۔ کچھ ادا نہیں ہوا۔",

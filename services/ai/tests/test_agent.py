@@ -469,12 +469,26 @@ async def test_reply_never_leaks_the_cards_context_marker(fake_backend):
     model = scripted([
         AIMessage(content="", tool_calls=[{"name": "get_balance", "args": {}, "id": "t1"}]),
         AIMessage(content='[cards]\n{"balance_paisa": 100}'),
-        AIMessage(content="Your balance is one rupee."),
+        AIMessage(content="SHOULD NOT BE REACHED — the turn already produced a card"),
     ])
-    reply, _ = await run_agent(client, [], "balance?", "en", model=model)
+    reply, cards = await run_agent(client, [], "balance?", "en", model=model)
     await client.aclose()
     assert "[cards]" not in reply
-    assert reply == "Your balance is one rupee."
+    # A card was emitted, so the turn is finished: speak a fixed line instead of re-invoking.
+    assert reply == "Here you go." and cards[0]["kind"] == "balance"
+
+
+async def test_marker_only_reply_with_no_card_is_still_re_prompted(fake_backend):
+    """Without a card there is nothing on screen and nothing was acted on, so asking the
+    model for a real sentence is safe."""
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = scripted([
+        AIMessage(content='[cards]\n{"balance_paisa": 100}'),
+        AIMessage(content="Your balance is one rupee."),
+    ])
+    reply, cards = await run_agent(client, [], "balance?", "en", model=model)
+    await client.aclose()
+    assert reply == "Your balance is one rupee." and not cards
 
 
 async def test_urdu_language_nudge_reply_is_also_stripped_of_the_marker(fake_backend):
@@ -950,3 +964,94 @@ async def test_chips_fallback_does_not_fire_when_the_tool_already_ran(fake_backe
     reply, cards = await run_agent(client, [], "top up my phone", "en", model=model)
     assert [c["kind"] for c in cards] == ["telco_chips"]   # exactly one, not two
     await client.aclose()
+
+
+# ---- regression: a turn that already acted must never be re-invoked ----
+
+async def test_language_switch_emits_exactly_one_profile_card(fake_backend):
+    """Live regression (UI ur, "switch to english"): update_profile('en') ran and the reply
+    was correctly English, so the Urdu-language nudge re-invoked the turn and the model
+    called update_profile('ur') — two profile cards, and the app stayed in Urdu."""
+    from langchain_core.messages import HumanMessage
+    from tests.fixtures_backend import wire_all
+
+    wire_all(fake_backend)
+    fake_backend.route("PATCH", "/api/v1/me",
+                       {"id": "u1", "name": "Ammi Jaan", "urduName": "امی", "language": "en"})
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    history = [
+        HumanMessage(content="میرا بیلنس کیا ہے؟"),
+        AIMessage(content="آپ کا بیلنس اکیاسی ہزار آٹھ سو روپے ہے۔\n[cards] balance: balance_paisa=8180000"),
+    ]
+    model = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="", tool_calls=[
+            {"name": "update_profile", "args": {"language": "en"}, "id": "t1"}]),
+        AIMessage(content="Okay, I will speak English from now on."),
+        # anything after this would be a second, forbidden invocation:
+        AIMessage(content="", tool_calls=[
+            {"name": "update_profile", "args": {"language": "ur"}, "id": "t2"}]),
+        AIMessage(content="جی، اب اردو میں بات کروں گی۔"),
+    ]))
+    reply, cards = await run_agent(client, history, "switch to english", "ur", model=model)
+
+    assert [c["kind"] for c in cards] == ["profile"], "more than one card = the turn re-ran"
+    assert cards[0]["language"] == "en"
+    assert cards[0]["applied"] == ["language"]
+    assert reply == "Okay, I will speak English from now on."   # English reply is correct here
+    assert len(model.received) == 2, "the turn was re-invoked after it had already acted"
+    patches = [r for r in fake_backend.requests if r.method == "PATCH"]
+    assert len(patches) == 1
+    await client.aclose()
+
+
+async def test_no_guard_re_invokes_once_a_card_exists(fake_backend):
+    """Belt and braces across guards: a card-bearing turn whose reply would otherwise trip
+    the announce/echo/generic/language guards must still cost exactly one invocation."""
+    from langchain_core.messages import HumanMessage
+    from tests.fixtures_backend import wire_all
+    import app.agent as agent_module
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    history = [AIMessage(content="Here are your pockets.\n[cards] pockets: p1:Umrah(12200000)")]
+    model = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="", tool_calls=[{"name": "list_pockets", "args": {}, "id": "t1"}]),
+        # announces data, echoes history, is English on an Urdu turn — all guards would fire
+        AIMessage(content="Here are your pockets."),
+        AIMessage(content="SHOULD NOT BE REACHED"),
+    ]))
+    reply, cards = await run_agent(client, history, "میری پاکٹس دکھائیں", "ur", model=model)
+    assert [c["kind"] for c in cards] == ["pockets"]
+    assert agent_module.last_turn_model_calls == 1, "the turn was re-invoked"
+    assert len(model.received) == 2   # one ReAct run: tool decision + final answer
+    await client.aclose()
+
+
+async def test_empty_reply_with_a_card_is_filled_without_a_model_call(fake_backend):
+    """A card plus a sanitized-away sentence: say one fixed line, don't re-invoke."""
+    from tests.fixtures_backend import wire_all
+    import app.agent as agent_module
+
+    wire_all(fake_backend)
+    client = BackendClient("jwt", transport=fake_backend.transport)
+    model = RecordingFakeToolModel(messages=iter([
+        AIMessage(content="", tool_calls=[{"name": "get_balance", "args": {}, "id": "t1"}]),
+        AIMessage(content="[cards] balance: balance_paisa=8180000"),   # sanitizes to ""
+        AIMessage(content="SHOULD NOT BE REACHED"),
+    ]))
+    reply, cards = await run_agent(client, [], "میرا بیلنس؟", "ur", model=model)
+    assert cards and cards[0]["kind"] == "balance"
+    assert reply == "جی، یہ حاضر ہے۔"
+    assert agent_module.last_turn_model_calls == 1, "the turn was re-invoked"
+    assert len(model.received) == 2
+    await client.aclose()
+
+
+def test_echo_detection_never_compares_a_reply_with_itself():
+    """_echoes_history reads prior turns only — the current reply is never in `history`."""
+    from app.agent import _echoes_history
+
+    reply = "Here are your last five transactions; the largest was 142,928 rupees."
+    assert not _echoes_history(reply, [])
+    assert not _echoes_history(reply, [AIMessage(content="Your balance is 84,500 rupees.")])
+    assert _echoes_history(reply, [AIMessage(content=reply)])
