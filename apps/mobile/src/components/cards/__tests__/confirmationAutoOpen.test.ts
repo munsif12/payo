@@ -118,3 +118,39 @@ describe('buildResultCards with a null transaction (F3.3)', () => {
     expect(cards[0]).toMatchObject({ kind: 'success', refNo: 'PY-1', amountPaisa: 50000 });
   });
 });
+
+// The `waiting_approval` card (v6) goes through the SAME guard when its 3 s poll
+// reports `approved`, passing the card's own `live` straight through. These pin
+// that contract: a card rehydrated from history must never open the PIN sheet by
+// itself on relaunch, and an approval may only auto-open once however many times
+// the poll re-reports it.
+describe('waiting_approval auto-open (G3.1)', () => {
+  beforeEach(() => resetAutoOpenGuard());
+
+  test('a live approved action opens the sheet by itself', () => {
+    expect(claimAutoOpenPin('act-live', { requiresPin: true, live: true, done: false })).toBe(true);
+  });
+
+  test('a card restored from history never opens the sheet, however it settles', () => {
+    expect(claimAutoOpenPin('act-restored', { requiresPin: true, live: false, done: false })).toBe(false);
+    // …and having been refused, it did not burn the claim either: the live card
+    // for the same action (a fresh send in this session) still gets its one open.
+    expect(claimAutoOpenPin('act-restored', { requiresPin: true, live: true, done: false })).toBe(true);
+  });
+
+  test('a repeating poll cannot open a second sheet for the same action', () => {
+    expect(claimAutoOpenPin('act-poll', { requiresPin: true, live: true, done: false })).toBe(true);
+    expect(claimAutoOpenPin('act-poll', { requiresPin: true, live: true, done: false })).toBe(false);
+    expect(claimAutoOpenPin('act-poll', { requiresPin: true, live: true, done: false })).toBe(false);
+  });
+
+  test("a 'busy' rejection hands the claim back so the next mount may open it", () => {
+    expect(claimAutoOpenPin('act-busy', { requiresPin: true, live: true, done: false })).toBe(true);
+    releaseAutoOpen('act-busy');
+    expect(claimAutoOpenPin('act-busy', { requiresPin: true, live: true, done: false })).toBe(true);
+  });
+
+  test('an action already executed in this session never re-opens', () => {
+    expect(claimAutoOpenPin('act-done', { requiresPin: true, live: true, done: true })).toBe(false);
+  });
+});

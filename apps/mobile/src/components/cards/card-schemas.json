@@ -51,6 +51,79 @@
       "title": "AccountCard",
       "type": "object"
     },
+    "ApprovalItem": {
+      "properties": {
+        "actionId": {
+          "title": "Actionid",
+          "type": "string"
+        },
+        "amountPaisa": {
+          "title": "Amountpaisa",
+          "type": "integer"
+        },
+        "createdAt": {
+          "title": "Createdat",
+          "type": "string"
+        },
+        "expiresAt": {
+          "title": "Expiresat",
+          "type": "string"
+        },
+        "payerName": {
+          "title": "Payername",
+          "type": "string"
+        },
+        "payerPhone": {
+          "title": "Payerphone",
+          "type": "string"
+        },
+        "riskFlags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Riskflags",
+          "type": "array"
+        },
+        "summary": {
+          "$ref": "#/$defs/Bilingual"
+        }
+      },
+      "required": [
+        "actionId",
+        "payerName",
+        "payerPhone",
+        "summary",
+        "amountPaisa",
+        "createdAt",
+        "expiresAt"
+      ],
+      "title": "ApprovalItem",
+      "type": "object"
+    },
+    "ApprovalsCard": {
+      "description": "What is waiting for the GUARDIAN to decide. Approve opens the PIN sheet in the app\n(the guardian's own PIN) — the assistant only ever shows and explains.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ApprovalItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "approvals",
+          "default": "approvals",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ApprovalsCard",
+      "type": "object"
+    },
     "BalanceCard": {
       "properties": {
         "balancePaisa": {
@@ -334,6 +407,38 @@
       "title": "CardCard",
       "type": "object"
     },
+    "CheckInCard": {
+      "description": "The calm, one-question interruption shown BEFORE a risk-flagged action proceeds.\n\nTwo answers only (\"Yes, someone asked me\" / \"No, this is my own idea\"); the app sends\nthem back through `answer_check_in`. A \"yes\" cancels the action — it never argues.",
+      "properties": {
+        "actionId": {
+          "title": "Actionid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "check_in",
+          "default": "check_in",
+          "title": "Kind",
+          "type": "string"
+        },
+        "prompt": {
+          "$ref": "#/$defs/Bilingual"
+        },
+        "riskFlags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Riskflags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "actionId",
+        "prompt"
+      ],
+      "title": "CheckInCard",
+      "type": "object"
+    },
     "ConfirmationCard": {
       "properties": {
         "actionId": {
@@ -405,6 +510,205 @@
         "value"
       ],
       "title": "ConfirmationLine",
+      "type": "object"
+    },
+    "DigestCard": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DigestItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "digest",
+          "default": "digest",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "DigestCard",
+      "type": "object"
+    },
+    "DigestItem": {
+      "properties": {
+        "amountPaisa": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Amountpaisa"
+        },
+        "intent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Bilingual"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "refId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Refid"
+        },
+        "subtitle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Bilingual"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "title": {
+          "$ref": "#/$defs/Bilingual"
+        }
+      },
+      "required": [
+        "kind",
+        "title"
+      ],
+      "title": "DigestItem",
+      "type": "object"
+    },
+    "GuardianCard": {
+      "properties": {
+        "ceilingPaisa": {
+          "title": "Ceilingpaisa",
+          "type": "integer"
+        },
+        "coolingMs": {
+          "title": "Coolingms",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "guardian",
+          "default": "guardian",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "pendingChange": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GuardianPendingChange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phone"
+        }
+      },
+      "required": [
+        "ceilingPaisa",
+        "coolingMs"
+      ],
+      "title": "GuardianCard",
+      "type": "object"
+    },
+    "GuardianPendingChange": {
+      "description": "A loosening that has not taken effect yet (removal, or a raised ceiling), or — when\nthe assistant proposes a change in chat — the change the user still has to confirm with\ntheir PIN in Settings.\n\n`change` is the enum only; the person a 'set' names travels in `phone`, never glued into\nthe enum value. `effectiveAt` is absent for a proposal, since nothing is scheduled yet.",
+      "properties": {
+        "ceilingPaisa": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ceilingpaisa"
+        },
+        "change": {
+          "enum": [
+            "set",
+            "remove",
+            "raise"
+          ],
+          "title": "Change",
+          "type": "string"
+        },
+        "effectiveAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effectiveat"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phone"
+        }
+      },
+      "required": [
+        "change"
+      ],
+      "title": "GuardianPendingChange",
       "type": "object"
     },
     "HelpCard": {
@@ -1570,18 +1874,61 @@
       ],
       "title": "TxnCounterparty",
       "type": "object"
+    },
+    "WaitingApprovalCard": {
+      "description": "A send parked until the trusted contact approves it. The PIN sheet does NOT open;\nthe app polls GET /actions/:id every 3 s and opens it when `approved` comes back.",
+      "properties": {
+        "actionId": {
+          "title": "Actionid",
+          "type": "string"
+        },
+        "amountPaisa": {
+          "title": "Amountpaisa",
+          "type": "integer"
+        },
+        "expiresAt": {
+          "title": "Expiresat",
+          "type": "string"
+        },
+        "guardianName": {
+          "title": "Guardianname",
+          "type": "string"
+        },
+        "kind": {
+          "const": "waiting_approval",
+          "default": "waiting_approval",
+          "title": "Kind",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Bilingual"
+        }
+      },
+      "required": [
+        "actionId",
+        "guardianName",
+        "expiresAt",
+        "amountPaisa",
+        "summary"
+      ],
+      "title": "WaitingApprovalCard",
+      "type": "object"
     }
   },
   "discriminator": {
     "mapping": {
       "account": "#/$defs/AccountCard",
+      "approvals": "#/$defs/ApprovalsCard",
       "balance": "#/$defs/BalanceCard",
       "bill": "#/$defs/BillCard",
       "biller_chips": "#/$defs/BillerChipsCard",
       "billers": "#/$defs/BillersCard",
       "bills": "#/$defs/BillsCard",
       "card": "#/$defs/CardCard",
+      "check_in": "#/$defs/CheckInCard",
       "confirmation": "#/$defs/ConfirmationCard",
+      "digest": "#/$defs/DigestCard",
+      "guardian": "#/$defs/GuardianCard",
       "help": "#/$defs/HelpCard",
       "institution_chips": "#/$defs/InstitutionChipsCard",
       "pocket": "#/$defs/PocketCard",
@@ -1600,7 +1947,8 @@
       "statements": "#/$defs/StatementsCard",
       "success": "#/$defs/SuccessCard",
       "telco_chips": "#/$defs/TelcoChipsCard",
-      "transactions": "#/$defs/TransactionsCard"
+      "transactions": "#/$defs/TransactionsCard",
+      "waiting_approval": "#/$defs/WaitingApprovalCard"
     },
     "propertyName": "kind"
   },
@@ -1685,6 +2033,21 @@
     },
     {
       "$ref": "#/$defs/QrCard"
+    },
+    {
+      "$ref": "#/$defs/CheckInCard"
+    },
+    {
+      "$ref": "#/$defs/WaitingApprovalCard"
+    },
+    {
+      "$ref": "#/$defs/ApprovalsCard"
+    },
+    {
+      "$ref": "#/$defs/DigestCard"
+    },
+    {
+      "$ref": "#/$defs/GuardianCard"
     }
   ]
 }

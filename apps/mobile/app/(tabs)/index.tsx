@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, Eye, EyeOff, Sparkles } from 'lucide-react-native';
 import { Screen, Text, Card, Pill, Avatar, Composer, VoiceStatusBar, useIsUrdu } from '../../src/ui';
@@ -13,6 +13,7 @@ import { useRecorder } from '../../src/voice/useRecorder';
 import { useVoiceLoop, type VoiceLoopHandlers } from '../../src/voice/useVoiceLoop';
 import { usePinSheet } from '../../src/pin/usePinSheet';
 import { useHomeGreeting, type Suggestion } from '../../src/home/useHomeGreeting';
+import { useHomeDigest } from '../../src/home/useHomeDigest';
 import { formatPaisa } from '../../src/lib/money';
 import { ltrIsolate } from '../../src/lib/bidi';
 
@@ -36,7 +37,10 @@ export default function Home() {
     onTurnDone: () => loopRef.current?.onTurnDone(),
     onError: () => loopRef.current?.onError(),
   });
-  const { messages, status, sendText, appendLocal } = converse;
+  const { messages, status, sendText, appendLocal, playAudio } = converse;
+  // The proactive digest (spec §1 C): fetched + spoken on focus, rendered under
+  // the greeting bubble. Null whenever the setting is off or the 4 h rule says no.
+  const digestCard = useHomeDigest(playAudio);
   const recorder = useRecorder((result) => loopRef.current?.onRecordingFinished(result));
   const { recording } = recorder;
   const { isOpen: pinSheetOpen } = usePinSheet();
@@ -122,7 +126,14 @@ export default function Home() {
             ListFooterComponent={status === 'thinking' ? <ThinkingBubble /> : null}
           />
         ) : (
-          <View style={{ flex: 1, paddingHorizontal: space.gutter, paddingTop: space.xs, gap: space.m }}>
+          // Scrollable, not a plain View: the greeting + suggestions always fit,
+          // but a digest card (spec §1 rule 12) can add several rows on top.
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.xs, paddingBottom: space.m, gap: space.m }}
+          >
             <Rise
               style={{
                 flexDirection: urdu ? 'row-reverse' : 'row',
@@ -144,6 +155,12 @@ export default function Home() {
               </View>
             </Rise>
 
+            {digestCard ? (
+              <Rise delay={40}>
+                <CardView card={digestCard} onChipTap={(text) => (live ? loop.sendSuggestion(text) : sendText(text))} />
+              </Rise>
+            ) : null}
+
             <View style={{ gap: space.s }}>
               {suggestions.map((s, i) => (
                 <SuggestionCard
@@ -155,7 +172,7 @@ export default function Home() {
                 />
               ))}
             </View>
-          </View>
+          </ScrollView>
         )}
 
         <View style={{ paddingHorizontal: space.gutter, paddingBottom: space.s, paddingTop: space.s }}>

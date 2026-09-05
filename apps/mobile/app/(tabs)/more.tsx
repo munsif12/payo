@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
 import {
   PiggyBank, CreditCard, FileText, Users, Globe, ShieldCheck, Bell, HelpCircle, LogOut,
+  Settings as SettingsIcon,
 } from 'lucide-react-native';
 import { Screen, Text, Card, ListRow, Avatar, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
@@ -88,6 +89,14 @@ export default function More() {
               left={<Icon icon={Globe} c={c} />}
               title={t('more.language')}
               right={<Text variant="sub">{languageLabel}</Text>}
+            />
+            <ListRow
+              testID="more-settings"
+              onPress={() => router.push('/settings')}
+              left={<Icon icon={SettingsIcon} c={c} />}
+              title={t('more.settings')}
+              subtitle={t('more.settingsFoot')}
+              showChevron
             />
             <ListRow
               testID="more-security"

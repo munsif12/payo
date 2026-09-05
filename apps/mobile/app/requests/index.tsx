@@ -9,7 +9,10 @@ import { Screen, Text, ListRow, Pill, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
 import { usePressScale } from '../../src/motion/usePressScale';
-import { useRequestsQuery, useApproveRequestMutation, useDeclineRequestMutation } from '../../src/api/client';
+import { useRequestsQuery, useApproveRequestMutation, useDeclineRequestMutation, useApprovalsQuery } from '../../src/api/client';
+import { CardView } from '../../src/components/cards/CardView';
+import type { ApprovalsCard, ApprovalItem } from '../../src/components/cards/cardShapes';
+import type { ChatCard } from '../../src/voice/useConverse';
 import { holdAction } from '../../src/store/pendingActionHolder';
 import { formatPaisa } from '../../src/lib/money';
 import type { RequestDto } from '../../src/api/types';
@@ -28,6 +31,21 @@ export default function Requests() {
   const urdu = useIsUrdu();
   const router = useRouter();
   const { data, isFetching, refetch } = useRequestsQuery();
+  // Guardian inbox (spec §1 rule 5) — sends waiting for MY decision. Rendered by
+  // the same `approvals` card the assistant shows in chat, so Approve opens the
+  // PIN sheet in guardian mode here too and there is only one approval UI.
+  const { data: approvals } = useApprovalsQuery();
+  const approvalItems: ApprovalItem[] = (approvals?.items ?? []).map((a) => ({
+    actionId: a.id,
+    payerName: a.payer.name,
+    payerPhone: a.payer.phone,
+    summary: a.summary,
+    amountPaisa: a.amountPaisa,
+    riskFlags: a.riskFlags,
+    createdAt: a.createdAt,
+    expiresAt: a.expiresAt,
+  }));
+  const approvalsCard: ApprovalsCard = { kind: 'approvals', items: approvalItems };
   const [approve] = useApproveRequestMutation();
   const [decline] = useDeclineRequestMutation();
 
@@ -49,6 +67,11 @@ export default function Requests() {
         keyExtractor={(x) => x.id}
         refreshing={isFetching}
         onRefresh={refetch}
+        ListHeaderComponent={
+          approvalItems.length
+            ? <CardView card={approvalsCard as unknown as ChatCard} />
+            : null
+        }
         ListEmptyComponent={<Text variant="sub" center style={{ marginTop: space.xxl }}>{t('requests.empty')}</Text>}
         renderItem={({ item }) => (
           <ListRow

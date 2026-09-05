@@ -43,6 +43,17 @@ export default function SendAmount() {
       const to = recipientId ? { recipientId } : { institutionId: institutionId ?? '', identifier: identifier ?? '' };
       const action = await createTransfer({ to, amountPaisa, note: note.trim() || undefined }).unwrap();
       holdAction(action);
+      // v6 gates, in the order the backend applies them (spec §1 rules 8-10):
+      // an unanswered check-in comes before everything, then the guardian's
+      // approval, and only then the normal confirm + PIN screen.
+      if (action.riskFlags?.length && !action.checkIn?.answered) {
+        router.push({ pathname: '/send/check-in', params: { actionId: action.id } });
+        return;
+      }
+      if (action.approval?.status === 'waiting') {
+        router.push({ pathname: '/send/waiting', params: { actionId: action.id } });
+        return;
+      }
       router.push({ pathname: '/confirm/[actionId]', params: { actionId: action.id } });
     } catch (e) {
       const { code, message } = apiErr(e);

@@ -1,6 +1,10 @@
 export interface PublicUser {
   id: string; name: string; urduName?: string; email?: string; phone: string;
   avatar?: string; language: 'ur' | 'en'; pinSet: boolean;
+  /** v6. Absent on an older backend — treat a missing flag as ON (the server default). */
+  preferences?: { proactiveGreeting: boolean };
+  /** Only what the payer needs to render "protected by …" — never the guardian's user id. */
+  guardian?: { name: string; phone: string };
 }
 
 export interface Txn {
@@ -12,12 +16,81 @@ export interface Txn {
   category: string; status: 'completed'; refNo: string; createdAt: string;
 }
 
+/** The guardian gate on a pending send (v6). `waiting` = the PIN sheet must NOT open. */
+export interface ActionApproval {
+  required: boolean;
+  guardianId: string;
+  status: 'waiting' | 'approved' | 'declined';
+  decidedAt?: string | null;
+  reason?: string | null;
+  remindedAt?: string | null;
+}
+
 export interface PendingAction {
   id: string; kind: string; amountPaisa: number; feePaisa: number;
   summary: { en: string; ur: string };
   lines: { label: { en: string; ur: string }; value: string }[];
   requiresPin: boolean; expiresAt: string; status: string;
+  // ---- v6 (absent on an older backend / on locally-built pseudo-actions) ----
+  cancelReason?: string | null;
+  approval?: ActionApproval | null;
+  riskFlags?: string[];
+  checkIn?: { answered: boolean; someoneAsked: boolean } | null;
 }
+
+/** GET /guardian — the trusted-contact state, including a loosening still cooling off. */
+export interface GuardianState {
+  guardian: { userId: string; phone: string; name: string; ceilingPaisa: number; since: string } | null;
+  /** A scheduled LOOSENING that has not taken effect yet. `replace` carries the
+   *  INCOMING guardian in `phone`/`name` (the swap is a loosening for the current
+   *  one); `raise` carries the ceiling it is going up to. */
+  pending: {
+    change: 'remove' | 'replace' | 'raise';
+    ceilingPaisa?: number;
+    phone?: string;
+    name?: string;
+    effectiveAt: string;
+  } | null;
+  ceilingPaisa: number;
+  coolingMs: number;
+}
+
+/** GET /approvals — one send waiting for MY decision as somebody's guardian. */
+export interface ApprovalDto {
+  id: string; kind: string;
+  payer: { name: string; urduName?: string; phone: string };
+  summary: { en: string; ur: string };
+  amountPaisa: number; feePaisa: number;
+  riskFlags: string[];
+  createdAt: string; expiresAt: string;
+}
+
+/** GET /me/digest — one row of the proactive greeting. Shapes differ per `kind`,
+ *  so the extra fields are read defensively by the renderer. */
+export interface DigestItemDto {
+  kind: 'received' | 'bill_due' | 'approval_waiting' | 'request' | 'anomaly' | 'guardian_notice';
+  amountPaisa?: number;
+  from?: { name: string; urduName?: string; detail?: string; phone?: string };
+  payer?: { name: string; phone: string };
+  biller?: { id: string; name: string; urduName?: string };
+  summary?: { en: string; ur: string };
+  category?: string;
+  thisMonthPaisa?: number;
+  averagePaisa?: number;
+  ratio?: number;
+  change?: 'remove' | 'replace' | 'raise' | 'reminder';
+  ceilingPaisa?: number;
+  effectiveAt?: string;
+  dueDate?: string;
+  note?: string;
+  actionId?: string;
+  billId?: string;
+  requestId?: string;
+  noticeId?: string;
+  transactionId?: string;
+}
+
+export interface DigestDto { items: DigestItemDto[]; since: string }
 
 export interface Me {
   user: PublicUser;

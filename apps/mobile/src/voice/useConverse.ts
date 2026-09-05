@@ -251,5 +251,10 @@ export function useConverse(opts?: ConverseOptions) {
   const appendLocal = (message: Omit<ChatMessage, 'id'> & { id?: string }) =>
     append({ id: message.id ?? mid(), role: message.role, text: message.text, cards: message.cards, restored: message.restored });
 
-  return { messages, status, sendText, sendAudio, appendLocal, interrupt };
+  // playAudio is exported so Home can speak its proactive digest (POST /speak →
+  // this player) through the SAME path a conversational reply uses — one player,
+  // one safety cap, one "speaking" status, so a digest and a turn can never
+  // overlap. It fires onSpeechEnd like any other clip; the voice loop ignores
+  // that while it is off (voiceLoopReducer's `audioEnded` is mode-gated).
+  return { messages, status, sendText, sendAudio, appendLocal, interrupt, playAudio };
 }

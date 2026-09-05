@@ -59,6 +59,16 @@ const REQUIRED: Record<string, string[]> = {
   RequestItem: ['requestId', 'direction', 'counterparty', 'amountPaisa', 'status'],
   RequestsCard: ['items'],
   QrCard: ['payload', 'name', 'phone'],
+  CheckInCard: ['actionId', 'prompt'],
+  WaitingApprovalCard: ['actionId', 'guardianName', 'expiresAt', 'amountPaisa', 'summary'],
+  ApprovalItem: ['actionId', 'payerName', 'payerPhone', 'summary', 'amountPaisa', 'createdAt', 'expiresAt'],
+  ApprovalsCard: ['items'],
+  // `kind` here is a FREE-FORM field ('received' | 'bill_due' | …), not the union
+  // discriminator, so it is a required property like any other.
+  DigestItem: ['kind', 'title'],
+  DigestCard: ['items'],
+  GuardianPendingChange: ['change'],
+  GuardianCard: ['ceilingPaisa', 'coolingMs'],
 };
 
 /** Optional properties, EXCLUDING the discriminator `kind` (defaulted in
@@ -83,6 +93,11 @@ const OPTIONAL: Record<string, string[]> = {
   RequestCounterparty: ['urduName'],
   RequestCard: ['note'],
   RequestItem: ['note'],
+  CheckInCard: ['riskFlags'],
+  ApprovalItem: ['riskFlags'],
+  DigestItem: ['subtitle', 'amountPaisa', 'intent', 'refId'],
+  GuardianPendingChange: ['phone', 'ceilingPaisa', 'effectiveAt'],
+  GuardianCard: ['name', 'phone', 'pendingChange'],
 };
 
 interface Def { properties?: Record<string, { const?: string }>; required?: string[] }
@@ -117,5 +132,44 @@ test('every v5 card kind from the spec is in the union', () => {
     'recipients', 'bills', 'billers', 'telco_chips', 'pockets', 'request', 'requests', 'qr',
   ]) {
     expect(kinds).toContain(k);
+  }
+});
+
+/** model name → the `kind` literal it is discriminated by. Restated here so a card
+ *  kind that appears in, disappears from, or is RENAMED in cards.py fails this suite
+ *  instead of slipping through: the per-model property tests above are keyed by model
+ *  name, and a `kind` whose property set drifts would otherwise only be caught if the
+ *  model name happened to change too. */
+const CARD_KINDS: Record<string, string> = {
+  ConfirmationCard: 'confirmation', SuccessCard: 'success', TransactionsCard: 'transactions',
+  StatementCard: 'statement', InstitutionChipsCard: 'institution_chips', RecipientCard: 'recipient',
+  RecipientChipsCard: 'recipient_chips', BillerChipsCard: 'biller_chips', SavePromptCard: 'save_prompt',
+  BillCard: 'bill', PocketCard: 'pocket', BalanceCard: 'balance', ReceiptCard: 'receipt',
+  SpendingCard: 'spending', AccountCard: 'account', ProfileCard: 'profile', HelpCard: 'help',
+  CardCard: 'card', StatementsCard: 'statements', RecipientsCard: 'recipients', BillsCard: 'bills',
+  BillersCard: 'billers', TelcoChipsCard: 'telco_chips', PocketsCard: 'pockets', RequestCard: 'request',
+  RequestsCard: 'requests', QrCard: 'qr',
+  CheckInCard: 'check_in', WaitingApprovalCard: 'waiting_approval', ApprovalsCard: 'approvals',
+  DigestCard: 'digest', GuardianCard: 'guardian',
+};
+
+test('the snapshot discriminates exactly the kinds the mirror claims', () => {
+  const fromSchema: Record<string, string> = {};
+  for (const [name, def] of Object.entries(defs)) {
+    if (isDiscriminator(def)) fromSchema[name] = def.properties!.kind!.const!;
+  }
+  expect(fromSchema).toEqual(CARD_KINDS);
+});
+
+test.each(Object.entries(CARD_KINDS))('kind %s (%s) has the property set cardShapes.ts declares', (name) => {
+  const def = defs[name];
+  expect(def).toBeDefined();
+  const schemaProps = Object.keys(def.properties ?? {}).filter((p) => p !== 'kind');
+  expect([...(REQUIRED[name] ?? []), ...(OPTIONAL[name] ?? [])].sort()).toEqual(schemaProps.sort());
+});
+
+test('every v6 card kind from the spec is in the union', () => {
+  for (const k of ['check_in', 'waiting_approval', 'approvals', 'digest', 'guardian']) {
+    expect(Object.values(CARD_KINDS)).toContain(k);
   }
 });

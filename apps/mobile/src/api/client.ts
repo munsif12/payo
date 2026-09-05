@@ -8,6 +8,7 @@ import type {
   StatementMeta, BillLookup, NamedItem, PublicUser, DueBill,
   RecipientSuggestion, BillerSuggestion, RecipientDto, SavedBillerDto,
   InstitutionDto, ResolvedRecipient, ExecuteActionResult,
+  GuardianState, ApprovalDto, DigestDto,
 } from './types';
 
 interface Ok<T> { success: true; data: T }
@@ -38,7 +39,10 @@ export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBa
 export const payoApi = createApi({
   reducerPath: 'payoApi',
   baseQuery: baseQueryWithAuth,
-  tagTypes: ['Me', 'Txns', 'Pockets', 'Requests', 'Card', 'Statements', 'DueBills', 'Recipients', 'SavedBillers'],
+  tagTypes: [
+    'Me', 'Txns', 'Pockets', 'Requests', 'Card', 'Statements', 'DueBills', 'Recipients', 'SavedBillers',
+    'Guardian', 'Approvals',
+  ],
   endpoints: (b) => ({
     me: b.query<Me, void>({
       query: () => '/me',
@@ -232,6 +236,67 @@ export const payoApi = createApi({
       transformResponse: (r: Ok<SavedBillerDto>) => r.data,
       invalidatesTags: ['SavedBillers'],
     }),
+    // ---- v6: trusted contact, scam check-in, guardian approvals, digest ----
+    updateMe: b.mutation<PublicUser, { name?: string; urduName?: string; language?: 'ur' | 'en'; preferences?: { proactiveGreeting?: boolean } }>({
+      query: (body) => ({ url: '/me', method: 'PATCH', body }),
+      transformResponse: (r: Ok<PublicUser>) => r.data,
+      invalidatesTags: ['Me'],
+    }),
+    guardian: b.query<GuardianState, void>({
+      query: () => '/guardian',
+      transformResponse: (r: Ok<GuardianState>) => r.data,
+      providesTags: ['Guardian'],
+    }),
+    setGuardian: b.mutation<GuardianState, { phone: string; pin: string }>({
+      query: (body) => ({ url: '/guardian', method: 'PUT', body }),
+      transformResponse: (r: Ok<GuardianState>) => r.data,
+      invalidatesTags: ['Guardian', 'Me'],
+    }),
+    removeGuardian: b.mutation<GuardianState, { pin: string }>({
+      query: (body) => ({ url: '/guardian', method: 'DELETE', body }),
+      transformResponse: (r: Ok<GuardianState>) => r.data,
+      invalidatesTags: ['Guardian', 'Me'],
+    }),
+    updateCeiling: b.mutation<GuardianState, { ceilingPaisa: number; pin: string }>({
+      query: (body) => ({ url: '/guardian/ceiling', method: 'PATCH', body }),
+      transformResponse: (r: Ok<GuardianState>) => r.data,
+      invalidatesTags: ['Guardian'],
+    }),
+    // Polled every 3 s by the waiting-approval card — deliberately untagged so a
+    // mutation elsewhere can never make the poll restart from scratch.
+    action: b.query<PendingAction, string>({
+      query: (id) => `/actions/${id}`,
+      transformResponse: (r: Ok<PendingAction>) => r.data,
+    }),
+    checkInAction: b.mutation<PendingAction, { id: string; someoneAsked: boolean }>({
+      query: ({ id, someoneAsked }) => ({ url: `/actions/${id}/check-in`, method: 'POST', body: { someoneAsked } }),
+      transformResponse: (r: Ok<PendingAction>) => r.data,
+    }),
+    remindGuardian: b.mutation<{ reminded: true; action: PendingAction }, string>({
+      query: (id) => ({ url: `/actions/${id}/remind`, method: 'POST' }),
+      transformResponse: (r: Ok<{ reminded: true; action: PendingAction }>) => r.data,
+    }),
+    approvals: b.query<{ items: ApprovalDto[] }, void>({
+      query: () => '/approvals',
+      transformResponse: (r: Ok<{ items: ApprovalDto[] }>) => r.data,
+      providesTags: ['Approvals'],
+    }),
+    approveApproval: b.mutation<PendingAction, { id: string; pin: string }>({
+      query: ({ id, pin }) => ({ url: `/approvals/${id}/approve`, method: 'POST', body: { pin } }),
+      transformResponse: (r: Ok<PendingAction>) => r.data,
+      invalidatesTags: ['Approvals'],
+    }),
+    declineApproval: b.mutation<PendingAction, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({ url: `/approvals/${id}/decline`, method: 'POST', body: reason ? { reason } : {} }),
+      transformResponse: (r: Ok<PendingAction>) => r.data,
+      invalidatesTags: ['Approvals'],
+    }),
+    // A MUTATION, not a query: `?ack=1` moves the server-side digest cursor, so it
+    // must never be re-run by a cache refetch. Home calls it at most once per 4 h.
+    digest: b.mutation<DigestDto, { ack?: boolean } | void>({
+      query: (arg) => ({ url: `/me/digest${arg && arg.ack ? '?ack=1' : ''}`, method: 'GET' }),
+      transformResponse: (r: Ok<DigestDto>) => r.data,
+    }),
     deleteSavedBiller: b.mutation<{ deleted: true }, string>({
       query: (id) => ({ url: `/saved-billers/${id}`, method: 'DELETE' }),
       transformResponse: (r: Ok<{ deleted: true }>) => r.data,
@@ -255,6 +320,11 @@ export const {
   useExecuteActionMutation, useCancelActionMutation,
   useCreateRecipientMutation, useCreateSavedBillerMutation,
   useSavedBillersQuery, useDeleteSavedBillerMutation,
+  useUpdateMeMutation,
+  useGuardianQuery, useSetGuardianMutation, useRemoveGuardianMutation, useUpdateCeilingMutation,
+  useActionQuery, useCheckInActionMutation, useRemindGuardianMutation,
+  useApprovalsQuery, useApproveApprovalMutation, useDeclineApprovalMutation,
+  useDigestMutation,
 } = payoApi;
 
 // Resolves the PAYO wallet institution (id + record) so callers that already know a

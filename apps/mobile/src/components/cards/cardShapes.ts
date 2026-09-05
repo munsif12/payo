@@ -339,10 +339,97 @@ export interface QrCard {
   phone: string;
 }
 
+
+// ---- v6 card kinds (guardian, scam interruption, proactive greeting — spec §3) ----
+
+/** The calm one-question interruption shown BEFORE a risk-flagged action proceeds. */
+export interface CheckInCard {
+  kind: 'check_in';
+  actionId: string;
+  prompt: Bilingual;
+  /** Defaulted server-side to [] — why the check-in fired (`new_recipient_large`, …). */
+  riskFlags?: string[];
+}
+
+/** A send parked until the trusted contact approves it. The PIN sheet does NOT open;
+ *  the app polls GET /actions/:id every 3 s and opens it when `approved` comes back. */
+export interface WaitingApprovalCard {
+  kind: 'waiting_approval';
+  actionId: string;
+  guardianName: string;
+  expiresAt: string;
+  amountPaisa: number;
+  summary: Bilingual;
+}
+
+export interface ApprovalItem {
+  actionId: string;
+  payerName: string;
+  payerPhone: string;
+  summary: Bilingual;
+  amountPaisa: number;
+  riskFlags?: string[];
+  createdAt: string;
+  expiresAt: string;
+}
+
+/** What is waiting for the GUARDIAN to decide — Approve opens the PIN sheet on the
+ *  guardian's own PIN (POST /approvals/:id/approve), never on the payer's. */
+export interface ApprovalsCard {
+  kind: 'approvals';
+  items: ApprovalItem[];
+}
+
+export type DigestItemKind =
+  | 'received' | 'bill_due' | 'approval_waiting' | 'request' | 'anomaly' | 'guardian_notice';
+
+export interface DigestItem {
+  /** Free-form server-side (`str`), narrowed here to the six kinds the spec lists —
+   *  the renderer falls back to a neutral icon for anything else. */
+  kind: DigestItemKind | string;
+  title: Bilingual;
+  subtitle?: Bilingual | null;
+  amountPaisa?: number | null;
+  /** The one-tap follow-up utterance for this row. */
+  intent?: Bilingual | null;
+  refId?: string | null;
+}
+
+export interface DigestCard {
+  kind: 'digest';
+  items: DigestItem[];
+}
+
+/** A loosening that has not taken effect yet (removal, or a raised ceiling), or a
+ *  change the assistant is proposing (no `effectiveAt` — nothing is scheduled).
+ *
+ *  `change` is the ENUM ONLY: who a 'set' names travels in `phone`, and the ceiling a
+ *  'raise' targets in `ceilingPaisa` — never glued into the enum value. Note this is the
+ *  AI card's vocabulary ('set' = a proposal awaiting the PIN); the BACKEND's own
+ *  `GET /guardian` pending uses 'remove' | 'replace' | 'raise' (see api/types.ts). */
+export interface GuardianPendingChange {
+  change: 'set' | 'remove' | 'raise';
+  /** 'set' only: who the trusted contact would become. */
+  phone?: string | null;
+  /** 'raise' only: the ceiling being raised to. */
+  ceilingPaisa?: number | null;
+  effectiveAt?: string | null;
+}
+
+export interface GuardianCard {
+  kind: 'guardian';
+  name?: string | null;
+  phone?: string | null;
+  ceilingPaisa: number;
+  pendingChange?: GuardianPendingChange | null;
+  coolingMs: number;
+}
+
 export type AnyCard =
   | ConfirmationCard | SuccessCard | TransactionsCard | StatementCard
   | InstitutionChipsCard | RecipientCard | RecipientChipsCard | BillerChipsCard
   | SavePromptCard | BillCard | PocketCard | BalanceCard
   | ReceiptCard | SpendingCard | AccountCard | ProfileCard | HelpCard | CardCard
   | StatementsCard | RecipientsCard | BillsCard | BillersCard | TelcoChipsCard
-  | PocketsCard | RequestCard | RequestsCard | QrCard;
+  | PocketsCard | RequestCard | RequestsCard | QrCard
+  | CheckInCard | WaitingApprovalCard | ApprovalsCard | DigestCard | GuardianCard;
