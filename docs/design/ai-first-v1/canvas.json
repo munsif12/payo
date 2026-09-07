@@ -1,0 +1,212 @@
+{
+ "artboards": [
+  {
+   "file": "Phone.dc.html",
+   "x": 0,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Phone"
+  },
+  {
+   "file": "Otp.dc.html",
+   "x": 480,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Otp"
+  },
+  {
+   "file": "Pin.dc.html",
+   "x": 960,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Pin"
+  },
+  {
+   "file": "Main.dc.html",
+   "x": 0,
+   "y": 1014,
+   "w": 390,
+   "h": 844,
+   "title": "Main"
+  },
+  {
+   "file": "HomeListening.dc.html",
+   "x": 480,
+   "y": 1014,
+   "w": 390,
+   "h": 844,
+   "title": "HomeListening"
+  },
+  {
+   "file": "HomeConversation.dc.html",
+   "x": 960,
+   "y": 1014,
+   "w": 390,
+   "h": 844,
+   "title": "HomeConversation"
+  },
+  {
+   "file": "HomePinSheet.dc.html",
+   "x": 1440,
+   "y": 1014,
+   "w": 390,
+   "h": 844,
+   "title": "HomePinSheet"
+  },
+  {
+   "file": "HomeUrdu.dc.html",
+   "x": 1920,
+   "y": 1014,
+   "w": 390,
+   "h": 844,
+   "title": "HomeUrdu"
+  },
+  {
+   "file": "Cards.dc.html",
+   "x": 0,
+   "y": 2028,
+   "w": 390,
+   "h": 1560,
+   "title": "Cards"
+  },
+  {
+   "file": "Wallet.dc.html",
+   "x": 0,
+   "y": 3758,
+   "w": 390,
+   "h": 844,
+   "title": "Wallet"
+  },
+  {
+   "file": "Pay.dc.html",
+   "x": 480,
+   "y": 3758,
+   "w": 390,
+   "h": 844,
+   "title": "Pay"
+  },
+  {
+   "file": "SendIdentifier.dc.html",
+   "x": 960,
+   "y": 3758,
+   "w": 390,
+   "h": 844,
+   "title": "SendIdentifier"
+  },
+  {
+   "file": "SendInstitution.dc.html",
+   "x": 1440,
+   "y": 3758,
+   "w": 390,
+   "h": 844,
+   "title": "SendInstitution"
+  },
+  {
+   "file": "SendAmount.dc.html",
+   "x": 1920,
+   "y": 3758,
+   "w": 390,
+   "h": 844,
+   "title": "SendAmount"
+  },
+  {
+   "file": "Success.dc.html",
+   "x": 2400,
+   "y": 3758,
+   "w": 390,
+   "h": 844,
+   "title": "Success"
+  },
+  {
+   "file": "Bills.dc.html",
+   "x": 0,
+   "y": 4772,
+   "w": 390,
+   "h": 844,
+   "title": "Bills"
+  },
+  {
+   "file": "Card.dc.html",
+   "x": 480,
+   "y": 4772,
+   "w": 390,
+   "h": 844,
+   "title": "Card"
+  },
+  {
+   "file": "Pockets.dc.html",
+   "x": 960,
+   "y": 4772,
+   "w": 390,
+   "h": 844,
+   "title": "Pockets"
+  },
+  {
+   "file": "Requests.dc.html",
+   "x": 1440,
+   "y": 4772,
+   "w": 390,
+   "h": 844,
+   "title": "Requests"
+  },
+  {
+   "file": "Settings.dc.html",
+   "x": 1920,
+   "y": 4772,
+   "w": 390,
+   "h": 844,
+   "title": "Settings"
+  },
+  {
+   "file": "More.dc.html",
+   "x": 2400,
+   "y": 4772,
+   "w": 390,
+   "h": 844,
+   "title": "More"
+  }
+ ],
+ "annotations": [
+  {
+   "id": "note-sign",
+   "x": 0,
+   "y": -70,
+   "w": 420,
+   "text": "Sign in"
+  },
+  {
+   "id": "note-home",
+   "x": 0,
+   "y": 944,
+   "w": 420,
+   "text": "Home \u2014 AI first (Direction B + A greeting)"
+  },
+  {
+   "id": "note-chat",
+   "x": 0,
+   "y": 1958,
+   "w": 420,
+   "text": "Chat cards"
+  },
+  {
+   "id": "note-classic",
+   "x": 0,
+   "y": 3688,
+   "w": 420,
+   "text": "Classic layer"
+  },
+  {
+   "id": "note-more",
+   "x": 0,
+   "y": 4702,
+   "w": 420,
+   "text": "More"
+  }
+ ],
+ "launch": {
+  "view": "canvas"
+ }
+}

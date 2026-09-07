@@ -13,3 +13,6 @@ android/app/build/
 .DS_Store
 coverage/
 .superpowers/
+
+# seeded design canvases (regenerate with gen.py + the design skill helper)
+docs/design/*/*-wireframes.html
