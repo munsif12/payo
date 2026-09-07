@@ -473,3 +473,7 @@ ul.list li b{color:var(--ink);font-weight:800}
 /* ---------- mock: honest pause ---------- */
 .screen.frozen *{animation-play-state:paused !important}
 [hidden]{display:none !important}
+
+/* demo video */
+.video-wrap{max-width:1040px;margin:40px auto 0}
+.video{display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:28px;background:var(--navy,#0D2A3D);box-shadow:0 12px 32px rgba(13,42,61,.18)}

@@ -1,6 +1,13 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/deck", "destination": "/deck.pdf" }
+    {
+      "source": "/deck",
+      "destination": "/deck.pdf"
+    },
+    {
+      "source": "/demo",
+      "destination": "/demo.mp4"
+    }
   ]
 }
