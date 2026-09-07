@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PAYO · Banking you can talk to</title>
+<meta name="description" content="PAYO is hands-free, conversational banking for everyone: in English or Urdu, spoken or typed. One mic tap, spoken answers, and a card for every reply. A hackathon build with a working demo.">
+<meta name="theme-color" content="#0D2A3D">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PAYO">
+<meta property="og:title" content="PAYO · Banking you can talk to">
+<meta property="og:description" content="Hands-free, conversational banking for everyone: in English or Urdu, spoken or typed. No forms, no menus.">
+<meta property="og:image" content="assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PAYO · Banking you can talk to">
+<meta name="twitter:description" content="Hands-free, conversational banking for everyone: in English or Urdu, spoken or typed.">
+<meta name="twitter:image" content="assets/og.png">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%23F2A93B'/%3E%3Ctext x='32' y='45' font-family='Helvetica,Arial,sans-serif' font-size='40' font-weight='bold' fill='%23FFFFFF' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">PAY<span>O</span></a>
+    <nav class="navlinks" aria-label="Sections">
+      <a href="#problem">Problem</a>
+      <a href="#product">Product</a>
+      <a href="#moments">Moments</a>
+      <a href="#safety">Safety</a>
+      <a href="#limits">Limits</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- 1 · HERO -->
+<section class="hero navy" aria-labelledby="hero-h">
+  <div class="wrap">
+    <div class="t">
+      <p class="eyebrow">Hackathon 2026 · working demo</p>
+      <h1 id="hero-h" class="rise">Banking you can talk to.</h1>
+      <p class="lede">Hands-free, conversational banking for everyone: in English or Urdu, spoken or typed. No forms, no menus.</p>
+      <p class="sub">Bank while your hands are busy. Cooking, driving, carrying a child, or just not in the mood to read a menu.</p>
+      <div class="btns">
+        <a class="btn primary" href="deck.pdf">Watch the deck</a>
+        <a class="btn ghost" href="https://github.com/munsif12/payo">View the code</a>
+      </div>
+    </div>
+    <div class="frame">
+      <img src="assets/home-greet.png" width="302" height="656" alt="PAYO home screen greeting the user with a spoken update and a mic button">
+    </div>
+  </div>
+</section>
+
+<!-- 2 · PROBLEM -->
+<section id="problem" aria-labelledby="problem-h">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">The problem</p>
+      <h2 id="problem-h">Every banking action is a stack of screens, taps and forms.</h2>
+      <div class="rule"></div>
+      <p class="lede">So we bank only when we can stop and stare at a phone. Hands wet, eyes on the road, a child on your hip, and the bank still asks you to read a menu and fill a field.</p>
+    </div>
+    <div class="tiles">
+      <div class="tile">
+        <h3>Menus assume reading</h3>
+        <p>Nobody wants to browse a bank. You want to ask a question and get an answer.</p>
+      </div>
+      <div class="tile">
+        <h3>Forms assume typing</h3>
+        <p>An IBAN field needs both hands and all your attention. It is where the conversation ends.</p>
+      </div>
+      <div class="tile">
+        <h3>Confirmations assume doubt</h3>
+        <p>Under pressure anyone taps yes. Another tap changes nothing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · PRODUCT -->
+<section id="product" class="navy product" aria-labelledby="product-h">
+  <div class="wrap">
+    <div class="t">
+      <p class="eyebrow">The product</p>
+      <h2 id="product-h">One mic tap. It listens, answers out loud, and keeps listening.</h2>
+      <div class="rule"></div>
+      <p class="lede">The voice carries the gist. The card makes every answer glanceable the moment you do look down. Type instead any time, and the whole app flips to right-to-left Urdu when you want it to.</p>
+      <div class="pills">
+        <span class="pill">46 capabilities</span>
+        <span class="pill">32 card types</span>
+        <span class="pill">English</span>
+        <span class="pill">Urdu</span>
+        <span class="pill">Roman Urdu</span>
+      </div>
+    </div>
+    <div class="frame">
+      <img src="assets/home-listening.png" width="302" height="656" loading="lazy" alt="PAYO listening, with a live waveform under the transcript" >
+    </div>
+  </div>
+</section>
+
+<!-- 4 · MAGIC MOMENTS -->
+<section id="moments" aria-labelledby="moments-h">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">Three magic moments</p>
+      <h2 id="moments-h">What it looks like when you just talk.</h2>
+      <div class="rule"></div>
+    </div>
+
+    <article class="moment" style="margin-top:44px">
+      <p class="eyebrow">Magic moment 01 · Send money</p>
+      <h3 style="font-size:clamp(21px,3vw,30px);margin-top:12px">You say “send 1,000 rupees” and the PIN pad opens inside the conversation.</h3>
+      <div class="phones">
+        <div class="ph">
+          <div class="frame"><img src="assets/send-chips.png" width="302" height="656" loading="lazy" alt="Bank selection chips shown inside the chat"></div>
+          <p class="cap">It asks which bank<i>Chips, not an IBAN field</i></p>
+        </div>
+        <div class="ph">
+          <div class="frame"><img src="assets/pin-sheet.png" width="302" height="656" loading="lazy" alt="PIN entry sheet opening inside the chat thread"></div>
+          <p class="cap">The PIN opens in chat<i>No separate screen, ever</i></p>
+        </div>
+        <div class="ph">
+          <div class="frame"><img src="assets/receipt.png" width="302" height="656" loading="lazy" alt="Payment receipt shown as a card in the conversation"></div>
+          <p class="cap">The receipt is a card<i>Spoken aloud, kept on screen</i></p>
+        </div>
+      </div>
+      <p class="tiny" style="margin-top:22px">The account title is resolved before anything moves. The recipient is saved by nickname afterwards.</p>
+    </article>
+
+    <article class="moment">
+      <p class="eyebrow">Magic moment 02 · The scam call</p>
+      <h3 style="font-size:clamp(21px,3vw,30px);margin-top:12px">When a payment smells like a scam, PAYO asks one calm question, and a trusted contact holds the key.</h3>
+      <div class="phones">
+        <div class="ph">
+          <div class="frame"><img src="assets/checkin.png" width="302" height="656" loading="lazy" alt="Scam check-in card asking whether someone called and asked for this payment"></div>
+          <p class="cap">One question, no lecture<i>“Yes” cancels the payment</i></p>
+        </div>
+        <div class="ph">
+          <div class="frame"><img src="assets/approvals-bilal.png" width="302" height="656" loading="lazy" alt="Guardian approval request on a second phone"></div>
+          <p class="cap">The guardian decides<i>On their phone, with their own PIN</i></p>
+        </div>
+        <div class="ph">
+          <div class="frame"><img src="assets/approved-ammi.png" width="302" height="656" loading="lazy" alt="Approved payment returning to the payer for PIN entry"></div>
+          <p class="cap">Approved, then her PIN<i>Two people, one payment</i></p>
+        </div>
+      </div>
+      <p class="tiny" style="margin-top:22px">Any user can add a guardian. A guardian is needed above ₨1,00,000, or for a new recipient at ₨20,000, or when a pressure flag applies.</p>
+    </article>
+
+    <article class="moment">
+      <p class="eyebrow">Magic moment 03 · Your language, your pace</p>
+      <h3 style="font-size:clamp(21px,3vw,30px);margin-top:12px">In Urdu, hands-free, it tells you what changed before you think to ask.</h3>
+      <div class="phones">
+        <div class="ph">
+          <div class="frame"><img src="assets/urdu.png" width="302" height="656" loading="lazy" alt="The app rendered right-to-left in Urdu"></div>
+          <p class="cap">The whole app flips<i>Right-to-left Urdu, instantly</i></p>
+        </div>
+        <div class="ph">
+          <div class="frame"><img src="assets/digest.png" width="302" height="656" loading="lazy" alt="Spoken digest card summarising what changed since the last visit"></div>
+          <p class="cap">It speaks first<i>“Since you were last here”</i></p>
+        </div>
+        <div class="ph">
+          <div class="frame"><img src="assets/wallet.png" width="302" height="656" loading="lazy" alt="Classic wallet screen with balance and recent transactions"></div>
+          <p class="cap">Hands still work<i>A full wallet underneath</i></p>
+        </div>
+      </div>
+      <p class="tiny" style="margin-top:22px">One mic tap starts the loop; it ends itself on silence. Every spoken action has a tappable equivalent.</p>
+    </article>
+  </div>
+</section>
+
+<!-- 5 · SAFETY -->
+<section id="safety" class="navy" aria-labelledby="safety-h">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">Why this is safe to put in a bank</p>
+      <h2 id="safety-h">The assistant can do everything the bank does. It cannot move a single rupee.</h2>
+      <div class="rule"></div>
+      <p class="lede">It holds the user’s own token, calls the same public API as the app, and has no database access. Every write it makes is a proposal the bank core still has to run.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <p class="num">Step 01 · Prepare</p>
+        <h3>The assistant proposes</h3>
+        <p>A write tool creates a pending action and nothing else. Money has not moved.</p>
+      </div>
+      <div class="step">
+        <p class="num">Step 02 · PIN</p>
+        <h3>The user confirms</h3>
+        <p>A confirmation card and the PIN sheet open in the conversation. The assistant never sees the PIN.</p>
+      </div>
+      <div class="step">
+        <p class="num">Step 03 · Execute once</p>
+        <h3>The core disposes</h3>
+        <p>One atomic, idempotent, single-use call. Unexecuted actions expire in two minutes.</p>
+      </div>
+    </div>
+
+    <div class="guards">
+      <div class="step">
+        <h3>Guardian approval</h3>
+        <p>A trusted contact approves large or unusual sends from their own phone, with their own PIN.</p>
+      </div>
+      <div class="step">
+        <h3>Scam check-in</h3>
+        <p>One question before a risky send: did someone call and ask you to send this? Yes cancels it, calmly.</p>
+      </div>
+      <div class="step">
+        <h3>Cooling period</h3>
+        <p>Tightening is instant. Removing a guardian or raising the ceiling cools off first, and the outgoing guardian keeps authority until it lands.</p>
+      </div>
+    </div>
+
+    <p class="callout">The model is allowed to be creative about <b>words</b>, never about <b>actions</b>.</p>
+  </div>
+</section>
+
+<!-- 6 · LIMITS -->
+<section id="limits" aria-labelledby="limits-h">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">What this is not yet</p>
+      <h2 id="limits-h">Everything above is real. Here is exactly what is not.</h2>
+      <div class="rule"></div>
+    </div>
+    <ul class="list">
+      <li><b>The world is seeded.</b> Balances, titles, bills and card numbers are deterministic fakes.</li>
+      <li><b>The institutions are simulated.</b> No rails, no settlement ledger, no KYC, no real SMS.</li>
+      <li><b>One platform.</b> Verified on the iOS simulator; Android has not been run in weeks.</li>
+      <li><b>Urdu trails English</b> by a turn on two flows, and routing stays probabilistic.</li>
+    </ul>
+    <p class="tiny" style="margin-top:8px">All of it is visible in the repo.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p class="who">Team PAYO<i>Hands-free banking, for everyone.</i></p>
+    <nav aria-label="Project links">
+      <a href="https://github.com/munsif12/payo">Repo</a>
+      <a href="deck.pdf">Deck (PDF)</a>
+      <a href="https://github.com/munsif12/payo/blob/master/docs/PROPOSAL.md">Proposal</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var h = document.getElementById('hero-h');
+  if (!h) return;
+  var words = h.textContent.split(' ');
+  h.textContent = '';
+  words.forEach(function (w, i) {
+    var s = document.createElement('span');
+    s.className = 'w';
+    s.textContent = w;
+    s.style.setProperty('--d', (i * 55) + 'ms');
+    h.appendChild(s);
+    if (i < words.length - 1) h.appendChild(document.createTextNode(' '));
+  });
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () { h.classList.add('go'); });
+  });
+})();
+</script>
+
+</body>
+</html>
