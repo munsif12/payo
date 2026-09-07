@@ -104,7 +104,7 @@ export default function Otp() {
               key={i}
               testID={`otp-box-${i}`}
               style={{
-                flex: 1, height: 60, borderRadius: 14, backgroundColor: c.surface,
+                flex: 1, height: 56, borderRadius: 14, backgroundColor: c.surface,
                 borderWidth: 1.5, borderColor: code[i] ? c.amber : c.separator,
                 alignItems: 'center', justifyContent: 'center',
               }}

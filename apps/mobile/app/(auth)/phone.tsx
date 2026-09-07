@@ -55,10 +55,10 @@ export default function Phone() {
     <Screen>
       <View style={{ gap: 22, paddingTop: space.xxxl }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.amber, alignItems: 'center', justifyContent: 'center' }}>
-            <Wallet size={22} color={c.navy} strokeWidth={2.4} />
+          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
+            <Wallet size={22} color={c.navy} strokeWidth={2} />
           </View>
-          <Text variant="h2" weight={800} style={{ letterSpacing: 1 }}>{t('appName')}</Text>
+          <Text weight={800} style={{ fontSize: 22 }}>{t('appName')}</Text>
         </View>
 
         <View>
@@ -70,8 +70,8 @@ export default function Phone() {
             `.num`), so this row is deliberately NOT mirrored for Urdu/RTL. */}
         <View
           style={{
-            height: 60, borderRadius: 16, backgroundColor: c.surface,
-            borderWidth: 1.5, borderColor: c.amber,
+            height: 56, borderRadius: 16, backgroundColor: c.surface,
+            borderWidth: 2, borderColor: c.amber,
             flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12,
           }}
         >

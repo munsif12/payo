@@ -19,6 +19,9 @@ const TILES: { key: string; icon: LucideIcon; href: TileHref }[] = [
   { key: 'pay.requests', icon: ArrowDownLeft, href: '/requests' },
 ];
 
+// Pay.dc.html: title, a 52pt search field, then a 2×3 grid of 104pt tiles
+// (radius 20, 40pt amber-tint icon square). The AI bar docked above the tab
+// bar is rendered by (tabs)/_layout.tsx, not here.
 export default function PayHub() {
   const { t } = useTranslation();
   const { c, dark } = useTheme();
@@ -38,12 +41,13 @@ export default function PayHub() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.xl, paddingBottom: space.xl }}>
           <Input
             testID="pay-search"
-            icon={<Search size={20} color={c.ink3} strokeWidth={2} />}
+            icon={<Search size={18} color={c.ink3} strokeWidth={2} />}
             placeholder={t('pay.searchPlaceholder')}
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={onSearchSubmit}
             returnKeyType="search"
+            containerStyle={{ height: 52 }}
           />
 
           <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: space.m }}>
@@ -55,19 +59,19 @@ export default function PayHub() {
                 style={[
                   {
                     width: '47%',
-                    minHeight: 110,
+                    height: 104,
                     backgroundColor: c.surface,
                     borderRadius: radius.card,
                     padding: space.l,
-                    gap: space.m,
+                    justifyContent: 'space-between',
                   },
                   dark ? shadow.card.dark : shadow.card.light,
                 ]}
               >
-                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon size={22} color={c.onAmber} strokeWidth={2.2} />
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon size={20} color={c.navy} strokeWidth={2.2} />
                 </View>
-                <Text variant="hl">{t(key)}</Text>
+                <Text variant="hl" weight={700} style={{ fontSize: 15, lineHeight: 19 }}>{t(key)}</Text>
               </Pressable>
             ))}
           </View>

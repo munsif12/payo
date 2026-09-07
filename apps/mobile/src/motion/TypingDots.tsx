@@ -11,7 +11,10 @@ import Animated, {
   cancelAnimation,
 } from 'react-native-reanimated';
 import { useReducedMotion } from './useReducedMotion';
-import { DOTS_MS, DOTS_OFFSET_MS, DOTS_LIFT_PX } from './config';
+// Screen-local numbers: the v7 motion table (config.ts) owns only shared tokens.
+const DOTS_MS = 1200;
+const DOTS_OFFSET_MS = 150;
+const DOTS_LIFT_PX = 3;
 
 const easeInOut = Easing.inOut(Easing.ease);
 

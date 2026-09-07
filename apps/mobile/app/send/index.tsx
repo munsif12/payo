@@ -3,7 +3,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Search } from 'lucide-react-native';
-import { Screen, Text, Input, ListRow, InstitutionLogo, Button, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, Input, ListRow, InstitutionLogo, Button, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
 import { useRecipientsQuery, useDeleteRecipientMutation } from '../../src/api/client';
@@ -61,6 +61,8 @@ export default function SendIdentifier() {
 
       <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.xl, paddingBottom: space.xl }}>
         <View style={{ gap: space.m }}>
+          {/* SendIdentifier.dc.html: the identifier field carries a persistent
+              2pt amber border (not just on focus). */}
           <Input
             testID="send-identifier"
             placeholder={t('send.identifierPlaceholder')}
@@ -69,6 +71,7 @@ export default function SendIdentifier() {
             keyboardType={numericFriendly ? 'phone-pad' : 'default'}
             value={identifier}
             onChangeText={setIdentifier}
+            containerStyle={{ borderWidth: 2, borderColor: c.amber }}
           />
           <Button
             testID="send-identifier-continue"
@@ -89,18 +92,22 @@ export default function SendIdentifier() {
             containerStyle={{ marginBottom: space.m }}
           />
           {items.length > 0 ? (
-            items.map((r) => (
-              <ListRow
-                key={r.id}
-                testID={`saved-recipient-${r.id}`}
-                onPress={() => goAmountForRecipient(r)}
-                onLongPress={() => onDelete(r)}
-                left={<InstitutionLogo size={40} shape="circle" name={r.nickname} code={r.institution.code ?? r.institution.id} logoUrl={r.institution.logoUrl} />}
-                title={r.nickname}
-                subtitle={ltrIsolate(`${r.title} · ${urdu && r.institution.urduName ? r.institution.urduName : r.institution.name} · ${maskIdentifier(r.identifier)}`)}
-                showChevron
-              />
-            ))
+            <Card padding={0} style={{ paddingHorizontal: space.l }}>
+              {items.map((r, i) => (
+                <ListRow
+                  key={r.id}
+                  testID={`saved-recipient-${r.id}`}
+                  onPress={() => goAmountForRecipient(r)}
+                  onLongPress={() => onDelete(r)}
+                  separator={i < items.length - 1}
+                  style={{ paddingVertical: 8 }}
+                  left={<InstitutionLogo size={40} shape="circle" name={r.nickname} code={r.institution.code ?? r.institution.id} logoUrl={r.institution.logoUrl} />}
+                  title={r.nickname}
+                  subtitle={ltrIsolate(`${r.title} · ${urdu && r.institution.urduName ? r.institution.urduName : r.institution.name} · ${maskIdentifier(r.identifier)}`)}
+                  showChevron
+                />
+              ))}
+            </Card>
           ) : (
             <Text variant="sub" color={c.ink2} center style={{ marginTop: space.l }}>{t('send.saved.empty')}</Text>
           )}

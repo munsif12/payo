@@ -11,7 +11,10 @@ import Animated, {
   cancelAnimation,
 } from 'react-native-reanimated';
 import { useReducedMotion } from './useReducedMotion';
-import { WAVE_BARS_MS, WAVE_BAR_COUNT, WAVE_BAR_SCALE_MIN } from './config';
+// Screen-local numbers: the v7 motion table (config.ts) owns only shared tokens.
+const WAVE_BARS_MS = 900;
+const WAVE_BAR_COUNT = 10;
+const WAVE_BAR_SCALE_MIN = 0.35;
 
 const easeInOut = Easing.inOut(Easing.ease);
 

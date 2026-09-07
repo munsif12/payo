@@ -74,7 +74,7 @@ export default function SendAmount() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
-        <Card padding={space.m} style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingHorizontal: space.l }}>
+        <Card padding={space.m} style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m, paddingHorizontal: space.l }}>
           <Avatar name={title ?? ''} />
           <View style={{ flex: 1 }}>
             <Text variant="hl" numberOfLines={1}>{title}</Text>
@@ -87,9 +87,11 @@ export default function SendAmount() {
 
         <View style={{ alignItems: 'center', paddingTop: space.m }}>
           <Text variant="cap">{t('send.amount.youSend')}</Text>
+          {/* SendAmount.dc.html: 48/800 tabular, larger than the standard
+              `money` variant's 40pt. */}
           <Text
             variant="money"
-            style={{ fontSize: 52, lineHeight: 60, letterSpacing: -1.5, marginTop: 6 }}
+            style={{ fontSize: 48, lineHeight: 56, marginTop: 6 }}
             color={amountPaisa > 0 ? c.ink : c.ink3}
           >
             {formatPaisa(amountPaisa)}

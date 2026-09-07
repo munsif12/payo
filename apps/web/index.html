@@ -97,7 +97,7 @@
       <div class="rule"></div>
       <p class="lede">The voice carries the gist. The card makes every answer glanceable the moment you do look down. Type instead any time, and the whole app flips to right-to-left Urdu when you want it to.</p>
       <div class="pills">
-        <span class="pill">46 capabilities</span>
+        <span class="pill">48 capabilities</span>
         <span class="pill">32 card types</span>
         <span class="pill">English</span>
         <span class="pill">Urdu</span>
@@ -128,15 +128,15 @@
           <p class="cap">It asks which bank<i>Chips, not an IBAN field</i></p>
         </div>
         <div class="ph">
-          <div class="frame"><img src="assets/pin-sheet.png" width="302" height="656" loading="lazy" alt="PIN entry sheet opening inside the chat thread"></div>
-          <p class="cap">The PIN opens in chat<i>No separate screen, ever</i></p>
+          <div class="frame"><img src="assets/send-pin-sheet.png" width="302" height="656" loading="lazy" alt="PIN entry sheet for a send, opening inside the chat thread"></div>
+          <p class="cap">The PIN opens in chat<i>Same thread, no separate screen</i></p>
         </div>
         <div class="ph">
-          <div class="frame"><img src="assets/receipt.png" width="302" height="656" loading="lazy" alt="Payment receipt shown as a card in the conversation"></div>
+          <div class="frame"><img src="assets/send-receipt.png" width="302" height="656" loading="lazy" alt="Rs 1,000 sent receipt shown as a card in the conversation"></div>
           <p class="cap">The receipt is a card<i>Spoken aloud, kept on screen</i></p>
         </div>
       </div>
-      <p class="tiny" style="margin-top:22px">The account title is resolved before anything moves. The recipient is saved by nickname afterwards.</p>
+      <p class="tiny" style="margin-top:22px">The account title is resolved before anything moves. The recipient is saved by nickname afterwards. The PIN sheet is from another send.</p>
     </article>
 
     <article class="moment">
@@ -185,10 +185,10 @@
 <section id="safety" class="navy" aria-labelledby="safety-h">
   <div class="wrap">
     <div class="head">
-      <p class="eyebrow">Why this is safe to put in a bank</p>
-      <h2 id="safety-h">The assistant can do everything the bank does. It cannot move a single rupee.</h2>
+      <p class="eyebrow">Why this is safe</p>
+      <h2 id="safety-h">The assistant can do everything the app does. It cannot move a single rupee.</h2>
       <div class="rule"></div>
-      <p class="lede">It holds the user’s own token, calls the same public API as the app, and has no database access. Every write it makes is a proposal the bank core still has to run.</p>
+      <p class="lede">It holds the user’s own token, calls the same public API as the app, and has no database access. Every write it makes is a proposal the mock bank core (simulated) still has to run.</p>
     </div>
 
     <div class="steps">

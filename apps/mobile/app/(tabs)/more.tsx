@@ -35,11 +35,11 @@ export default function More() {
   return (
     <Screen>
       <View style={{ paddingTop: space.l }}>
-        <Text variant="h1" style={{ marginBottom: space.l }}>{t('more.title')}</Text>
+        <Text variant="h2" style={{ marginBottom: space.l }}>{t('more.title')}</Text>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
           <Pressable testID="more-profile-header" onPress={() => router.push('/profile')}>
             <Card style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m }}>
-              <Avatar name={name || '?'} size={56} />
+              <Avatar name={name || '?'} size={48} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text variant="hl" numberOfLines={1}>{name}</Text>
                 <Text variant="foot" numberOfLines={1}>{ltrIsolate(user?.phone ?? '')}</Text>
@@ -138,11 +138,11 @@ export default function More() {
 }
 
 function Icon({ icon: IconCmp, c, tint }: { icon: typeof PiggyBank; c: ReturnType<typeof useTheme>['c']; tint?: 'danger' }) {
-  const bg = tint === 'danger' ? c.redTint : c.surface2;
-  const color = tint === 'danger' ? c.red : c.ink;
+  const bg = tint === 'danger' ? c.redTint : c.amberTint;
+  const color = tint === 'danger' ? c.red : c.navy;
   return (
-    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-      <IconCmp size={20} color={color} strokeWidth={2.2} />
+    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+      <IconCmp size={20} color={color} strokeWidth={2} />
     </View>
   );
 }

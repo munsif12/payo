@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Share, View } from 'react-native';
+import { Pressable, Share, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowDownLeft, ArrowDownRight, ArrowUpRight, BellRing, Check, Clock, Download, FileText,
-  HelpCircle, QrCode as QrIcon, Settings as SettingsIcon, Share2, ShieldAlert, ShieldCheck,
+  ArrowDownLeft, ArrowDownRight, ArrowUpRight, BellRing, Check, ChevronRight, Clock, Download,
+  FileText, QrCode as QrIcon, Settings as SettingsIcon, Share2, ShieldAlert, ShieldCheck,
   Sparkles, TrendingUp, Users, Zap, type LucideIcon,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -14,6 +14,7 @@ import { Text, Card as NewCard, Button, Input, Pill, Avatar, InstitutionLogo, Li
 import { useTheme } from '../../theme/useTheme';
 import { space, radius, touch } from '../../theme/tokens';
 import { usePressScale } from '../../motion/usePressScale';
+import { IconSwap } from '../../motion/IconSwap';
 import { useActionDone, markActionDone } from '../../store/pendingActionHolder';
 import { usePinSheet } from '../../pin/usePinSheet';
 import {
@@ -49,6 +50,80 @@ import type {
 } from './cardShapes';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// Cards.dc.html geometry. Every chat card is the shared Card shell (radius 20 +
+// the card shadow token) with the artboard's 12/14 padding — not the 20pt
+// screen padding a full-width card gets, because a card in the conversation is
+// already inset to 86% of the list by the bubble around it.
+const CARD_PAD_V = 12;
+const CARD_PAD_H = 14;
+/** Receipt avatar / check-in shield / waiting clock disc. */
+const ICON_CIRCLE = 44;
+/** Icon drawn inside ICON_CIRCLE. */
+const ICON_GLYPH = 22;
+/** Recipient + approval row avatar (Cards/HomeConversation artboards). */
+const ROW_LOGO = 36;
+/** InstitutionLogo only offers 24 / 32 / 40 (its type is owned outside this
+ *  phase), so a hosted mark renders at the nearest supported size: 40 where the
+ *  artboard draws a 44pt disc, 32 where it draws 36. The initials Avatar — the
+ *  fallback, and what the artboards actually show — uses the exact size. */
+const LOGO_CARD = 40;
+const LOGO_ROW = 32;
+/** Spending bar track/fill height. */
+const BAR_H = 6;
+/** Cards.dc.html row/label size that sits between `sub` (15) and `foot` (13). */
+const BODY_14 = 14;
+/** Cards.dc.html footnote (expiry, fee/total line). */
+const FOOT_12 = 12;
+
+/** The white card every chat card is drawn on (Cards.dc.html). */
+function CardShell({ children, style }: {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <NewCard
+      padding={0}
+      style={[{ marginTop: space.s, paddingVertical: CARD_PAD_V, paddingHorizontal: CARD_PAD_H }, style]}
+    >
+      {children}
+    </NewCard>
+  );
+}
+
+/** Receipt details, as the artboard's two-column grid: label left in ink2,
+ *  value right in ink, 13pt, 6pt gutters, no separators. */
+function DetailGrid({ rows }: { rows: [string, string][] }) {
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  return (
+    <View style={{ gap: 6 }}>
+      {rows.map(([label, value]) => (
+        <View
+          key={label}
+          style={{ flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between', gap: space.s }}
+        >
+          <Text variant="foot" color={c.ink2}>{label}</Text>
+          <Text variant="foot" color={c.ink} numberOfLines={1} style={{ flexShrink: 1 }}>{value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** The 18pt chevron the Cards artboard puts on a tappable row. */
+function RowChevron() {
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  return (
+    <ChevronRight
+      size={18}
+      color={c.ink3}
+      strokeWidth={2}
+      style={urdu ? { transform: [{ scaleX: -1 }] } : undefined}
+    />
+  );
+}
 
 interface Props {
   card: ChatCard;
@@ -104,6 +179,7 @@ function ConfirmationCardView({ card, onAppendLocal, live }: {
   live?: boolean;
 }) {
   const { t } = useTranslation();
+  const { c } = useTheme();
   const urdu = useIsUrdu();
   const { openPinSheet } = usePinSheet();
   const { speak } = useOutcomeSpeech();
@@ -178,36 +254,53 @@ function ConfirmationCardView({ card, onAppendLocal, live }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card.actionId]);
 
+  // HomeConversation.dc.html confirmation card: centred summary in ink2, the
+  // amount at 32/800, the fee/total foot, then the amber CTA.
+  const amountPaisa = Number(card.amountPaisa);
+  const feePaisa = Number(card.feePaisa ?? 0);
+  const showAmount = showConfirmationAmount(amountPaisa);
+  const feeLine = `${t('common.fee')} ${formatPaisa(feePaisa)} · ${t('confirm.total')} ${formatPaisa(amountPaisa + feePaisa)}`;
+
   return (
-    <NewCard style={{ marginTop: space.s, borderWidth: 1, borderColor: undefined, gap: space.m, alignItems: 'center' }}>
-      <Text variant="hl" center>{urdu ? summary.ur : summary.en}</Text>
-      {showConfirmationAmount(Number(card.amountPaisa)) ? (
-        <Text variant="money">{formatPaisa(Number(card.amountPaisa))}</Text>
+    <CardShell style={{ alignItems: 'center' }}>
+      <Text variant="foot" color={c.ink2} center>{urdu ? summary.ur : summary.en}</Text>
+      {showAmount ? (
+        <>
+          <Text variant="money" style={{ fontSize: 32, lineHeight: 38, marginTop: 6, marginBottom: 2 }}>
+            {ltrIsolate(formatPaisa(amountPaisa))}
+          </Text>
+          <Text variant="foot" center style={{ fontSize: FOOT_12, lineHeight: 16 }}>{ltrIsolate(feeLine)}</Text>
+        </>
       ) : null}
       <Button
         testID={done ? 'chat-confirm-done' : 'chat-confirm'}
         variant={done ? 'secondary' : 'primary'}
-        label={done ? t('confirm.completed') : t('common.confirm')}
+        label={done ? t('confirm.completed') : card.requiresPin ? t('confirm.confirmWithPin') : t('common.confirm')}
         onPress={onConfirm}
         disabled={done}
         loading={confirming}
-        style={{ alignSelf: 'stretch' }}
+        style={{ alignSelf: 'stretch', marginTop: 10 }}
       />
-    </NewCard>
+    </CardShell>
   );
 }
 
 function BalanceCardView({ card }: { card: ChatCard }) {
   const { t } = useTranslation();
   return (
-    <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.xs }}>
+    <CardShell style={{ alignItems: 'center', gap: space.xs }}>
       <Text variant="cap">{t('home.balance')}</Text>
       <Text variant="money">{ltrIsolate(formatPaisa(Number(card.balancePaisa)))}</Text>
-    </NewCard>
+    </CardShell>
   );
 }
 
-function ChipRow({ label, detail, logo, onPress, testID }: {
+/** Cards.dc.html gives a chip three looks: the amber-bordered option chip the
+ *  disambiguation lists use, and — on the recipient card — an amber "Yes,
+ *  continue" pill beside a surface2 "No". */
+type ChipTone = 'outline' | 'primary' | 'secondary';
+
+function ChipRow({ label, detail, logo, onPress, testID, tone = 'outline' }: {
   label: string;
   detail?: string;
   /** F1: the institution / biller mark, rendered before the label inside the chip.
@@ -215,10 +308,13 @@ function ChipRow({ label, detail, logo, onPress, testID }: {
   logo?: React.ReactNode;
   onPress: () => void;
   testID?: string;
+  tone?: ChipTone;
 }) {
   const { c } = useTheme();
   const urdu = useIsUrdu();
   const { style, onPressIn, onPressOut } = usePressScale();
+  const labelColor = tone === 'primary' ? c.navy : c.ink;
+  const labelWeight = tone === 'primary' ? 700 : 600;
   return (
     <AnimatedPressable
       testID={testID}
@@ -228,9 +324,12 @@ function ChipRow({ label, detail, logo, onPress, testID }: {
       onPressOut={onPressOut}
       style={[
         {
-          backgroundColor: c.surface2, borderRadius: radius.pill,
-          borderWidth: 1, borderColor: c.amber,
-          paddingHorizontal: space.m, paddingVertical: space.s,
+          backgroundColor: tone === 'primary' ? c.amber : c.surface2,
+          borderRadius: radius.pill,
+          borderWidth: tone === 'outline' ? 1 : 0,
+          borderColor: c.amber,
+          paddingHorizontal: tone === 'outline' ? space.m : space.l,
+          paddingVertical: space.s,
           // A one-line chip is ~36pt tall from padding alone; the floor + centring
           // brings every chip (telco/institution/biller/recipient) up to the 44pt
           // minimum touch target without changing how a two-line chip looks.
@@ -243,13 +342,13 @@ function ChipRow({ label, detail, logo, onPress, testID }: {
         <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.s }}>
           {logo}
           <View style={{ flexShrink: 1 }}>
-            <Text variant="sub" weight={600}>{label}</Text>
+            <Text variant="sub" weight={labelWeight} color={labelColor}>{label}</Text>
             {detail ? <Text variant="foot">{detail}</Text> : null}
           </View>
         </View>
       ) : (
         <>
-          <Text variant="sub" weight={600}>{label}</Text>
+          <Text variant="sub" weight={labelWeight} color={labelColor}>{label}</Text>
           {detail ? <Text variant="foot">{detail}</Text> : null}
         </>
       )}
@@ -333,38 +432,48 @@ function BillerChipsCardView({ card, onChipTap }: Props) {
   );
 }
 
+// recipient — HomeConversation.dc.html: a 36pt logo beside the name and the
+// institution line, the question in ink2, then the two chips (amber "Yes,
+// continue", surface2 "No").
 function RecipientCardView({ card, onChipTap }: Props) {
   const { t } = useTranslation();
+  const { c } = useTheme();
   const urdu = useIsUrdu();
-  const c = card as unknown as RecipientCardShape;
-  const institution = c.institution;
+  const shape = card as unknown as RecipientCardShape;
+  const institution = shape.institution;
 
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.m, alignItems: 'center' }}>
-      <InstitutionLogo
-        size={40}
-        shape="circle"
-        name={c.title}
-        code={institution?.id}
-        logoUrl={institution?.logoUrl}
-      />
-      <Text variant="hl" center>{c.title}</Text>
-      <Text variant="foot" center>
-        {urdu && institution?.urduName ? institution.urduName : institution?.name} · {ltrIsolate(maskIdentifier(c.identifier))}
-      </Text>
-      <Text variant="sub" center>{urdu ? c.prompt.ur : c.prompt.en}</Text>
-      <View style={{ flexDirection: 'row', gap: space.s }}>
-        <ChipRow testID="chip-recipient-yes" label={t('chips.yesContinue')} onPress={() => onChipTap?.(t('chips.yesContinue'))} />
-        <ChipRow testID="chip-recipient-no" label={t('chips.no')} onPress={() => onChipTap?.(t('chips.no'))} />
+    <CardShell>
+      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m }}>
+        <InstitutionLogo
+          size={LOGO_ROW}
+          shape="circle"
+          name={shape.title}
+          code={institution?.id}
+          logoUrl={institution?.logoUrl}
+        />
+        <View style={{ flexShrink: 1 }}>
+          <Text variant="hl" weight={700} style={{ fontSize: 16 }} numberOfLines={1}>{shape.title}</Text>
+          <Text variant="foot" color={c.ink2} numberOfLines={1}>
+            {urdu && institution?.urduName ? institution.urduName : institution?.name} · {ltrIsolate(maskIdentifier(shape.identifier))}
+          </Text>
+        </View>
       </View>
-    </NewCard>
+      <Text variant="sub" color={c.ink2} style={{ fontSize: BODY_14, marginTop: 10, marginBottom: space.s }}>
+        {urdu ? shape.prompt.ur : shape.prompt.en}
+      </Text>
+      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s }}>
+        <ChipRow tone="primary" testID="chip-recipient-yes" label={t('chips.yesContinue')} onPress={() => onChipTap?.(t('chips.yesContinue'))} />
+        <ChipRow tone="secondary" testID="chip-recipient-no" label={t('chips.no')} onPress={() => onChipTap?.(t('chips.no'))} />
+      </View>
+    </CardShell>
   );
 }
 
 function BillCardView({ card }: { card: ChatCard }) {
   const { t } = useTranslation();
   return (
-    <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.xs }}>
+    <CardShell style={{ alignItems: 'center', gap: space.xs }}>
       <InstitutionLogo
         size={40}
         shape="rounded"
@@ -377,7 +486,7 @@ function BillCardView({ card }: { card: ChatCard }) {
       <Text variant="foot" center>
         {t('bills.month')} {String(card.month)} · {t('bills.dueDate')} {ltrIsolate(String(card.dueDate).slice(0, 10))}
       </Text>
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -387,7 +496,7 @@ function PocketCardView({ card }: { card: ChatCard }) {
   const goal = card.goalPaisa ? Number(card.goalPaisa) : 0;
   const pct = goal ? Math.min(1, Number(card.balancePaisa) / goal) : 0;
   return (
-    <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.xs }}>
+    <CardShell style={{ alignItems: 'center', gap: space.xs }}>
       <Text variant="hl" center>{String(card.emoji)} {urdu && card.urduName ? String(card.urduName) : String(card.name)}</Text>
       <Text variant="money" style={{ fontSize: 30, lineHeight: 36 }}>{ltrIsolate(formatPaisa(Number(card.balancePaisa)))}</Text>
       {goal ? (
@@ -395,7 +504,7 @@ function PocketCardView({ card }: { card: ChatCard }) {
           <View style={{ width: `${pct * 100}%`, height: 8, borderRadius: 4, backgroundColor: c.amber }} />
         </View>
       ) : null}
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -405,14 +514,14 @@ function StatementCardView({ card }: { card: ChatCard }) {
   const urdu = useIsUrdu();
   const period = card.period as { en: string; ur: string };
   return (
-    <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.s }}>
+    <CardShell style={{ alignItems: 'center', gap: space.s }}>
       <FileText size={22} color={c.ink2} strokeWidth={2} />
       <Text variant="hl" center>{urdu ? period.ur : period.en}</Text>
       <Text variant="foot" center>
         {ltrIsolate(`${t('statements.moneyIn')} ${formatPaisa(Number(card.totalInPaisa))} · ${t('statements.moneyOut')} ${formatPaisa(Number(card.totalOutPaisa))}`)}
       </Text>
       <StatementDownload statementId={String(card.statementId)} />
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -438,7 +547,7 @@ function TxnsCardView({ card }: { card: ChatCard }) {
   const { c } = useTheme();
   const items = (card.items as { id: string; direction: string; amountPaisa: number; counterparty: { name: string; urduName?: string; institutionLogoUrl?: string }; createdAt: string }[]).slice(0, 5);
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.s }}>
+    <CardShell style={{ gap: space.s }}>
       {items.map((txn) => (
         <View key={txn.id} style={{ flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.s }}>
           <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.s, flexShrink: 1 }}>
@@ -454,7 +563,7 @@ function TxnsCardView({ card }: { card: ChatCard }) {
           </Text>
         </View>
       ))}
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -463,14 +572,14 @@ function SuccessCardView({ card }: { card: ChatCard }) {
   const { c } = useTheme();
   const title = card.title as { en: string; ur: string };
   return (
-    <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.s }}>
+    <CardShell style={{ alignItems: 'center', gap: space.s }}>
       <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.greenTint, alignItems: 'center', justifyContent: 'center' }}>
         <Check size={22} color={c.green} strokeWidth={3} />
       </View>
       <Text variant="hl" center>{urdu ? title.ur : title.en}</Text>
       <Text variant="money" style={{ fontSize: 28, lineHeight: 34 }}>{formatPaisa(Number(card.amountPaisa))}</Text>
       <Pill label={String(card.refNo)} bg={c.surface2} color={c.ink2} />
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -523,18 +632,18 @@ function SavePromptCardView({ card }: { card: ChatCard }) {
 
   if (saved) {
     return (
-      <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.s }}>
+      <CardShell style={{ alignItems: 'center', gap: space.s }}>
         <View testID="save-prompt-saved">
           <Pill label={t('save.saved')} bg={c.greenTint} color={c.green} />
         </View>
-      </NewCard>
+      </CardShell>
     );
   }
 
   if (dismissed) return null;
 
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.m }}>
+    <CardShell style={{ gap: space.m }}>
       <Text variant="sub" center>{prompt}</Text>
       <Input
         testID="save-prompt-nickname"
@@ -560,7 +669,7 @@ function SavePromptCardView({ card }: { card: ChatCard }) {
           style={{ flex: 1 }}
         />
       </View>
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -589,9 +698,10 @@ function DetailRow({ label, value, last }: { label: string; value: string; last?
   );
 }
 
-// receipt — the chat mirror of app/txn/[id].tsx: who, how much (coloured by
-// direction), when, ref no., category, status. Plus a Share button, which the
-// full-screen receipt does not have (it is the one thing the AI turn adds).
+// receipt — Cards.dc.html: a centred 44pt avatar/logo, "Sent to X" at 15/600,
+// the amount at 28/800 coloured by direction (money in green, money out red),
+// the status pill, the two-column details grid, and the Share ghost button —
+// the one thing the AI turn adds over the full-screen receipt.
 function ReceiptCardView({ card }: { card: ChatCard }) {
   const { t } = useTranslation();
   const { c } = useTheme();
@@ -601,7 +711,9 @@ function ReceiptCardView({ card }: { card: ChatCard }) {
   const txn = shape.txn;
   const name = urdu && txn.counterparty.urduName ? txn.counterparty.urduName : txn.counterparty.name;
   const sign = txn.direction === 'in' ? '+' : '−';
-  const amountColor = txn.direction === 'in' ? c.green : c.ink;
+  // Artboard: money out is red (−₨2,550), money in green. The sign is the
+  // static cue that survives colour-blindness / greyscale.
+  const amountColor = txn.direction === 'in' ? c.green : c.red;
   const headline = txn.direction === 'in'
     ? t('activity.receivedFrom', { name })
     : t('activity.sentTo', { name });
@@ -615,26 +727,31 @@ function ReceiptCardView({ card }: { card: ChatCard }) {
   };
 
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.m }}>
-      <View style={{ alignItems: 'center', gap: space.s }}>
+    <CardShell>
+      <View style={{ alignItems: 'center' }}>
         {txn.counterparty.institutionLogoUrl
-          ? <InstitutionLogo size={40} shape="circle" name={name} logoUrl={txn.counterparty.institutionLogoUrl} />
-          : <Avatar name={name} size={56} />}
-        <Text variant="hl" center>{headline}</Text>
-        <Text variant="money" style={{ fontSize: 30, lineHeight: 36 }} color={amountColor}>
+          ? <InstitutionLogo size={LOGO_CARD} shape="circle" name={name} logoUrl={txn.counterparty.institutionLogoUrl} />
+          : <Avatar name={name} size={ICON_CIRCLE} />}
+        <Text variant="sub" weight={600} color={c.ink} center style={{ marginTop: space.s }}>{headline}</Text>
+        <Text variant="money" style={{ fontSize: 28, lineHeight: 34 }} color={amountColor}>
           {ltrIsolate(sign + formatPaisa(txn.amountPaisa))}
         </Text>
         <Pill
           label={t('activity.completed')}
           bg={c.greenTint}
           color={c.green}
-          icon={<Check size={14} color={c.green} strokeWidth={3} />}
+          icon={<Check size={12} color={c.green} strokeWidth={3} />}
+          style={{ alignSelf: 'center', marginTop: 6 }}
         />
       </View>
-      <View>
-        <DetailRow label={t('activity.date')} value={ltrIsolate(new Date(txn.createdAt).toLocaleString())} />
-        <DetailRow label={t('activity.category')} value={txn.category} />
-        <DetailRow label={t('activity.refNo')} value={ltrIsolate(txn.refNo)} last />
+      <View style={{ marginTop: space.m }}>
+        <DetailGrid
+          rows={[
+            [t('activity.date'), ltrIsolate(new Date(txn.createdAt).toLocaleString())],
+            [t('activity.category'), txn.category],
+            [t('activity.refNo'), ltrIsolate(txn.refNo)],
+          ]}
+        />
       </View>
       <Button
         testID="chat-receipt-share"
@@ -642,13 +759,15 @@ function ReceiptCardView({ card }: { card: ChatCard }) {
         label={t('cards.receipt.share')}
         icon={<Share2 size={20} color={c.ink2} strokeWidth={2} />}
         onPress={onShare}
+        style={{ marginTop: space.s }}
       />
-    </NewCard>
+    </CardShell>
   );
 }
 
-// spending — plain bars, no chart library (spec §6). Bar width = the category's
-// share of money out; amber fill on surface2, mirroring PocketCardView's meter.
+// spending — Cards.dc.html: the period/money-out caption, the total at 30/800,
+// one 6pt amber-on-surface2 bar per category, and the compare row in red (spent
+// more) or green (spent less). Plain bars, no chart library (spec §6).
 function SpendingCardView({ card }: { card: ChatCard }) {
   const { t } = useTranslation();
   const { c } = useTheme();
@@ -668,57 +787,50 @@ function SpendingCardView({ card }: { card: ChatCard }) {
       });
 
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.m }}>
-      <View style={{ alignItems: 'center', gap: space.xs }}>
-        <Text variant="cap">{bi(shape.period)}</Text>
-        <Text variant="cap">{t('cards.spending.moneyOut')}</Text>
-        <Text variant="money" style={{ fontSize: 30, lineHeight: 36 }}>
-          {ltrIsolate(formatPaisa(shape.totalOutPaisa))}
-        </Text>
-        <Text variant="foot">
-          {ltrIsolate(`${t('cards.spending.moneyIn')} ${formatPaisa(shape.totalInPaisa)}`)}
-        </Text>
-      </View>
+    <CardShell>
+      <Text variant="cap">{`${bi(shape.period)} · ${t('cards.spending.moneyOut')}`}</Text>
+      <Text variant="money" style={{ fontSize: 30, lineHeight: 36 }}>
+        {ltrIsolate(formatPaisa(shape.totalOutPaisa))}
+      </Text>
+      <Text variant="foot">
+        {ltrIsolate(`${t('cards.spending.moneyIn')} ${formatPaisa(shape.totalInPaisa)}`)}
+      </Text>
 
       {shape.byCategory.length ? (
-        <View style={{ gap: space.s }}>
-          <Text variant="cap">{t('cards.spending.byCategory')}</Text>
-          {shape.byCategory.map((row) => (
-            <View key={row.category} style={{ gap: space.xs }}>
-              <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
-                <Text variant="sub">{bi(row.label)}</Text>
-                <Text variant="sub" weight={600}>{ltrIsolate(formatPaisa(row.totalPaisa))}</Text>
-              </View>
-              <View style={{ height: 8, borderRadius: 4, backgroundColor: c.surface2, overflow: 'hidden' }}>
-                <View
-                  testID={`spending-bar-${row.category}`}
-                  style={{
-                    // share is 0..1 from the service; clamp so a bad value can't
-                    // overflow the track or render a negative width.
-                    width: `${Math.max(0, Math.min(1, row.share)) * 100}%`,
-                    height: 8, borderRadius: 4, backgroundColor: c.amber,
-                    alignSelf: urdu ? 'flex-end' : 'flex-start',
-                  }}
-                />
-              </View>
-              <Text variant="foot">{t('cards.spending.txnCount', { count: row.count })}</Text>
+        shape.byCategory.map((row) => (
+          <View key={row.category} style={{ marginTop: space.s }}>
+            <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between', gap: space.s }}>
+              <Text variant="sub" color={c.ink} style={{ fontSize: BODY_14, flexShrink: 1 }} numberOfLines={1}>{bi(row.label)}</Text>
+              <Text variant="sub" weight={600} color={c.ink} style={{ fontSize: BODY_14 }}>{ltrIsolate(formatPaisa(row.totalPaisa))}</Text>
             </View>
-          ))}
-        </View>
+            <View style={{ height: BAR_H, borderRadius: BAR_H / 2, backgroundColor: c.surface2, overflow: 'hidden', marginTop: space.xs }}>
+              <View
+                testID={`spending-bar-${row.category}`}
+                style={{
+                  // share is 0..1 from the service; clamp so a bad value can't
+                  // overflow the track or render a negative width.
+                  width: `${Math.max(0, Math.min(1, row.share)) * 100}%`,
+                  height: BAR_H, borderRadius: BAR_H / 2, backgroundColor: c.amber,
+                  alignSelf: urdu ? 'flex-end' : 'flex-start',
+                }}
+              />
+            </View>
+          </View>
+        ))
       ) : (
-        <Text variant="foot" center>{t('cards.empty')}</Text>
+        <Text variant="foot" center style={{ marginTop: space.s }}>{t('cards.empty')}</Text>
       )}
 
       {compare ? (
         <View
           testID="spending-compare"
-          style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.s }}
+          style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, marginTop: 10 }}
         >
-          <DeltaIcon size={18} color={deltaColor} strokeWidth={2.4} />
-          <Text variant="sub" color={deltaColor} style={{ flex: 1 }}>{compareText}</Text>
+          <DeltaIcon size={16} color={deltaColor} strokeWidth={2.4} />
+          <Text variant="foot" weight={600} color={deltaColor} style={{ flex: 1 }}>{compareText}</Text>
         </View>
       ) : null}
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -728,7 +840,7 @@ function AccountCardView({ card }: { card: ChatCard }) {
   const shape = card as unknown as AccountCardShape;
   const name = urdu && shape.urduName ? shape.urduName : shape.name;
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.m }}>
+    <CardShell style={{ gap: space.m }}>
       <View style={{ alignItems: 'center', gap: space.s }}>
         <Avatar name={name} size={56} />
         <Text variant="hl" center>{name}</Text>
@@ -745,7 +857,7 @@ function AccountCardView({ card }: { card: ChatCard }) {
           last
         />
       </View>
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -777,7 +889,7 @@ function ProfileCardView({ card }: { card: ChatCard }) {
   };
 
   return (
-    <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.s }}>
+    <CardShell style={{ alignItems: 'center', gap: space.s }}>
       <Avatar name={name} size={48} />
       <Text variant="hl" center>{t('cards.profile.title')}</Text>
       <Text variant="sub" center>{name}</Text>
@@ -786,35 +898,34 @@ function ProfileCardView({ card }: { card: ChatCard }) {
           <Pill key={field} label={labels[field] ?? field} bg={c.greenTint} color={c.green} />
         ))}
       </View>
-    </NewCard>
+    </CardShell>
   );
 }
 
-// help — every row is a ≥44pt tap target that sends the intent phrased in the
-// language the user is reading, so the assistant answers in that language too.
+// help — Cards.dc.html "Things you can say": the caption, then 44pt rows at
+// 15/600 with an 18pt chevron and a separator. Every row sends the intent
+// phrased in the language the user is reading, so the assistant answers in that
+// language too.
 function HelpCardView({ card, onChipTap }: Props) {
   const { t } = useTranslation();
   const { c } = useTheme();
   const bi = useBilingual();
   const shape = card as unknown as HelpCardShape;
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.xs }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s }}>
-        <HelpCircle size={18} color={c.ink2} strokeWidth={2} />
-        <Text variant="cap">{t('cards.help.title')}</Text>
-      </View>
+    <CardShell style={{ gap: space.xs }}>
+      <Text variant="cap">{t('cards.help.title')}</Text>
       {shape.intents.map((item, i) => (
         <ListRow
           key={`${item.intent.en}-${i}`}
           testID={`chat-help-${i}`}
-          title={bi(item.label)}
-          showChevron
+          title={<Text variant="sub" weight={600} color={c.ink} numberOfLines={1}>{bi(item.label)}</Text>}
+          right={<RowChevron />}
           separator={i < shape.intents.length - 1}
           style={{ minHeight: touch.min }}
           onPress={() => onChipTap?.(bi(item.intent))}
         />
       ))}
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -883,13 +994,13 @@ function StatementsCardView({ card }: { card: ChatCard }) {
   const shape = card as unknown as StatementsCardShape;
   if (!shape.items.length) {
     return (
-      <NewCard style={{ marginTop: space.s }}>
+      <CardShell>
         <Text variant="foot" center>{t('statements.empty')}</Text>
-      </NewCard>
+      </CardShell>
     );
   }
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.xs }}>
+    <CardShell style={{ gap: space.xs }}>
       <Text variant="cap">{t('cards.statements.title')}</Text>
       {shape.items.map((item, i) => (
         <ListRow
@@ -906,7 +1017,7 @@ function StatementsCardView({ card }: { card: ChatCard }) {
           onPress={() => router.push('/statements')}
         />
       ))}
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -918,10 +1029,10 @@ function ListCard({ title, empty, children }: {
 }) {
   const { t } = useTranslation();
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.xs }}>
+    <CardShell style={{ gap: space.xs }}>
       <Text variant="cap">{title}</Text>
       {empty ? <Text variant="foot" center>{t('cards.empty')}</Text> : children}
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -1126,9 +1237,9 @@ function RequestRow({ item, onChipTap, separator }: {
 function RequestCardView({ card, onChipTap }: Props) {
   const shape = card as unknown as RequestCardShape;
   return (
-    <NewCard style={{ marginTop: space.s }}>
+    <CardShell>
       <RequestRow item={shape as RequestItem} onChipTap={onChipTap} separator={false} />
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -1157,7 +1268,7 @@ function QrCardView({ card }: { card: ChatCard }) {
   const { c } = useTheme();
   const shape = card as unknown as QrCardShape;
   return (
-    <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.s }}>
+    <CardShell style={{ alignItems: 'center', gap: space.s }}>
       <Text variant="cap">{t('cards.qr.title')}</Text>
       <View style={{ backgroundColor: c.white, borderRadius: radius.tile, padding: space.l }}>
         {shape.payload
@@ -1167,7 +1278,7 @@ function QrCardView({ card }: { card: ChatCard }) {
       <Text variant="hl" center>{shape.name}</Text>
       <Text variant="foot" center>{ltrIsolate(shape.phone)}</Text>
       <Text variant="foot" center>{t('cards.qr.hint')}</Text>
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -1175,13 +1286,13 @@ function QrCardView({ card }: { card: ChatCard }) {
 
 /** Human label for a risk flag. Unknown flags render as nothing rather than as
  *  a raw enum — a card from a newer AI service must never leak `snake_case`. */
-function RiskFlags({ flags }: { flags?: string[] }) {
+function RiskFlags({ flags, center }: { flags?: string[]; center?: boolean }) {
   const { t } = useTranslation();
   const { c } = useTheme();
   const known = (flags ?? []).filter((f) => f === 'new_recipient_large' || f === 'pressure_language');
   if (!known.length) return null;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, justifyContent: center ? 'center' : 'flex-start' }}>
       {known.map((f) => (
         <Pill
           key={f}
@@ -1279,47 +1390,60 @@ function CheckInCardView({ card, onAppendLocal, live }: {
     }
   };
 
-  if (answered === 'yes') {
-    return (
-      <NewCard style={{ marginTop: space.s, alignItems: 'center', gap: space.s }}>
-        <View testID="check-in-cancelled" />
-        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.greenTint, alignItems: 'center', justifyContent: 'center' }}>
-          <ShieldCheck size={22} color={c.green} strokeWidth={2.4} />
-        </View>
-        <Text variant="hl" center>{t('cards.checkIn.stopped')}</Text>
-        <Text variant="sub" center>{t('cards.checkIn.stoppedBody')}</Text>
-      </NewCard>
-    );
-  }
+  // Cards.dc.html check-in: a 44pt shield in amberTint, the question at 17/700,
+  // the risk flag pill, then the two stacked 56pt answers. Answering "yes" keeps
+  // the same card and swaps the shield for the green ShieldCheck (IconSwap) —
+  // one card, one state change, so the change is visible rather than a cut.
+  const stopped = answered === 'yes';
 
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.m }}>
-      <View style={{ alignItems: 'center', gap: space.s }}>
-        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
-          <ShieldAlert size={22} color={c.amberDeep} strokeWidth={2.4} />
-        </View>
-        <Text variant="hl" center>{bi(shape.prompt)}</Text>
-        <RiskFlags flags={shape.riskFlags} />
+    <CardShell style={{ alignItems: 'center' }}>
+      {stopped ? <View testID="check-in-cancelled" /> : null}
+      <View
+        style={{
+          width: ICON_CIRCLE, height: ICON_CIRCLE, borderRadius: ICON_CIRCLE / 2,
+          backgroundColor: stopped ? c.greenTint : c.amberTint,
+          alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <IconSwap
+          active={stopped}
+          size={ICON_GLYPH}
+          from={<ShieldAlert size={ICON_GLYPH} color={c.amberDeep} strokeWidth={2.4} />}
+          to={<ShieldCheck size={ICON_GLYPH} color={c.green} strokeWidth={2.4} />}
+        />
       </View>
-      {error ? <Text variant="sub" color={c.red} center>{error}</Text> : null}
-      {/* Two answers only, both ≥56pt (touch.primary) — the spec's "two large buttons". */}
-      <Button
-        testID="check-in-yes"
-        label={t('cards.checkIn.yes')}
-        onPress={() => answer(true)}
-        loading={busy && answered === null}
-        disabled={answered !== null || done || restored}
-        style={{ minHeight: touch.primary, alignSelf: 'stretch' }}
-      />
-      <Button
-        testID="check-in-no"
-        variant="secondary"
-        label={t('cards.checkIn.no')}
-        onPress={() => answer(false)}
-        disabled={busy || answered !== null || done || restored}
-        style={{ minHeight: touch.primary, alignSelf: 'stretch' }}
-      />
-    </NewCard>
+      <Text variant="hl" weight={700} center style={{ marginTop: space.s, marginBottom: space.xs }}>
+        {stopped ? t('cards.checkIn.stopped') : bi(shape.prompt)}
+      </Text>
+      {stopped ? (
+        <Text variant="sub" center>{t('cards.checkIn.stoppedBody')}</Text>
+      ) : (
+        <>
+          <RiskFlags flags={shape.riskFlags} center />
+          {error ? <Text variant="sub" color={c.red} center style={{ marginTop: space.s }}>{error}</Text> : null}
+          {/* Two answers only, both ≥56pt (touch.primary) — the spec's "two large buttons". */}
+          <View style={{ alignSelf: 'stretch', marginTop: space.m, gap: space.s }}>
+            <Button
+              testID="check-in-yes"
+              label={t('cards.checkIn.yes')}
+              onPress={() => answer(true)}
+              loading={busy && answered === null}
+              disabled={answered !== null || done || restored}
+              style={{ minHeight: touch.primary, alignSelf: 'stretch' }}
+            />
+            <Button
+              testID="check-in-no"
+              variant="secondary"
+              label={t('cards.checkIn.no')}
+              onPress={() => answer(false)}
+              disabled={busy || answered !== null || done || restored}
+              style={{ minHeight: touch.primary, alignSelf: 'stretch' }}
+            />
+          </View>
+        </>
+      )}
+    </CardShell>
   );
 }
 
@@ -1457,28 +1581,41 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
   // nothing left to confirm, and the success card below already carries the ref no.
   const sent = doneApproved || polled?.status === 'completed';
 
+  // Cards.dc.html waiting card: a 44pt clock in amberTint, the summary at
+  // 15/600, the amount at 28/800, the named body line, the expiry foot, and the
+  // secondary Remind button. The clock becomes a green check the moment the
+  // guardian settles it (IconSwap) — the amber → green disc is the static cue.
+  const settledOk = sent || outcome === 'approved';
+
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.m }}>
+    <CardShell style={{ alignItems: 'center' }}>
       <View testID={`waiting-approval-${shape.actionId}`} />
-      <View style={{ alignItems: 'center', gap: space.s }}>
-        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: outcome === 'approved' ? c.greenTint : c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
-          {sent
-            ? <Check size={22} color={c.green} strokeWidth={3} />
-            : outcome === 'approved'
-              ? <ShieldCheck size={22} color={c.green} strokeWidth={2.4} />
-              : <Clock size={22} color={statusColor} strokeWidth={2.4} />}
-        </View>
-        <Text variant="hl" center>{bi(shape.summary)}</Text>
-        <Text variant="money" style={{ fontSize: 28, lineHeight: 34 }}>{ltrIsolate(formatPaisa(shape.amountPaisa))}</Text>
+      <View
+        style={{
+          width: ICON_CIRCLE, height: ICON_CIRCLE, borderRadius: ICON_CIRCLE / 2,
+          backgroundColor: settledOk ? c.greenTint : c.amberTint,
+          alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <IconSwap
+          active={settledOk}
+          size={ICON_GLYPH}
+          from={<Clock size={ICON_GLYPH} color={statusColor} strokeWidth={2.4} />}
+          to={sent
+            ? <Check size={ICON_GLYPH} color={c.green} strokeWidth={3} />
+            : <ShieldCheck size={ICON_GLYPH} color={c.green} strokeWidth={2.4} />}
+        />
       </View>
+      <Text variant="sub" weight={600} color={c.ink} center style={{ marginTop: space.s }}>{bi(shape.summary)}</Text>
+      <Text variant="money" style={{ fontSize: 28, lineHeight: 34 }}>{ltrIsolate(formatPaisa(shape.amountPaisa))}</Text>
 
       {outcome === 'waiting' ? (
         <>
-          <Text variant="sub" center>{gt('cards.waiting.body')}</Text>
-          <Text testID="waiting-countdown" variant="foot" center>
+          <Text variant="sub" center style={{ fontSize: BODY_14, marginTop: 6, marginBottom: 6 }}>{gt('cards.waiting.body')}</Text>
+          <Text testID="waiting-countdown" variant="foot" center style={{ fontSize: FOOT_12, lineHeight: 16 }}>
             {left === null ? t('cards.waiting.expired') : t('cards.waiting.expiresIn', { time: ltrIsolate(formatCountdown(left)) })}
           </Text>
-          {error ? <Text variant="sub" color={c.red} center>{error}</Text> : null}
+          {error ? <Text variant="sub" color={c.red} center style={{ marginTop: space.s }}>{error}</Text> : null}
           <Button
             testID="waiting-remind"
             variant="secondary"
@@ -1489,15 +1626,16 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
             onPress={onRemind}
             disabled={cooldownLeft > 0}
             loading={reminding}
-            style={{ alignSelf: 'stretch' }}
+            style={{ alignSelf: 'stretch', marginTop: 10 }}
           />
         </>
       ) : (
-        <>
+        <View style={{ alignSelf: 'stretch', alignItems: 'center', marginTop: 6, gap: 10 }}>
           <Text
             testID="waiting-outcome"
             variant="sub"
             center
+            style={{ fontSize: BODY_14 }}
             color={outcome === 'approved' ? c.green : c.red}
           >
             {sent
@@ -1523,9 +1661,9 @@ function WaitingApprovalCardView({ card, onAppendLocal, live }: {
               style={{ alignSelf: 'stretch' }}
             />
           ) : null}
-        </>
+        </View>
       )}
-    </NewCard>
+    </CardShell>
   );
 }
 
@@ -1594,13 +1732,15 @@ function ApprovalRow({ item, separator }: { item: ApprovalItemShape; separator: 
       testID={`approval-${item.actionId}`}
       style={{ gap: space.s, paddingVertical: space.m, borderBottomWidth: separator ? 1 : 0, borderBottomColor: c.separator }}
     >
-      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m }}>
-        <Avatar name={item.payerName} size={36} />
+      {/* Cards.dc.html approvals row: 36pt avatar, payer at 15/700 over the
+          summary at 13, the amount at 800 on the trailing edge. */}
+      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
+        <Avatar name={item.payerName} size={ROW_LOGO} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="hl" numberOfLines={1}>{item.payerName}</Text>
-          <Text variant="foot" numberOfLines={1}>{bi(item.summary)}</Text>
+          <Text variant="sub" weight={700} color={c.ink} numberOfLines={1}>{item.payerName}</Text>
+          <Text variant="foot" color={c.ink2} numberOfLines={1}>{bi(item.summary)}</Text>
         </View>
-        <Text variant="hl">{ltrIsolate(formatPaisa(item.amountPaisa))}</Text>
+        <Text variant="sub" weight={800} color={c.ink}>{ltrIsolate(formatPaisa(item.amountPaisa))}</Text>
       </View>
       <RiskFlags flags={item.riskFlags} />
       {error ? <Text variant="sub" color={c.red}>{error}</Text> : null}
@@ -1646,14 +1786,14 @@ function ApprovalRow({ item, separator }: { item: ApprovalItemShape; separator: 
             label={t('cards.approvals.approve')}
             onPress={onApprove}
             loading={busy}
-            style={{ alignSelf: 'stretch', minHeight: touch.min }}
+            style={{ alignSelf: 'stretch', minHeight: touch.primary }}
           />
           <Button
             testID={`approval-decline-${item.actionId}`}
             variant="secondary"
             label={t('cards.approvals.decline')}
             onPress={() => setReasonOpen(true)}
-            style={{ alignSelf: 'stretch', minHeight: touch.min }}
+            style={{ alignSelf: 'stretch', minHeight: touch.primary }}
           />
         </View>
       )}
@@ -1742,7 +1882,7 @@ function GuardianCardView({ card }: { card: ChatCard }) {
   );
 
   return (
-    <NewCard style={{ marginTop: space.s, gap: space.m }}>
+    <CardShell style={{ gap: space.m }}>
       <View style={{ alignItems: 'center', gap: space.s }}>
         <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: shape.name ? c.greenTint : c.surface2, alignItems: 'center', justifyContent: 'center' }}>
           <ShieldCheck size={22} color={shape.name ? c.green : c.ink3} strokeWidth={2.4} />
@@ -1760,6 +1900,6 @@ function GuardianCardView({ card }: { card: ChatCard }) {
         onPress={() => router.push('/settings')}
         style={{ alignSelf: 'stretch' }}
       />
-    </NewCard>
+    </CardShell>
   );
 }

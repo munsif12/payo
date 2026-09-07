@@ -41,7 +41,7 @@ export default function Recharge() {
         <Pressable testID="recharge-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
           <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
         </Pressable>
-        <Text variant="h1">{t('recharge.title')}</Text>
+        <Text variant="h2">{t('recharge.title')}</Text>
       </View>
       <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
         <Text variant="sub">{t('recharge.chooseTelco')}</Text>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Phone, ShieldCheck, Sparkles, Wallet } from 'lucide-react-native';
+import { ChevronLeft, Phone, ShieldCheck, Sparkles, Users, Wallet } from 'lucide-react-native';
 import { Screen, Text, Card, Button, Input, ListRow, useIsUrdu } from '../src/ui';
 import { useTheme } from '../src/theme/useTheme';
 import { space, touch } from '../src/theme/tokens';
@@ -134,9 +134,9 @@ export default function Settings() {
     <Screen>
       <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
         <Pressable testID="settings-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />
+          <ChevronLeft size={24} color={c.ink} strokeWidth={2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />
         </Pressable>
-        <Text variant="h2" weight={800}>{t('settings.title')}</Text>
+        <Text variant="h2">{t('settings.title')}</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.l, paddingBottom: space.xxxl }}>
@@ -276,6 +276,16 @@ export default function Settings() {
           />
         </Card>
 
+        <Card padding={0} style={{ paddingHorizontal: space.l }}>
+          <ListRow
+            testID="settings-age-protection"
+            left={<RowIcon icon={Users} c={c} />}
+            title={t('settings.ageProtection.title')}
+            subtitle={t('settings.ageProtection.foot')}
+            separator={false}
+          />
+        </Card>
+
         {error ? <Text testID="settings-error" variant="sub" color={c.red} center>{error}</Text> : null}
       </ScrollView>
     </Screen>
@@ -284,8 +294,8 @@ export default function Settings() {
 
 function RowIcon({ icon: Icon, c }: { icon: typeof ShieldCheck; c: ReturnType<typeof useTheme>['c'] }) {
   return (
-    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center' }}>
-      <Icon size={20} color={c.ink} strokeWidth={2.2} />
+    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
+      <Icon size={20} color={c.navy} strokeWidth={2} />
     </View>
   );
 }

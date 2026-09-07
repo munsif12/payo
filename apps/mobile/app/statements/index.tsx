@@ -82,7 +82,7 @@ export default function Statements() {
         <Pressable testID="statements-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
           <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
         </Pressable>
-        <Text variant="h2" weight={800}>{t('statements.title')}</Text>
+        <Text variant="h2">{t('statements.title')}</Text>
       </View>
 
       {error ? <Text color={c.red} center style={{ marginBottom: space.m }}>{error}</Text> : null}

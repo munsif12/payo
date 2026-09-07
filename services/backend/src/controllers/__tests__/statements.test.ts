@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { createApp } from '../../app';
 import { createVerifiedUser } from '../../testUtils/factories';
+import { extractPdfText } from '../../testUtils/pdfText';
 import { Transaction } from '../../models';
 
 const app = createApp();
@@ -46,6 +47,9 @@ test('monthly statement totals match; regenerate is upsert; pdf downloads', asyn
   expect(pdf.headers['content-type']).toContain('application/pdf');
   expect(pdf.body.length).toBeGreaterThan(1000);
   expect(pdf.body.subarray(0, 4).toString()).toBe('%PDF');
+
+  const text = extractPdfText(pdf.body);
+  expect(text).toContain('Page 1 of');
 });
 
 test('empty month → 404 NO_ACTIVITY; yearly statement covers both months', async () => {

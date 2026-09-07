@@ -3,7 +3,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Search } from 'lucide-react-native';
-import { Screen, Text, Input, ListRow, InstitutionLogo, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, Input, ListRow, InstitutionLogo, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
 import { useInstitutionsQuery, useResolveRecipientMutation, apiErr } from '../../src/api/client';
@@ -57,11 +57,16 @@ export default function InstitutionPicker() {
     }
   };
 
-  const renderRow = (inst: InstitutionDto) => (
+  // SendInstitution.dc.html: 56pt rows (a 40pt InstitutionLogo — the closest
+  // of the component's fixed 24/32/40 sizes to the artboard's 36 — + name +
+  // chevron, no subtitle), grouped in a card with separators between rows.
+  const renderRow = (inst: InstitutionDto, i: number, all: InstitutionDto[]) => (
     <ListRow
       key={inst.id}
       testID={`institution-${inst.name.replace(/\s/g, '-')}`}
       onPress={() => onPick(inst)}
+      separator={i < all.length - 1}
+      style={{ paddingVertical: 8 }}
       left={<InstitutionLogo size={40} shape="circle" name={inst.name} code={inst.code ?? inst.id} logoUrl={inst.logoUrl} />}
       title={urdu && inst.urduName ? inst.urduName : inst.name}
       subtitle={resolvingId === inst.id && resolving ? t('common.loading') : undefined}
@@ -80,11 +85,11 @@ export default function InstitutionPicker() {
 
       <Input
         testID="institution-search"
-        icon={<Search size={20} color={c.ink3} strokeWidth={2} />}
+        icon={<Search size={18} color={c.ink3} strokeWidth={2} />}
         placeholder={t('send.searchInstitutions')}
         value={query}
         onChangeText={setQuery}
-        containerStyle={{ marginBottom: space.l }}
+        containerStyle={{ height: 52, marginBottom: space.l }}
       />
 
       {error ? <Text variant="sub" color={c.red} center style={{ marginBottom: space.m }}>{error}</Text> : null}
@@ -93,13 +98,17 @@ export default function InstitutionPicker() {
         {popular.length > 0 ? (
           <View style={{ marginBottom: space.l }}>
             <Text variant="cap" style={{ marginBottom: 4 }}>{t('send.popular')}</Text>
-            {popular.map(renderRow)}
+            <Card padding={0} style={{ paddingHorizontal: space.l }}>
+              {popular.map((inst, i) => renderRow(inst, i, popular))}
+            </Card>
           </View>
         ) : null}
         {rest.length > 0 ? (
           <View>
             <Text variant="cap" style={{ marginBottom: 4 }}>{t('send.allInstitutions')}</Text>
-            {rest.map(renderRow)}
+            <Card padding={0} style={{ paddingHorizontal: space.l }}>
+              {rest.map((inst, i) => renderRow(inst, i, rest))}
+            </Card>
           </View>
         ) : null}
       </ScrollView>

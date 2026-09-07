@@ -2,7 +2,7 @@
 // import, so these run without a store, network mocking, or a native-module
 // transform. `useHomeGreeting` / `buildSuggestions` (which also need the
 // lucide icon set) are exercised indirectly via the Home screen.
-import { greetingBucket, billSubtitle } from '../homeGreetingLogic';
+import { greetingBucket, billSubtitle, firstName } from '../homeGreetingLogic';
 import type { DueBill } from '../../api/types';
 
 const t = (key: string, opts?: Record<string, unknown>) => {
@@ -17,6 +17,20 @@ test('greetingBucket: morning below 12, afternoon below 17, else evening', () =>
   expect(greetingBucket(16)).toBe('afternoon');
   expect(greetingBucket(17)).toBe('evening');
   expect(greetingBucket(23)).toBe('evening');
+});
+
+// Main.dc.html: "Assalam o Alaikum, Ammi." over the row that still says "Ammi Jaan".
+test('firstName: the greeting line uses the first name only', () => {
+  expect(firstName('Ammi Jaan')).toBe('Ammi');
+  expect(firstName('Ammi')).toBe('Ammi');
+  expect(firstName('Munsif Ali Misri')).toBe('Munsif');
+  expect(firstName('  Ammi   Jaan  ')).toBe('Ammi');
+  expect(firstName('امی جان')).toBe('امی');
+});
+
+test('firstName: an unknown name stays empty so callers can wait for /me', () => {
+  expect(firstName('')).toBe('');
+  expect(firstName('   ')).toBe('');
 });
 
 const bill: DueBill = {

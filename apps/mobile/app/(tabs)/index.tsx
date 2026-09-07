@@ -1,11 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import {
+  FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { ChevronRight, Eye, EyeOff, Sparkles } from 'lucide-react-native';
-import { Screen, Text, Card, Pill, Avatar, Composer, VoiceStatusBar, useIsUrdu } from '../../src/ui';
+import Animated from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronRight, Keyboard as KeyboardIcon, Mic, Send, X } from 'lucide-react-native';
+import { Text, Card, Input, Sheet, NavyHead, useIsUrdu, SHEET_OVERLAP } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space, radius } from '../../src/theme/tokens';
-import { Rise, TypingDots, WaveBars } from '../../src/motion';
+import { space, radius, touch, shadow } from '../../src/theme/tokens';
+import {
+  Rise, TypingDots, ListeningRings, IconSwap, useFirstPaint,
+  wordRiseEnd, splitWords, usePressScale, motionConfig,
+} from '../../src/motion';
 import { CardView } from '../../src/components/cards/CardView';
 import { useConverse, type ChatMessage } from '../../src/voice/useConverse';
 import { showBubbleText } from '../../src/voice/bubbleText';
@@ -14,21 +22,37 @@ import { useVoiceLoop, type VoiceLoopHandlers } from '../../src/voice/useVoiceLo
 import { usePinSheet } from '../../src/pin/usePinSheet';
 import { useHomeGreeting, type Suggestion } from '../../src/home/useHomeGreeting';
 import { useHomeDigest } from '../../src/home/useHomeDigest';
+import { homeState, headHeight, headStatus } from '../../src/home/homeState';
 import { useRegisterOutcomePlayer } from '../../src/voice/OutcomeSpeechProvider';
-import { formatPaisa } from '../../src/lib/money';
-import { ltrIsolate } from '../../src/lib/bidi';
 
-// Home — Main.dc.html (idle greeting + suggestions) / HomeListening.dc.html
-// (mic listening) / HomeConversation.dc.html (turns in progress). The Home
-// tab IS the AI assistant: no AIBar here (see (tabs)/_layout.tsx), the
-// Composer at the bottom is the only entry point for voice/text.
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const { D_SHEET, STAGGER } = motionConfig;
+/** Main.dc.html: the amber mic is a 64 pt floating button, bottom-right. */
+const FAB_SIZE = 64;
+const KEY_BUTTON = 44;
+/** What the floating block occupies before onLayout has measured it: the 64 pt
+ *  FAB plus the 16 pt gap the artboard leaves under it. The measured height
+ *  wins as soon as it arrives — this is only the floor, so the last card is
+ *  never briefly stuck under the mic on the very first frame. */
+const FAB_CLEARANCE = FAB_SIZE + space.l;
+
+// Home — Main.dc.html (greet) / HomeListening.dc.html (listening) /
+// HomeConversation.dc.html (conversation): a navy head over a cream sheet, with
+// the amber mic floating on the sheet. The Home tab IS the AI assistant (no
+// AIBar here, see (tabs)/_layout.tsx). This screen is a view over the existing
+// hooks — useVoiceLoop / useConverse / useHomeGreeting / useHomeDigest own all
+// the behaviour; `homeState` (pure) decides which of the three faces shows.
 export default function Home() {
   const { t } = useTranslation();
   const urdu = useIsUrdu();
   const { c } = useTheme();
+  const insets = useSafeAreaInsets();
   const { greetingFoot, name, greetingMessage, suggestions, balancePaisa } = useHomeGreeting();
   const [balanceRevealed, setBalanceRevealed] = useState(false);
   const [draft, setDraft] = useState('');
+  /** The composer input is opened by the keyboard icon (spec §1 rule 1). */
+  const [inputOpen, setInputOpen] = useState(false);
   // useConverse and useRecorder own native state and must exist before the loop
   // that drives them, so their callbacks are forwarded through this ref to the
   // loop's stable handlers (see useVoiceLoop's VoiceLoopHandlers).
@@ -39,15 +63,15 @@ export default function Home() {
     onError: () => loopRef.current?.onError(),
   });
   const { messages, status, sendText, appendLocal, playAudio } = converse;
-  // The proactive digest (spec §1 C): fetched + spoken on focus, rendered under
-  // the greeting bubble. Null whenever the setting is off or the 4 h rule says no.
+  // The proactive digest (spec §1 C): fetched + spoken on focus, rendered on the
+  // sheet. Null whenever the setting is off or the 4 h rule says no.
   const digestCard = useHomeDigest(playAudio);
   // F2: the post-PIN outcome sentence plays through THIS player, so the
   // hands-free loop sees `speaking` → audioStarted and onSpeechEnd →
   // audioEnded and re-arms the mic afterwards, exactly as the digest does.
   useRegisterOutcomePlayer(playAudio);
   const recorder = useRecorder((result) => loopRef.current?.onRecordingFinished(result));
-  const { recording } = recorder;
+  const { recording, level } = recorder;
   const { isOpen: pinSheetOpen } = usePinSheet();
   const loop = useVoiceLoop({ recorder, converse, pinSheetOpen });
   // Assigned in an effect, not during render — render must stay side-effect
@@ -57,14 +81,29 @@ export default function Home() {
     loopRef.current = loop.handlers;
   }, [loop.handlers]);
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  // Measured height of the composer block (VoiceStatusBar + input/mic row +
-  // hint line) so the scrollable content above it can reserve exactly that
-  // much bottom space — with a digest card on top of the suggestions, the
-  // greeting state's content can run long enough that its last card lands
-  // under the composer instead of stopping above it.
+  // Measured height of the floating block (optional input row + mic FAB) so the
+  // sheet's scrollable content reserves exactly that much bottom space and its
+  // last card stops above the mic instead of landing under it.
   const [composerBlockHeight, setComposerBlockHeight] = useState(0);
 
+  // Entrance choreography, once per mount (spec §3). The greeting words go
+  // first, the sheet settles behind the last word, then the rows cascade.
+  // Latched on the first render so the flip to false never replays anything.
+  const firstPaint = useFirstPaint();
+  // The greeting waits for the name — /me can resolve a beat after mount, and
+  // "Assalam o Alaikum, ." is not the line worth playing in word by word.
+  // WordRise arms on the first render where this is true and latches that text.
+  const greetingPaint = useFirstPaint(name.length > 0);
+  const choreo = useRef<{ sheet: number; rows: number } | null>(null);
+  if (choreo.current === null) {
+    const wordsEnd = firstPaint ? wordRiseEnd(splitWords(greetingMessage).length) : 0;
+    choreo.current = firstPaint ? { sheet: wordsEnd, rows: wordsEnd + D_SHEET } : { sheet: 0, rows: 0 };
+  }
+  /** Rows mounted after the entrance window (a digest landing) rise immediately. */
+  const rowDelay = (index: number) => (firstPaint ? choreo.current!.rows + index * STAGGER : 0);
+
   const live = loop.mode !== 'off';
+  const state = homeState({ mode: loop.mode, messageCount: messages.length, recording });
 
   const submitDraft = () => {
     const text = draft.trim();
@@ -74,147 +113,262 @@ export default function Home() {
     loop.onTextSend(text);
   };
 
-  const hasMessages = messages.length > 0;
-  const placeholder = recording ? t('home.hint.listening') : t('home.composerPlaceholder');
   // 'typed' ends the loop because the user took over by hand — no "conversation
   // ended" nudge is wanted there; 'limit' gets its own copy (the cost guard).
   const endedHint =
     loop.endedReason === 'limit' ? t('home.voice.endedLimit')
       : loop.endedReason && loop.endedReason !== 'typed' ? t('home.voice.ended')
         : null;
-  const hint = live
-    ? t('home.voice.hintLive')
-    : endedHint ?? (status === 'thinking' ? t('home.hint.thinking') : t('home.hint.tap'));
+
+  const onSuggestion = (intent: string) => (live ? loop.sendSuggestion(intent) : sendText(intent));
+  // The floating block (mic FAB, keyboard button, optional input) sits OVER the
+  // sheet, so everything scrollable inside the sheet has to reserve its height —
+  // otherwise the last suggestion card is unreadable and untappable under the
+  // mic. Measured via onLayout, floored at the FAB's own clearance plus whatever
+  // the safe area leaves between the sheet and the tab bar.
+  const bottomBlock = Math.max(composerBlockHeight, FAB_CLEARANCE + Math.max(insets.bottom, space.l));
+  const contentPadding = { paddingBottom: bottomBlock + space.m };
 
   return (
-    <Screen padded={false}>
-      <View style={{ paddingHorizontal: space.gutter }}>
-        <View
-          style={{
-            flexDirection: urdu ? 'row-reverse' : 'row',
-            alignItems: 'center', justifyContent: 'space-between',
-            paddingTop: space.s, paddingBottom: space.s,
-          }}
-        >
-          <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m }}>
-            <Avatar name={name || 'PAYO'} size={40} />
-            <View>
-              <Text variant="foot">{greetingFoot}</Text>
-              <Text variant="hl">{name}</Text>
-            </View>
-          </View>
-          <Pressable testID="home-balance-pill" onPress={() => setBalanceRevealed((s) => !s)} hitSlop={8}>
-            <Pill
-              height={36}
-              bg={c.surface}
-              color={c.ink}
-              icon={
-                balanceRevealed
-                  ? <EyeOff size={16} color={c.ink3} strokeWidth={2} />
-                  : <Eye size={16} color={c.ink3} strokeWidth={2} />
-              }
-              label={balanceRevealed ? (urdu ? ltrIsolate(formatPaisa(balancePaisa)) : formatPaisa(balancePaisa)) : '₨ ••••••'}
-            />
-          </Pressable>
-        </View>
-      </View>
+    <View style={{ flex: 1, backgroundColor: c.navy }}>
+      <NavyHead
+        name={name}
+        greetingFoot={greetingFoot}
+        greeting={greetingMessage}
+        // The conversation head drops the balance line (HomeConversation.dc.html).
+        balancePaisa={state === 'conversation' ? null : balancePaisa}
+        balanceRevealed={balanceRevealed}
+        onToggleBalance={() => setBalanceRevealed((s) => !s)}
+        status={headStatus(loop.mode, recording)}
+        level={level}
+        onStatusPress={loop.interrupt}
+        height={headHeight(state)}
+        urdu={urdu}
+        animateGreeting={greetingPaint}
+      />
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        {recording && !live ? (
-          // The full-screen listening takeover only applies to a legacy
-          // tap-per-turn recording. While a hands-free conversation is live the
-          // VoiceStatusBar above the composer carries the state instead, so the
-          // messages and suggestion cards stay reachable (spec §4 item 2).
-          <ListeningContent />
-        ) : hasMessages ? (
+      <Sheet
+        testID="home-sheet"
+        delay={choreo.current.sheet}
+        animate={firstPaint}
+        style={{ marginTop: -SHEET_OVERLAP }}
+      >
+        {state === 'conversation' ? (
           <FlatList
             ref={listRef}
             data={messages}
             keyExtractor={(m) => m.id}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-            contentContainerStyle={{
-              paddingHorizontal: space.gutter, paddingTop: space.m,
-              paddingBottom: space.m + composerBlockHeight, gap: space.s,
-            }}
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[{ paddingTop: space.s, gap: space.s }, contentPadding]}
             renderItem={({ item }) => <Bubble message={item} onChipTap={sendText} onAppendLocal={appendLocal} />}
             ListFooterComponent={status === 'thinking' ? <ThinkingBubble /> : null}
           />
-        ) : (
-          // Scrollable, not a plain View: the greeting + suggestions always fit,
-          // but a digest card (spec §1 rule 12) can add several rows on top.
-          // paddingBottom reserves the measured composer height so the last
-          // suggestion card scrolls fully clear of it instead of landing underneath.
+        ) : state === 'listening' ? (
+          // HomeListening.dc.html: the sheet is the transcript.
           <ScrollView
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{
-              paddingHorizontal: space.gutter, paddingTop: space.xs,
-              paddingBottom: space.m + composerBlockHeight, gap: space.m,
-            }}
+            contentContainerStyle={[{ gap: space.s }, contentPadding]}
           >
-            <Rise
-              style={{
-                flexDirection: urdu ? 'row-reverse' : 'row',
-                gap: 10, alignItems: 'flex-end',
-              }}
-            >
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.amber, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Sparkles size={19} color={c.navy} strokeWidth={2.2} />
-              </View>
-              <View
-                style={{
-                  flex: 1, backgroundColor: c.surface, borderRadius: radius.card,
-                  borderBottomLeftRadius: urdu ? radius.card : 6,
-                  borderBottomRightRadius: urdu ? 6 : radius.card,
-                  padding: space.l,
-                }}
-              >
-                <Text style={{ fontSize: 19, lineHeight: 27 }}>{greetingMessage}</Text>
-              </View>
-            </Rise>
-
+            <SheetLabel>{t('home.sheet.heard')}</SheetLabel>
+            <Card padding={0} style={{ paddingHorizontal: 14, paddingVertical: space.m }}>
+              <Text style={{ fontSize: 17, lineHeight: urdu ? undefined : 24 }} color={c.ink3}>
+                {t('home.hint.speak')}
+              </Text>
+            </Card>
+          </ScrollView>
+        ) : (
+          // Main.dc.html: "Since you were last here" (the digest card carries its
+          // own heading) then "Say it, or tap" over the suggestions.
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[{ gap: space.s }, contentPadding]}
+          >
             {digestCard ? (
-              <Rise delay={40}>
-                <CardView card={digestCard} onChipTap={(text) => (live ? loop.sendSuggestion(text) : sendText(text))} />
+              <Rise delay={rowDelay(0)}>
+                <CardView card={digestCard} onChipTap={onSuggestion} />
               </Rise>
             ) : null}
 
-            <View style={{ gap: space.s }}>
-              {suggestions.map((s, i) => (
-                <SuggestionCard
-                  key={s.key}
-                  suggestion={s}
-                  delay={(i + 1) * 60}
-                  // A suggestion tap keeps the conversation live (spec §1 rule 6).
-                  onPress={() => (live ? loop.sendSuggestion(s.intent) : sendText(s.intent))}
-                />
-              ))}
-            </View>
+            <SheetLabel>{t('home.sheet.sayOrTap')}</SheetLabel>
+
+            {suggestions.map((s, i) => (
+              <SuggestionCard
+                key={s.key}
+                suggestion={s}
+                delay={rowDelay(i + 1)}
+                // A suggestion tap keeps the conversation live (spec §1 rule 6).
+                onPress={() => onSuggestion(s.intent)}
+              />
+            ))}
           </ScrollView>
         )}
+      </Sheet>
 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        pointerEvents="box-none"
+        style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end' }]}
+      >
         <View
-          style={{ paddingHorizontal: space.gutter, paddingBottom: space.s, paddingTop: space.s }}
+          pointerEvents="box-none"
+          style={{
+            paddingHorizontal: space.xxl,
+            paddingBottom: Math.max(insets.bottom, space.l),
+            gap: space.s,
+          }}
           onLayout={(e) => setComposerBlockHeight(e.nativeEvent.layout.height)}
         >
-          {live ? <VoiceStatusBar mode={loop.mode} onInterrupt={loop.interrupt} style={{ marginBottom: space.s }} /> : null}
-          <Composer
-            value={draft}
-            onChangeText={setDraft}
-            onSubmit={submitDraft}
-            placeholder={placeholder}
-            hint={hint}
-            live={live}
-            onMicPress={loop.start}
-            onStopListening={() => loop.stop('user')}
-          />
+          {endedHint ? <Text variant="foot" center>{endedHint}</Text> : null}
+
+          {inputOpen ? (
+            <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.s }}>
+              <Input
+                autoFocus
+                value={draft}
+                onChangeText={setDraft}
+                onSubmitEditing={submitDraft}
+                placeholder={t('home.composerPlaceholder')}
+                returnKeyType="send"
+                containerStyle={{ flex: 1, borderRadius: radius.button }}
+              />
+              <RoundButton
+                testID="composer-send"
+                label={t('home.composerPlaceholder')}
+                bg={c.amber}
+                onPress={submitDraft}
+              >
+                <Send size={20} color={c.navy} strokeWidth={2.4} />
+              </RoundButton>
+            </View>
+          ) : null}
+
+          {/* HomeUrdu.dc.html keeps the mic bottom-RIGHT in Urdu too, so this
+              row is the one thing on Home that does not mirror. */}
+          <View pointerEvents="box-none" style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <RoundButton
+              testID="composer-keyboard"
+              label={t('home.hint.askPayo')}
+              bg={c.surface}
+              onPress={() => setInputOpen((s) => !s)}
+              style={shadow.card.light}
+            >
+              <IconSwap
+                active={inputOpen}
+                size={22}
+                from={<KeyboardIcon size={22} color={c.ink2} strokeWidth={2} />}
+                to={<X size={22} color={c.ink2} strokeWidth={2} />}
+              />
+            </RoundButton>
+            <View style={{ flex: 1 }} />
+            <MicFab
+              live={live}
+              listening={loop.mode === 'listening'}
+              onPress={() => (live ? loop.stop('user') : loop.start())}
+            />
+          </View>
         </View>
       </KeyboardAvoidingView>
-    </Screen>
+    </View>
   );
 }
 
+/** The uppercase sheet section label — Main.dc.html "SINCE YOU WERE LAST HERE" /
+ *  "SAY IT, OR TAP": 12/600, .08em tracking, ink3. */
+function SheetLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text variant="cap" style={{ letterSpacing: 0.96, marginTop: space.xs }}>{children}</Text>
+  );
+}
+
+/** The amber mic (Main.dc.html): 64 pt, bottom-right, amber glow. Rings only
+ *  while the loop is actually listening (spec §3) — nothing loops otherwise. */
+function MicFab({ live, listening, onPress }: { live: boolean; listening: boolean; onPress: () => void }) {
+  const { c } = useTheme();
+  const { t } = useTranslation();
+  const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
+
+  return (
+    <View style={{ width: FAB_SIZE, height: FAB_SIZE }}>
+      {listening ? (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <ListeningRings size={FAB_SIZE} color={c.amber} />
+        </View>
+      ) : null}
+      <AnimatedPressable
+        testID={live ? 'composer-stop-listening' : 'composer-mic'}
+        accessibilityRole="button"
+        accessibilityLabel={live ? t('home.voice.hintLive') : t('home.hint.tap')}
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => {});
+          onPress();
+        }}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={[
+          {
+            width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2,
+            backgroundColor: c.amber, alignItems: 'center', justifyContent: 'center',
+            shadowColor: 'rgba(242,169,59,1)',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.45,
+            shadowRadius: 20,
+            elevation: 6,
+          },
+          pressStyle,
+        ]}
+      >
+        <IconSwap
+          active={live}
+          size={28}
+          from={<Mic size={28} color={c.navy} strokeWidth={2.4} />}
+          to={<X size={26} color={c.navy} strokeWidth={2.6} />}
+        />
+      </AnimatedPressable>
+    </View>
+  );
+}
+
+function RoundButton({ testID, label, bg, onPress, children, style }: {
+  testID: string;
+  label: string;
+  bg: string;
+  onPress: () => void;
+  children: React.ReactNode;
+  style?: import('react-native').StyleProp<import('react-native').ViewStyle>;
+}) {
+  const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
+  return (
+    <AnimatedPressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={[
+        {
+          width: KEY_BUTTON, height: KEY_BUTTON, borderRadius: KEY_BUTTON / 2,
+          backgroundColor: bg, alignItems: 'center', justifyContent: 'center',
+          minWidth: touch.min, minHeight: touch.min,
+        },
+        style,
+        pressStyle,
+      ]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+}
+
+/** Main.dc.html suggestion row: white card radius 18, 40 pt amber icon tile,
+ *  15/600 title over a 13 pt subtitle, chevron. */
 function SuggestionCard({ suggestion, delay, onPress }: { suggestion: Suggestion; delay: number; onPress: () => void }) {
   const { c } = useTheme();
   const urdu = useIsUrdu();
@@ -223,6 +377,7 @@ function SuggestionCard({ suggestion, delay, onPress }: { suggestion: Suggestion
   // press is still being handled (run() also gates this, but this keeps the
   // card itself from looking like it accepts repeat taps).
   const [pressed, setPressed] = useState(false);
+  const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
   const handlePress = () => {
     if (pressed) return;
     setPressed(true);
@@ -230,34 +385,40 @@ function SuggestionCard({ suggestion, delay, onPress }: { suggestion: Suggestion
   };
   return (
     <Rise delay={delay}>
-      <Pressable
+      <AnimatedPressable
         testID={`home-suggestion-${suggestion.key}`}
         accessibilityRole="button"
         onPress={handlePress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         disabled={pressed}
+        style={pressStyle}
       >
         <Card
           padding={0}
           style={{
-            minHeight: 64,
-            paddingHorizontal: space.l, paddingVertical: 10,
+            borderRadius: radius.tile,
+            paddingHorizontal: 14, paddingVertical: space.m,
             flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m,
+            minHeight: touch.min + 2 * space.m,
           }}
         >
-          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon size={22} color={c.onAmber} strokeWidth={2.2} />
+          <View style={{ width: 40, height: 40, borderRadius: space.m, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon size={20} color={c.onAmber} strokeWidth={2} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="hl">{suggestion.title}</Text>
+            <Text variant="hl" style={{ fontSize: 15, lineHeight: urdu ? undefined : 19 }}>{suggestion.title}</Text>
             <Text variant="foot" numberOfLines={1}>{suggestion.subtitle}</Text>
           </View>
-          <ChevronRight size={20} color={c.ink3} strokeWidth={2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />
+          <ChevronRight size={18} color={c.ink3} strokeWidth={2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />
         </Card>
-      </Pressable>
+      </AnimatedPressable>
     </Rise>
   );
 }
 
+// HomeConversation.dc.html: the user's turn is a navy bubble (max 78%, radius
+// 20/20/4/20); an assistant turn is 86% wide and carries its cards.
 function Bubble({ message, onChipTap, onAppendLocal }: {
   message: ChatMessage;
   onChipTap: (t: string) => void;
@@ -275,20 +436,20 @@ function Bubble({ message, onChipTap, onAppendLocal }: {
     <View style={{ alignItems: align }}>
       <View
         style={{
-          maxWidth: '86%',
-          backgroundColor: isError ? c.redTint : isUser ? c.navy : c.surface,
+          maxWidth: isUser ? '78%' : '86%',
+          width: isUser ? undefined : '86%',
+          backgroundColor: isError ? c.redTint : isUser ? c.navy : 'transparent',
           borderRadius: radius.card,
-          borderBottomLeftRadius: !tailOnRight ? 6 : radius.card,
-          borderBottomRightRadius: tailOnRight ? 6 : radius.card,
-          paddingHorizontal: space.l, paddingVertical: space.m,
+          borderBottomLeftRadius: !tailOnRight ? 4 : radius.card,
+          borderBottomRightRadius: tailOnRight ? 4 : radius.card,
+          paddingHorizontal: isUser || isError ? 14 : 0,
+          paddingVertical: isUser || isError ? 10 : 0,
         }}
       >
         {isError && <Text variant="sub" weight={700} color={c.red}>{t('voice.errorPrefix')}</Text>}
         {/* A card-carrying assistant turn renders its cards only — see showBubbleText. */}
         {message.text && showBubbleText(message) ? (
-          <Text style={{ fontSize: 16, lineHeight: 22 }} color={isError ? c.red : isUser ? c.white : c.ink}>
-            {message.text}
-          </Text>
+          <AssistantText message={message} isUser={isUser} isError={isError} />
         ) : null}
         {message.cards.map((card, i) => (
           <CardView
@@ -304,29 +465,44 @@ function Bubble({ message, onChipTap, onAppendLocal }: {
   );
 }
 
+/** An assistant line with no card of its own still needs the white bubble the
+ *  artboard gives it; the user's line is already inside its navy pill. */
+function AssistantText({ message, isUser, isError }: { message: ChatMessage; isUser: boolean; isError: boolean }) {
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  const body = (
+    <Text
+      style={{ fontSize: 15, lineHeight: urdu ? undefined : 21 }}
+      color={isError ? c.red : isUser ? c.white : c.ink}
+    >
+      {message.text}
+    </Text>
+  );
+  if (isUser || isError) return body;
+  return (
+    <Card
+      padding={0}
+      style={{
+        paddingHorizontal: 14, paddingVertical: space.m,
+        borderBottomLeftRadius: urdu ? radius.card : 4,
+        borderBottomRightRadius: urdu ? 4 : radius.card,
+        marginBottom: message.cards.length ? space.s : 0,
+        alignSelf: urdu ? 'flex-end' : 'flex-start',
+      }}
+    >
+      {body}
+    </Card>
+  );
+}
+
 function ThinkingBubble() {
   const urdu = useIsUrdu();
   const { c } = useTheme();
   return (
-    <View style={{ alignItems: urdu ? 'flex-end' : 'flex-start', paddingHorizontal: space.gutter }}>
-      <View style={{ backgroundColor: c.surface, borderRadius: radius.card, paddingHorizontal: space.l, paddingVertical: space.m }}>
+    <View style={{ alignItems: urdu ? 'flex-end' : 'flex-start' }}>
+      <Card padding={0} style={{ paddingHorizontal: 14, paddingVertical: space.m }}>
         <TypingDots color={c.ink3} />
-      </View>
-    </View>
-  );
-}
-
-function ListeningContent() {
-  const { t } = useTranslation();
-  const { c } = useTheme();
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.l, paddingHorizontal: space.xxl }}>
-      <WaveBars color={c.amber} />
-      <Text variant="h2" center>{t('home.hint.listening')}</Text>
-      <Card style={{ maxWidth: 320 }}>
-        <Text center style={{ fontSize: 19, lineHeight: 27 }}>{t('home.hint.speak')}</Text>
       </Card>
-      <Text variant="foot" center>{t('home.hint.listeningFootnote')}</Text>
     </View>
   );
 }

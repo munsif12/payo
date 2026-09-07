@@ -1,11 +1,11 @@
 import React from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Plus } from 'lucide-react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { Screen, Text, ListRow, Pill, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, ListRow, Pill, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
 import { usePressScale } from '../../src/motion/usePressScale';
@@ -55,58 +55,108 @@ export default function Requests() {
     router.push({ pathname: '/confirm/[actionId]', params: { actionId: action.id } });
   };
 
+  const items = data?.items ?? [];
+  const incoming = items.filter((x) => x.direction === 'incoming');
+  const outgoing = items.filter((x) => x.direction === 'outgoing');
+
+  const requestRow = (item: RequestDto, isLast: boolean) => (
+    <ListRow
+      key={item.id}
+      testID={`request-${item.id}`}
+      separator={!isLast}
+      left={
+        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: item.direction === 'incoming' ? c.amberTint : c.surface2, alignItems: 'center', justifyContent: 'center' }}>
+          {item.direction === 'incoming'
+            ? <ArrowDownLeft size={20} color={c.navy} strokeWidth={2} />
+            : <ArrowUpRight size={20} color={c.navy} strokeWidth={2} />}
+        </View>
+      }
+      title={urdu && item.counterparty.urduName ? item.counterparty.urduName : item.counterparty.name}
+      subtitle={item.note ?? undefined}
+      right={
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+          <Text variant="hl">{formatPaisa(item.amountPaisa)}</Text>
+          {item.direction === 'incoming' && item.status === 'pending' ? (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <MiniButton testID={`approve-${item.id}`} label={t('requests.approve')} onPress={() => onApprove(item.id)} />
+              <MiniButton testID={`decline-${item.id}`} label={t('requests.decline')} danger onPress={() => decline(item.id)} />
+            </View>
+          ) : (
+            <Pill label={t(`requests.${item.status}`)} bg={c.surface2} color={c[STATUS_COLOR[item.status]]} height={22} />
+          )}
+        </View>
+      }
+    />
+  );
+
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: space.l, marginBottom: space.l }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m }}>
+      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: space.l, marginBottom: space.l }}>
+        <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m }}>
           <Pressable testID="requests-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-            <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
+            <ChevronLeft size={24} color={c.ink} strokeWidth={2} />
           </Pressable>
-          <Text variant="h1">{t('requests.title')}</Text>
+          <Text variant="h2">{t('requests.title')}</Text>
         </View>
-        <MiniButton testID="requests-new" label={t('requests.new')} icon={<Plus size={16} color={c.navy} strokeWidth={2.4} />} onPress={() => router.push('/requests/new')} />
+        <HeaderPill testID="requests-new" label={t('requests.new')} onPress={() => router.push('/requests/new')} />
       </View>
 
-      <FlatList
-        data={data?.items ?? []}
-        keyExtractor={(x) => x.id}
-        refreshing={isFetching}
-        onRefresh={refetch}
-        ListHeaderComponent={
-          approvalItems.length
-            ? <CardView card={approvalsCard as unknown as ChatCard} />
-            : null
-        }
-        ListEmptyComponent={<Text variant="sub" center style={{ marginTop: space.xxl }}>{t('requests.empty')}</Text>}
-        renderItem={({ item }) => (
-          <ListRow
-            testID={`request-${item.id}`}
-            left={
-              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center' }}>
-                {item.direction === 'incoming'
-                  ? <ArrowDownLeft size={20} color={c.green} strokeWidth={2.2} />
-                  : <ArrowUpRight size={20} color={c.ink2} strokeWidth={2.2} />}
-              </View>
-            }
-            title={urdu && item.counterparty.urduName ? item.counterparty.urduName : item.counterparty.name}
-            subtitle={item.note ?? undefined}
-            right={
-              <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                <Text variant="hl">{formatPaisa(item.amountPaisa)}</Text>
-                {item.direction === 'incoming' && item.status === 'pending' ? (
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <MiniButton testID={`approve-${item.id}`} label={t('requests.approve')} onPress={() => onApprove(item.id)} />
-                    <MiniButton testID={`decline-${item.id}`} label={t('requests.decline')} danger onPress={() => decline(item.id)} />
-                  </View>
-                ) : (
-                  <Pill label={t(`requests.${item.status}`)} bg={c.surface2} color={c[STATUS_COLOR[item.status]]} height={22} />
-                )}
-              </View>
-            }
-          />
-        )}
-      />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
+        contentContainerStyle={{ gap: space.m, paddingBottom: space.xl }}
+      >
+        {approvalItems.length ? <CardView card={approvalsCard as unknown as ChatCard} /> : null}
+
+        {incoming.length ? (
+          <View>
+            <Text variant="cap" style={{ marginBottom: 4 }}>{t('requests.incoming')}</Text>
+            <Card padding={0} style={{ paddingHorizontal: space.l }}>
+              {incoming.map((item, i) => requestRow(item, i === incoming.length - 1))}
+            </Card>
+          </View>
+        ) : null}
+
+        {outgoing.length ? (
+          <View>
+            <Text variant="cap" style={{ marginBottom: 4 }}>{t('requests.outgoing')}</Text>
+            <Card padding={0} style={{ paddingHorizontal: space.l }}>
+              {outgoing.map((item, i) => requestRow(item, i === outgoing.length - 1))}
+            </Card>
+          </View>
+        ) : null}
+
+        {!approvalItems.length && !items.length ? (
+          <Text variant="sub" center style={{ marginTop: space.xxl }}>{t('requests.empty')}</Text>
+        ) : null}
+      </ScrollView>
     </Screen>
+  );
+}
+
+// Requests.dc.html header pill: amber, 36pt tall, "+ Request money".
+function HeaderPill({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) {
+  const { c } = useTheme();
+  const { style, onPressIn, onPressOut } = usePressScale();
+  return (
+    <AnimatedPressable
+      testID={testID}
+      accessibilityRole="button"
+      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+      onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress(); }}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={[
+        {
+          height: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: c.amber,
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+        },
+        style,
+      ]}
+    >
+      <Plus size={14} color={c.navy} strokeWidth={2.6} />
+      <Text variant="foot" weight={700} color={c.navy} style={{ lineHeight: undefined }}>{label}</Text>
+    </AnimatedPressable>
   );
 }
 

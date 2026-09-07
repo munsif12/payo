@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Send, Zap, Wallet, Smartphone, FileText, type LucideIcon } from 'lucide-react-native';
 import { useMeQuery, useDueBillsQuery } from '../api/client';
-import { greetingBucket, billSubtitle, type Translate } from './homeGreetingLogic';
+import { greetingBucket, billSubtitle, firstName, type Translate } from './homeGreetingLogic';
 import type { DueBill } from '../api/types';
 
-export { greetingBucket, billSubtitle };
+export { greetingBucket, billSubtitle, firstName };
 
 export interface Suggestion {
   key: 'send' | 'bill' | 'balance' | 'topup' | 'statement';
@@ -66,7 +66,8 @@ export function useHomeGreeting() {
   return {
     greetingFoot: t(`home.greeting.${bucket}`),
     name,
-    greetingMessage: t('home.greeting.hello', { name }),
+    // The head's name row keeps the full name; the greeting line uses the first.
+    greetingMessage: t('home.greeting.hello', { name: firstName(name) }),
     suggestions,
     balancePaisa: me?.account.balancePaisa ?? 0,
   };

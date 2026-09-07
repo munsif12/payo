@@ -14,6 +14,13 @@ export function greetingBucket(hour: number): GreetingBucket {
   return 'evening';
 }
 
+/** Main.dc.html greets on FIRST name only — "Assalam o Alaikum, Ammi." — while
+ *  the row above it keeps the full name ("Ammi Jaan"). Whitespace-only or empty
+ *  names give '', so the caller can tell the name has not arrived yet. */
+export function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? '';
+}
+
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 /** The bill suggestion's subtitle: the first due bill (biller + amount +

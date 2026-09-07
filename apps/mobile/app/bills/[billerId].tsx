@@ -53,7 +53,7 @@ export default function BillLookupScreen() {
         <Pressable testID="bill-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
           <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
         </Pressable>
-        <Text variant="h2" weight={800}>{urduName || name}</Text>
+        <Text variant="h2">{urduName || name}</Text>
       </View>
 
       <View style={{ gap: space.m }}>

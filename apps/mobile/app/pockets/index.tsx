@@ -3,9 +3,11 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } fr
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Plus } from 'lucide-react-native';
+import Animated from 'react-native-reanimated';
 import { Screen, Text, Card, Input, Button, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space, radius } from '../../src/theme/tokens';
+import { space, radius, touch } from '../../src/theme/tokens';
+import { usePressScale } from '../../src/motion/usePressScale';
 import { usePocketsQuery, usePocketMoveMutation, apiErr } from '../../src/api/client';
 import { holdAction } from '../../src/store/pendingActionHolder';
 import { formatPaisa } from '../../src/lib/money';
@@ -44,9 +46,9 @@ export default function Pockets() {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: space.l, marginBottom: space.l }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m }}>
           <Pressable testID="pockets-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-            <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
+            <ChevronLeft size={24} color={c.ink} strokeWidth={2} />
           </Pressable>
-          <Text variant="h2" weight={800}>{t('pockets.title')}</Text>
+          <Text variant="h2">{t('pockets.title')}</Text>
         </View>
         <Pressable
           testID="pocket-new"
@@ -62,7 +64,9 @@ export default function Pockets() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
         <Card style={{ backgroundColor: c.navy }}>
           <Text variant="cap" color="rgba(255,255,255,0.6)">{t('pockets.totalSaved')}</Text>
-          <Text variant="money" color={c.white} style={{ marginTop: 4 }}>{ltrIsolate(formatPaisa(totalPaisa))}</Text>
+          <Text variant="money" weight={800} color={c.white} style={{ fontSize: 36, lineHeight: 42, marginTop: 4 }}>
+            {ltrIsolate(formatPaisa(totalPaisa))}
+          </Text>
           <Text variant="foot" color="rgba(255,255,255,0.6)" style={{ marginTop: 4 }}>
             {t('pockets.totalSavedFoot', { count: pockets.length })}
           </Text>
@@ -89,8 +93,8 @@ export default function Pockets() {
 
               {p.goalPaisa ? (
                 <View style={{ gap: 6 }}>
-                  <View style={{ height: 8, borderRadius: 4, backgroundColor: c.surface2, overflow: 'hidden' }}>
-                    <View style={{ width: `${pct * 100}%`, height: 8, borderRadius: 4, backgroundColor: c.amber }} />
+                  <View style={{ height: 6, borderRadius: 3, backgroundColor: c.surface2, overflow: 'hidden' }}>
+                    <View style={{ width: `${pct * 100}%`, height: 6, borderRadius: 3, backgroundColor: c.amber }} />
                   </View>
                   <Text variant="foot">{t('pockets.pctThere', { pct: Math.round(pct * 100) })}</Text>
                 </View>
@@ -98,7 +102,7 @@ export default function Pockets() {
 
               <View style={{ flexDirection: 'row', gap: space.s }}>
                 <View style={{ flex: 1 }}>
-                  <Button testID={`pocket-deposit-${p.id}`} variant="secondary" label={t('pockets.deposit')} onPress={() => setMove({ pocket: p, op: 'deposit' })} />
+                  <Button testID={`pocket-deposit-${p.id}`} label={t('pockets.deposit')} onPress={() => setMove({ pocket: p, op: 'deposit' })} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Button testID={`pocket-withdraw-${p.id}`} variant="secondary" label={t('pockets.withdraw')} onPress={() => setMove({ pocket: p, op: 'withdraw' })} />
@@ -108,11 +112,10 @@ export default function Pockets() {
           );
         })}
 
-        <Button
+        <TertiaryButton
           testID="pocket-new-bottom"
-          variant="secondary"
           label={t('pockets.new')}
-          icon={<Plus size={20} color={c.ink} strokeWidth={2.4} />}
+          icon={<Plus size={20} color={c.white} strokeWidth={2} />}
           onPress={() => router.push('/pockets/new')}
         />
       </ScrollView>
@@ -131,5 +134,41 @@ export default function Pockets() {
         </KeyboardAvoidingView>
       </Modal>
     </Screen>
+  );
+}
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// Pockets.dc.html "New pocket": a navy-filled pill — the app's third button
+// weight (primary amber / secondary cream / this, tertiary navy) alongside
+// the shared Button component's variants.
+function TertiaryButton({ label, icon, onPress, testID }: {
+  label: string;
+  icon?: React.ReactNode;
+  onPress: () => void;
+  testID?: string;
+}) {
+  const { c } = useTheme();
+  const { style, onPressIn, onPressOut } = usePressScale();
+  return (
+    <AnimatedPressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={[
+        {
+          height: touch.primary, minHeight: touch.min, borderRadius: radius.button,
+          backgroundColor: c.navy, alignItems: 'center', justifyContent: 'center',
+          flexDirection: 'row', gap: 8,
+        },
+        style,
+      ]}
+    >
+      {icon}
+      <Text variant="hl" weight={700} color={c.white}>{label}</Text>
+    </AnimatedPressable>
   );
 }

@@ -65,8 +65,12 @@ export async function statementPdf(req: Request, res: Response) {
     userId: req.userId, createdAt: { $gte: from, $lt: to },
   }).sort({ createdAt: 1 });
 
+  const statementRef = `STMT-${st.year}${st.month ? '-' + String(st.month).padStart(2, '0') : ''}-${String(st._id).slice(-6).toUpperCase()}`;
+
   const pdf = await buildStatementPdf({
     holderName: user?.name ?? 'PAYO user',
+    phone: user?.phone ?? '',
+    statementRef,
     periodLabel: periodLabel(st.year, st.month ?? undefined).en,
     summary: {
       totalInPaisa: st.totalInPaisa, totalOutPaisa: st.totalOutPaisa,
@@ -75,7 +79,7 @@ export async function statementPdf(req: Request, res: Response) {
     },
     transactions: txns.map(t => ({
       createdAt: (t as unknown as { createdAt: Date }).createdAt, type: t.type, direction: t.direction as 'in' | 'out',
-      amountPaisa: t.amountPaisa, counterpartyName: t.counterparty!.name,
+      category: t.category, amountPaisa: t.amountPaisa, counterpartyName: t.counterparty!.name,
     })),
   });
   res.setHeader('Content-Type', 'application/pdf');

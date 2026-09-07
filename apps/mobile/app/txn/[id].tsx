@@ -45,7 +45,7 @@ export default function Receipt() {
         <Pressable testID="receipt-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
           <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
         </Pressable>
-        <Text variant="h2" weight={800}>{t('activity.receipt')}</Text>
+        <Text variant="h2">{t('activity.receipt')}</Text>
       </View>
 
       <View style={{ alignItems: 'center', gap: 10, paddingBottom: space.l }}>

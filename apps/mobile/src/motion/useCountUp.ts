@@ -7,14 +7,14 @@ import {
   Easing,
 } from 'react-native-reanimated';
 import { useReducedMotion } from './useReducedMotion';
-import { COUNT_MS } from './config';
+import { COUNT_UP, EASE_OUT } from './config';
 
-const easeOut = Easing.out(Easing.ease);
+const easeOut = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
 
 // Balance update — digits count from the previous value to the new one over
-// 250ms ease-out. Motion.dc.html "Balance update" row. Returns the current
+// COUNT_UP ms ease-out (spec §3). Tabular figures come from Text's `money` variant. Returns the current
 // (possibly mid-animation) paisa value to render with formatPaisa().
-export function useCountUp(paisa: number, durationMs = COUNT_MS): number {
+export function useCountUp(paisa: number, durationMs = COUNT_UP): number {
   const reducedMotion = useReducedMotion();
   const shared = useSharedValue(paisa);
   const first = useRef(true);

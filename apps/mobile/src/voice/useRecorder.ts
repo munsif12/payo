@@ -3,7 +3,12 @@ import {
   AudioModule, RecordingPresets, setAudioModeAsync,
   useAudioRecorder, useAudioRecorderState,
 } from 'expo-audio';
+import { useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 import { silenceDecision } from './silence';
+import { levelFromDb, smoothLevel } from '../motion/waveformLevel';
+import { D_UI, D_MICRO, EASE_OUT } from '../motion/config';
+
+const easeOut = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
 
 export interface RecordingResult {
   uri: string;
@@ -22,6 +27,12 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
   const hadSpeech = useRef(false);
   const startedAt = useRef(0);
   const stopping = useRef(false);
+  // 0..1 mic level for the listening Waveform (spec §3: "the waveform is real").
+  // A SHARED value, not React state: metering polls every 300 ms and the bars
+  // must not cost a render each time. Smoothed in JS (expo-audio's polls are
+  // coarse and jumpy) and then eased into on the UI thread.
+  const level = useSharedValue(0);
+  const smoothed = useRef(0);
   const finishedRef = useRef(onFinished);
   finishedRef.current = onFinished;
 
@@ -57,7 +68,12 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
 
   // Auto-stop: watch the metered level while recording and apply silenceDecision.
   useEffect(() => {
-    if (!state.isRecording || stopping.current) return;
+    if (!state.isRecording) {
+      smoothed.current = 0;
+      level.value = withTiming(0, { duration: D_MICRO, easing: easeOut });
+      return;
+    }
+    if (stopping.current) return;
     const result = silenceDecision({
       now: Date.now(),
       startedAt: startedAt.current,
@@ -67,6 +83,8 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
     });
     hadSpeech.current = result.hadSpeech;
     silenceSince.current = result.silenceSince;
+    smoothed.current = smoothLevel(smoothed.current, levelFromDb(state.metering ?? -160));
+    level.value = withTiming(smoothed.current, { duration: D_UI, easing: easeOut });
     if (result.decision === 'stop') stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.isRecording, state.metering, state.durationMillis]);
@@ -93,5 +111,5 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { recording: state.isRecording, start, stop };
+  return { recording: state.isRecording, level, start, stop };
 }

@@ -130,7 +130,7 @@ export default function Activity() {
         <Pressable testID="activity-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
           <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
         </Pressable>
-        <Text variant="h2" weight={800}>{t('activity.title')}</Text>
+        <Text variant="h2">{t('activity.title')}</Text>
       </View>
 
       <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s, marginBottom: space.l, flexWrap: 'wrap' }}>

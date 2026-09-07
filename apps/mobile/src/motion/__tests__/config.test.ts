@@ -1,39 +1,31 @@
 import {
-  RISE_MS,
-  STAGGER_MS,
-  BREATHE_MS,
-  RING_MS,
-  DOTS_MS,
-  COUNT_MS,
-  SHAKE_PX,
-  SHAKE_MS,
-  PRESS_SCALE,
-  PRESS_MS,
-  PIN_DOT_MS,
-  WAVE_BARS_MS,
-  DOTS_OFFSET_MS,
-  RING_OFFSET_MS,
-  BREATHE_SCALE,
-  RING_SCALE_TO,
+  EASE_OUT, EASE_IN, D_MICRO, D_UI, D_ENTER, D_SHEET,
+  STAGGER, WORD_STEP, PRESS_SCALE, RINGS, COUNT_UP, ICON_SWAP,
 } from '../config';
+import * as config from '../config';
 
-// Values pinned to docs/design/revamp-v1/Motion.dc.html — see keyframes block
-// and the motion-spec table on that artboard.
-test('motion timing constants match Motion.dc.html', () => {
-  expect(RISE_MS).toBe(300);
-  expect(STAGGER_MS).toBe(60);
-  expect(BREATHE_MS).toBe(2400);
-  expect(RING_MS).toBe(1800);
-  expect(DOTS_MS).toBe(1200);
-  expect(COUNT_MS).toBe(250);
-  expect(SHAKE_PX).toBe(4);
-  expect(SHAKE_MS).toBe(200);
-  expect(PRESS_SCALE).toBe(0.98);
-  expect(PRESS_MS).toBe(100);
-  expect(PIN_DOT_MS).toBe(150);
-  expect(WAVE_BARS_MS).toBe(900);
-  expect(DOTS_OFFSET_MS).toBe(150);
-  expect(RING_OFFSET_MS).toBe(600);
-  expect(BREATHE_SCALE).toBe(1.04);
-  expect(RING_SCALE_TO).toBe(2.1);
+// Values pinned to docs/2026-09-07-payo-v7-ai-first-ui-design.md §3.
+test('motion tokens match the v7 motion spec', () => {
+  expect(EASE_OUT).toEqual([0.2, 0, 0, 1]);
+  expect(EASE_IN).toEqual([0.4, 0, 1, 1]);
+  expect(D_MICRO).toBe(150);
+  expect(D_UI).toBe(220);
+  expect(D_ENTER).toBe(300);
+  expect(D_SHEET).toBe(320);
+  expect(STAGGER).toBe(60);
+  expect(WORD_STEP).toBe(55);
+  expect(PRESS_SCALE).toBe(0.96);
+  expect(RINGS).toEqual({ duration: 1800, scaleTo: 2.1, opacityFrom: 0.5, offset: 600 });
+  expect(COUNT_UP).toBe(250);
+  expect(ICON_SWAP).toEqual({ scaleFrom: 0.25 });
+});
+
+// The spec makes config.ts the single source: anything else that creeps in here
+// is a screen-specific number that belongs at its use site.
+test('config exports exactly the v7 token set', () => {
+  expect(Object.keys(config).sort()).toEqual([
+    'COUNT_UP', 'D_ENTER', 'D_MICRO', 'D_SHEET', 'D_UI',
+    'EASE_IN', 'EASE_OUT', 'ICON_SWAP', 'PRESS_SCALE', 'RINGS',
+    'STAGGER', 'WORD_STEP',
+  ]);
 });

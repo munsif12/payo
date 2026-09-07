@@ -25,7 +25,7 @@ export default function Profile() {
         <Pressable testID="profile-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
           <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
         </Pressable>
-        <Text variant="h2" weight={800}>{t('profile.title')}</Text>
+        <Text variant="h2">{t('profile.title')}</Text>
       </View>
 
       <Card style={{ alignItems: 'center', gap: space.s }}>

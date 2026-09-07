@@ -1,40 +1,49 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Switch, View } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Check, Share2 } from 'lucide-react-native';
-import { Screen, Text, Button, Pill, Input, useIsUrdu } from '../src/ui';
+import { Check, Mic, Share2 } from 'lucide-react-native';
+import { Screen, Text, Card, Button, Pill, Input, useIsUrdu } from '../src/ui';
 import { useTheme } from '../src/theme/useTheme';
 import { space } from '../src/theme/tokens';
-import { useReducedMotion } from '../src/motion/useReducedMotion';
-import { SUCCESS_CHECK_MS, SUCCESS_TEXT_MS, RISE_TRANSLATE_Y, EASE_OUT } from '../src/motion/config';
+import { IconSwap, useRise, useCountUp, motionConfig } from '../src/motion';
 import { formatPaisa } from '../src/lib/money';
 import { useCreateRecipientMutation, useCreateSavedBillerMutation, apiErr } from '../src/api/client';
+import { outcomeSpeech } from '../src/voice/outcomeSpeech';
 import type { RecipientSuggestion, BillerSuggestion, Txn } from '../src/api/types';
 import { useOutcomeSpeech } from '../src/voice/OutcomeSpeechProvider';
 
-const easeInOut = Easing.inOut(Easing.ease);
-const easeOut = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
+const { D_UI } = motionConfig;
+/** Success.dc.html: an 88pt greenTint circle around the check glyph. */
+const CHECK_SIZE = 88;
 
 function parseJson<T>(raw?: string): T | null {
   if (!raw) return null;
   try { return JSON.parse(raw) as T; } catch { return null; }
 }
 
+// Success — Success.dc.html: the check lands first (IconSwap, once), then the
+// amount/recipient/reference/spoken-line block rises D_UI behind it (spec §3
+// "check draws + lands first, then amount and ref rise"). Both primitives
+// already honour reduced motion and the UI-thread-only rule on their own.
 export default function Success() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { c } = useTheme();
   const urdu = useIsUrdu();
   const router = useRouter();
   const { refNo, amountPaisa, summary, txn: txnRaw, recipientSuggestion: recipientSuggestionRaw, billerSuggestion: billerSuggestionRaw } =
     useLocalSearchParams<{ refNo: string; amountPaisa: string; summary?: string; txn?: string; recipientSuggestion?: string; billerSuggestion?: string }>();
-  const reducedMotion = useReducedMotion();
-  const checkProgress = useSharedValue(reducedMotion ? 1 : 0);
-  // Text block rises SUCCESS_TEXT_MS after the check lands at SUCCESS_CHECK_MS
-  // (Motion.dc.html "Success": "check draws + lands first, then amount and ref rise").
-  const textProgress = useSharedValue(reducedMotion ? 1 : 0);
+
+  // Flips false → true right after mount, so IconSwap actually animates the
+  // check "in" instead of starting already-settled — a one-shot entrance,
+  // never replayed (this component only ever mounts once per transaction).
+  const [checkIn, setCheckIn] = useState(false);
+  useEffect(() => { setCheckIn(true); }, []);
+  const textStyle = useRise(D_UI);
+
+  const countedAmount = useCountUp(Number(amountPaisa || 0));
 
   const recipientSuggestion = useMemo(() => parseJson<RecipientSuggestion>(recipientSuggestionRaw), [recipientSuggestionRaw]);
   const billerSuggestion = useMemo(() => parseJson<BillerSuggestion>(billerSuggestionRaw), [billerSuggestionRaw]);
@@ -61,25 +70,18 @@ export default function Success() {
     spokenRef.current = true;
     speak({ transaction: txn }, { kind: 'classic', amountPaisa: txn.amountPaisa });
   }, [txn, speak]);
+  // The same sentence, composed with the same pure helper `speak` posts for
+  // TTS, rendered as the visible "spoken line" (Success.dc.html: a mic glyph
+  // next to the quoted sentence) — spec §3 "every animated/spoken change also
+  // has a static cue".
+  const spokenLine = useMemo(
+    () => (txn ? outcomeSpeech({ transaction: txn }, { kind: 'classic', amountPaisa: txn.amountPaisa }, i18n.language) : ''),
+    [txn, i18n.language],
+  );
 
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    if (!reducedMotion) {
-      checkProgress.value = withTiming(1, { duration: SUCCESS_CHECK_MS, easing: easeInOut });
-      textProgress.value = withDelay(SUCCESS_CHECK_MS, withTiming(1, { duration: SUCCESS_TEXT_MS, easing: easeOut }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const checkStyle = useAnimatedStyle(() => ({
-    opacity: checkProgress.value,
-    transform: [{ scale: 0.5 + checkProgress.value * 0.5 }],
-  }));
-
-  const textStyle = useAnimatedStyle(() => ({
-    opacity: textProgress.value,
-    transform: [{ translateY: reducedMotion ? 0 : (1 - textProgress.value) * RISE_TRANSLATE_Y }],
-  }));
 
   const onDone = async () => {
     if (target && saveEnabled && !saved && nickname.trim()) {
@@ -110,29 +112,36 @@ export default function Success() {
   return (
     <Screen>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.l, paddingHorizontal: space.xl }}>
-        <Animated.View
-          style={[
-            { width: 112, height: 112, borderRadius: 56, backgroundColor: c.greenTint, alignItems: 'center', justifyContent: 'center' },
-            checkStyle,
-          ]}
-        >
-          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: c.green, alignItems: 'center', justifyContent: 'center' }}>
-            <Check size={40} color={c.white} strokeWidth={3} />
-          </View>
-        </Animated.View>
+        <View style={{ width: CHECK_SIZE, height: CHECK_SIZE, borderRadius: CHECK_SIZE / 2, backgroundColor: c.greenTint, alignItems: 'center', justifyContent: 'center' }}>
+          <IconSwap
+            testID="success-check"
+            active={checkIn}
+            size={40}
+            from={null}
+            to={<Check size={40} color={c.green} strokeWidth={2.6} />}
+          />
+        </View>
 
         <Animated.View style={[{ alignItems: 'center', gap: space.m, alignSelf: 'stretch' }, textStyle]}>
-          <Text variant="h1" center style={{ marginTop: 8 }}>{t('success.title')}</Text>
+          <Text variant="h1" center weight={800} style={{ fontSize: 26, lineHeight: 32, marginTop: 8 }}>
+            {t('success.title')}
+          </Text>
+          {amountPaisa ? <Text variant="money">{formatPaisa(countedAmount)}</Text> : null}
           <Text variant="sub" center>{summary || t('success.sent')}</Text>
-          {amountPaisa ? <Text variant="money">{formatPaisa(Number(amountPaisa))}</Text> : null}
-          {refNo ? <Pill label={t('success.refPill', { ref: refNo })} bg={c.surface2} color={c.ink2} height={32} /> : null}
+          {refNo ? <Pill label={t('success.refPill', { ref: refNo })} bg={c.surface2} color={c.ink2} /> : null}
+          {spokenLine ? (
+            <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, marginTop: 2, paddingHorizontal: space.l }}>
+              <Mic size={14} color={c.amberDeep} strokeWidth={2} />
+              <Text variant="foot" center style={{ flexShrink: 1 }}>&ldquo;{spokenLine}&rdquo;</Text>
+            </View>
+          ) : null}
 
           {target && saved ? (
             <View testID="success-saved" style={{ marginTop: space.m }}>
               <Pill label={t('save.saved')} bg={c.greenTint} color={c.green} />
             </View>
           ) : target ? (
-            <View style={{ alignSelf: 'stretch', marginTop: space.l, gap: space.m }}>
+            <Card style={{ alignSelf: 'stretch', marginTop: space.l, gap: space.m }}>
               <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text variant="sub">{target === 'recipient' ? t('save.recipientToggle') : t('save.billerToggle')}</Text>
                 <Switch
@@ -151,7 +160,7 @@ export default function Success() {
                 />
               ) : null}
               {error ? <Text variant="foot" color={c.red} center>{error}</Text> : null}
-            </View>
+            </Card>
           ) : null}
         </Animated.View>
       </View>

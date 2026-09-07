@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,24 +7,32 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { useReducedMotion } from './useReducedMotion';
-import { RISE_MS, RISE_TRANSLATE_Y, EASE_OUT } from './config';
+import { D_ENTER, D_MICRO, EASE_OUT } from './config';
 
 const easeOut = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
 
-// Home greeting / suggestion-card rise: opacity 0->1, translateY 12->0,
-// 300ms ease-out, optionally delayed for the 60ms stagger. Motion.dc.html
-// "Home greeting" + "Suggestion cards" rows.
+/** Entrance travel. Spec §3: exits translate ≤ 12 pt, entrances rise from here. */
+export const RISE_TRANSLATE_Y = 12;
+
+// Row / card entrance: opacity 0->1, translateY 12->0, D_ENTER ease-out,
+// optionally delayed for the STAGGER cascade (first paint only — the caller
+// owns that decision via useFirstPaint). Reduced motion: D_MICRO opacity, no
+// translate.
 export function useRise(delayMs = 0) {
   const reducedMotion = useReducedMotion();
   const progress = useSharedValue(0);
+  // Latched at mount. The caller computes the stagger from useFirstPaint, which
+  // flips to false right after the first commit — without this latch that flip
+  // would change `delayMs` and replay the entrance of every mounted row.
+  const delay = useRef(delayMs).current;
 
   useEffect(() => {
     if (reducedMotion) {
-      progress.value = 1;
+      progress.value = withTiming(1, { duration: D_MICRO });
       return;
     }
-    progress.value = withDelay(delayMs, withTiming(1, { duration: RISE_MS, easing: easeOut }));
-  }, [delayMs, reducedMotion, progress]);
+    progress.value = withDelay(delay, withTiming(1, { duration: D_ENTER, easing: easeOut }));
+  }, [delay, reducedMotion, progress]);
 
   const style = useAnimatedStyle(() => ({
     opacity: progress.value,

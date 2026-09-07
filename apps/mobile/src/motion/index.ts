@@ -1,9 +1,15 @@
 export * as motionConfig from './config';
 export { useReducedMotion } from './useReducedMotion';
-export { useRise, Rise } from './useRise';
+export { useFirstPaint } from './useFirstPaint';
+export { useRise, Rise, RISE_TRANSLATE_Y } from './useRise';
 export { usePressScale } from './usePressScale';
-export { Breathe } from './Breathe';
 export { ListeningRings } from './ListeningRings';
 export { WaveBars } from './WaveBars';
 export { TypingDots } from './TypingDots';
 export { useCountUp } from './useCountUp';
+export { WordRise, wordDelays, wordRiseEnd, splitWords } from './WordRise';
+export type { WordRiseProps } from './WordRise';
+export { Waveform, levelFromDb, smoothLevel } from './Waveform';
+export type { WaveformProps } from './Waveform';
+export { IconSwap } from './IconSwap';
+export type { IconSwapProps } from './IconSwap';
