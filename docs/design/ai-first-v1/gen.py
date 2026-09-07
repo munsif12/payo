@@ -33,7 +33,8 @@ I = dict(
     arrowdown='<path d="M12 4v16M5 13l7 7 7-7"/>', bell='<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/>', eye='<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
 )
 
-def wrap(name, body, extra_css=""):
+def wrap(name, body, extra_css="", height=None):
+    H_ = height or H
     return f"""<!doctype html>
 <html>
 <head>
@@ -46,11 +47,11 @@ def wrap(name, body, extra_css=""):
   {FONT}
   <style>{BASE_CSS}{extra_css}</style>
 </helmet>
-<div style="width:{W}px;height:{H}px;background:{C['bg']};position:relative;overflow:hidden;border-radius:0">
+<div style="width:{W}px;height:{H_}px;background:{C['bg']};position:relative;overflow:hidden;border-radius:0">
 {body}
 </div>
 </x-dc>
-<script data-dc-script data-props='{{"$preview":{{"width":{W},"height":{H}}}}}'>
+<script data-dc-script data-props='{{"$preview":{{"width":{W},"height":{H_}}}}}'>
 class Component extends DCLogic {{}}
 </script>
 </body>
@@ -90,7 +91,7 @@ def navy_head(name="Ammi Jaan", greet="Good morning", balance="₨84,500", statu
 </div>'''
 
 def sheet(top, inner, radius=28):
-    return f'<div style="position:absolute;left:0;right:0;top:{top}px;bottom:0;background:{C["bg"]};border-radius:{radius}px {radius}px 0 0;padding:14px 18px 100px;display:flex;flex-direction:column;gap:10px"><div style="width:36px;height:4px;border-radius:2px;background:{C["sep"]};margin:0 auto 2px"></div>{inner}</div>'
+    return f'<div style="position:absolute;left:0;right:0;top:{top}px;bottom:0;background:{C["bg"]};border-radius:{radius}px {radius}px 0 0;padding:14px 18px 212px;display:flex;flex-direction:column;gap:10px"><div style="width:36px;height:4px;border-radius:2px;background:{C["sep"]};margin:0 auto 2px"></div>{inner}</div>'
 
 def cap(t): return f'<div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{C["ink3"]};margin-top:4px">{t}</div>'
 def card(inner, pad="12px 14px", bg=None, radius=20, extra=""):
@@ -156,7 +157,7 @@ boards["Pin"] = wrap("Pin", f'''
 
 # ---------- Home states ----------
 home_sheet = (cap("Since you were last here") +
-    card(row(I['bolt'], "K-Electric bill is due", "Due 9 Sep", right="₨4,320")) +
+    card(row(I['bolt'], "K-Electric bill is due", "Due 10 Sep", right="₨4,320")) +
     card(row(I['arrowdown'], "Sara Khan paid you", "Yesterday", right=f'<span style="color:{C["green"]}">+₨2,000</span>', tint=C['greenTint'])) +
     cap("Say it, or tap") +
     suggestion(I['send'], "Send money", "To a contact or a bank") +
@@ -183,7 +184,7 @@ pinsheet = f'''<div style="position:absolute;left:0;right:0;top:0;bottom:0;backg
 boards["HomePinSheet"] = wrap("HomePinSheet", navy_head(status="speaking", height=230, balance=None) + sheet(216, conv) + tabbar("Home") + pinsheet)
 boards["HomeUrdu"] = wrap("HomeUrdu", navy_head(name="امی", greet="صبح بخیر", status=None, urdu=True, height=350).replace("Assalam o Alaikum, Ammi.<br>What shall we do?", '<span class="ur" style="font-size:26px">السلام علیکم امی!</span>') + sheet(336,
     cap("پچھلی بار کے بعد").replace('margin-top:4px', 'margin-top:4px;text-align:right') +
-    card(f'<div style="display:flex;align-items:center;gap:12px;flex-direction:row-reverse;text-align:right"><div style="width:40px;height:40px;border-radius:12px;background:{C["amberTint"]};display:flex;align-items:center;justify-content:center">{svg(I["bolt"],20,C["navy"])}</div><div class="ur" style="flex:1"><div style="font-size:15px;font-weight:600">کے الیکٹرک کا بل واجب الادا ہے</div><div style="font-size:13px;color:{C["ink2"]}">آخری تاریخ 9 ستمبر</div></div><div class="money" style="font-weight:700">₨4,320</div></div>') +
+    card(f'<div style="display:flex;align-items:center;gap:12px;flex-direction:row-reverse;text-align:right"><div style="width:40px;height:40px;border-radius:12px;background:{C["amberTint"]};display:flex;align-items:center;justify-content:center">{svg(I["bolt"],20,C["navy"])}</div><div class="ur" style="flex:1"><div style="font-size:15px;font-weight:600">کے الیکٹرک کا بل واجب الادا ہے</div><div style="font-size:13px;color:{C["ink2"]}">آخری تاریخ 10 ستمبر</div></div><div class="money" style="font-weight:700">₨4,320</div></div>') +
     card(f'<div class="ur" style="display:flex;align-items:center;gap:12px;flex-direction:row-reverse;text-align:right"><div style="width:40px;height:40px;border-radius:12px;background:{C["amberTint"]};display:flex;align-items:center;justify-content:center">{svg(I["send"],20,C["navy"])}</div><div style="flex:1"><div style="font-size:15px;font-weight:600">پیسے بھیجیں</div><div style="font-size:13px;color:{C["ink2"]}">کسی رابطے یا بینک اکاؤنٹ کو</div></div></div>', radius=18)) + mic_fab() + tabbar("Home"))
 
 # ---------- Cards sheet (component artboard) ----------
@@ -197,7 +198,7 @@ boards["Cards"] = wrap("Cards", f'''
 <div style="position:absolute;left:20px;right:20px;top:24px;display:flex;flex-direction:column;gap:14px">
   <div style="font-size:12px;font-weight:600;letter-spacing:.1em;color:{C['amberDeep']}">CHAT CARDS · NO TEXT BUBBLE, THE SENTENCE IS SPOKEN</div>
   {receipt}{spend}{checkin}{waiting}{approvals}{helpc}
-</div>''')
+</div>''', height=1560)
 
 # ---------- Classic screens ----------
 boards["Wallet"] = wrap("Wallet", navy_head(greet="Available balance", balance="₨84,500", status=None, height=300).replace("Assalam o Alaikum, Ammi.<br>What shall we do?", f'<span style="font-size:14px;color:{C["navy2"]};font-weight:500">Ammi Jaan · PAYO wallet · PKR</span>') + f'''
@@ -226,8 +227,8 @@ boards["Bills"] = wrap("Bills", plain_header("Bills") + body_area(card(row(I['bo
 boards["Card"] = wrap("Card", plain_header("My card") + body_area(f'''<div style="border-radius:20px;background:linear-gradient(135deg,{C['navy']},#1A3B52);color:{C['onNavy']};padding:20px;height:190px;display:flex;flex-direction:column;justify-content:space-between"><div style="display:flex;justify-content:space-between;font-weight:800">PAYO<span style="font-size:11px;background:rgba(255,255,255,.15);border-radius:999px;padding:3px 8px">Virtual</span></div><div class="money" style="font-size:20px;letter-spacing:.12em">•••• •••• •••• 9405</div><div style="display:flex;justify-content:space-between;font-size:12px"><span>AMMI JAAN</span><span>09/29</span></div></div>
 <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px">''' + "".join(f'<div style="background:{C["surface"]};border-radius:18px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:600;min-height:70px;box-shadow:0 1px 2px rgba(14,34,51,.05)">{svg(ic,22,C["navy"])}{t}</div>' for ic,t in [(I['eye'],"Show number"),(I['lock'],"Freeze card"),(I['gear'],"Limits")]) + '</div>' + card(row(I['shield'], "Card is active", "Online payments enabled", right=f'<div style="width:44px;height:26px;border-radius:13px;background:{C["green"]}"></div>', tint=C['greenTint'])) + cap("Card activity") + card(row(I['send'], "Meezan Savings", "Aug 28", right="−₨142,928", tint=C['surface2']))))
 boards["Pockets"] = wrap("Pockets", plain_header("Savings") + body_area(f'<div style="border-radius:20px;background:{C["navy"]};color:{C["onNavy"]};padding:20px"><div style="font-size:12px;color:{C["navy2"]};letter-spacing:.08em;font-weight:600">TOTAL SAVED</div><div class="money" style="font-size:36px;font-weight:800">₨120,000</div><div style="font-size:13px;color:{C["navy2"]}">across 1 pocket</div></div>' + card(f'<div style="display:flex;align-items:center;gap:12px"><div style="width:44px;height:44px;border-radius:14px;background:{C["amberTint"]};display:flex;align-items:center;justify-content:center">{svg(I["pig"],22,C["navy"])}</div><div style="flex:1"><div style="font-size:16px;font-weight:700">Umrah Fund</div><div style="font-size:13px;color:{C["ink2"]}">₨120,000 of ₨500,000</div><div style="height:6px;border-radius:3px;background:{C["surface2"]};margin-top:8px"><div style="height:6px;border-radius:3px;background:{C["amber"]};width:24%"></div></div></div></div><div style="display:flex;gap:8px;margin-top:12px"><div style="flex:1">{button("Add money")}</div><div style="flex:1">{button("Withdraw","secondary")}</div></div>') + button("New pocket","tertiary")))
-boards["Requests"] = wrap("Requests", plain_header("Requests") + f'<div style="position:absolute;right:20px;top:64px;height:36px;border-radius:18px;background:{C["amber"]};color:{C["navy"]};font-weight:700;font-size:13px;display:flex;align-items:center;padding:0 14px">+ Request money</div>' + body_area(cap("Waiting for your approval") + approvals + cap("Incoming") + card(row(I['users'], "Bilal Ahmed asks for ₨1,500", "lunch · 2h ago", right="₨1,500")) + cap("Outgoing") + card(row(I['send'], "You asked Sara for ₨2,000", "Pending", right="₨2,000", tint=C['surface2']))))
-boards["Settings"] = wrap("Settings", plain_header("Settings") + body_area(card(row(I['shield'], "Trusted contact", "Bilal Ahmed · +92••••••002", chevron=False) + f'<div style="display:flex;gap:8px;margin-top:12px"><div style="flex:1">{button("Change","secondary")}</div><div style="flex:1;height:56px;border-radius:28px;background:{C["redTint"]};color:{C["red"]};font-weight:700;display:flex;align-items:center;justify-content:center">Remove</div></div>') + card(row(I['wallet'], "Approval limit", "Sends of ₨100,000 or more need approval", chevron=False) + f'<div style="margin-top:12px">{button("Change limit","secondary")}</div>') + card(row(I['mic'], "PAYO speaks first", "Hear what changed when you open the app", right=f'<div style="width:44px;height:26px;border-radius:13px;background:{C["amber"]}"></div>')) + card(row(I['users'], "Age-based protection", "Ammi is 65 · extra check on large sends to someone new", chevron=False, tint=C['surface2']))))
+boards["Requests"] = wrap("Requests", plain_header("Requests") + f'<div style="position:absolute;right:20px;top:64px;height:36px;border-radius:18px;background:{C["amber"]};color:{C["navy"]};font-weight:700;font-size:13px;display:flex;align-items:center;padding:0 14px">+ Request money</div>' + body_area(approvals + cap("Incoming") + card(row(I['users'], "Bilal Ahmed asks for ₨1,500", "lunch · 2h ago", right="₨1,500")) + cap("Outgoing") + card(row(I['send'], "You asked Sara for ₨2,000", "Pending", right="₨2,000", tint=C['surface2']))))
+boards["Settings"] = wrap("Settings", plain_header("Settings") + body_area(card(row(I['shield'], "Trusted contact", "Bilal Ahmed · +92••••••002", chevron=False) + f'<div style="display:flex;gap:8px;margin-top:12px"><div style="flex:1">{button("Change","secondary")}</div><div style="flex:1;height:56px;border-radius:28px;background:{C["redTint"]};color:{C["red"]};font-weight:700;display:flex;align-items:center;justify-content:center">Remove</div></div>') + card(row(I['wallet'], "Approval limit", "₨100,000 or more — or ₨20,000+ to someone new — needs Bilal's approval", chevron=False) + f'<div style="margin-top:12px">{button("Change limit","secondary")}</div>') + card(row(I['mic'], "PAYO speaks first", "Hear what changed when you open the app", right=f'<div style="width:44px;height:26px;border-radius:13px;background:{C["amber"]}"></div>')) + card(row(I['users'], "Age-based protection", "Ammi is 65 · extra check on large sends to someone new", chevron=False, tint=C['surface2']))))
 more_rows = [(I['pig'],"Savings","1 pocket · ₨120,000"),(I['card'],"My card","Virtual · active"),(I['doc'],"Statements",None),(I['users'],"Requests",None)]
 more2 = [(I['globe'],"Language","English"),(I['gear'],"Settings","Trusted contact, limits, greeting"),(I['lock'],"Security & PIN",None)]
 def group(rows): return card("".join(row(ic,t,s) + (f'<div style="height:1px;background:{C["sep"]};margin:8px 0"></div>' if i < len(rows)-1 else "") for i,(ic,t,s) in enumerate(rows)))
