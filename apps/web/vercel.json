@@ -8,6 +8,21 @@
     {
       "source": "/demo",
       "destination": "/demo.mp4"
+    },
+    {
+      "source": "/version",
+      "destination": "/version.json"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/version.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
     }
   ]
 }

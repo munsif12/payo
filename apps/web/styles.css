@@ -477,3 +477,7 @@ ul.list li b{color:var(--ink);font-weight:800}
 /* demo video */
 .video-wrap{max-width:1040px;margin:40px auto 0}
 .video{display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:28px;background:var(--navy,#0D2A3D);box-shadow:0 12px 32px rgba(13,42,61,.18)}
+
+/* version stamp */
+.ver{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;border:1px solid rgba(13,42,61,.25);font-size:12px;font-weight:700;text-decoration:none;color:inherit;opacity:.75}
+.ver:hover{opacity:1}
