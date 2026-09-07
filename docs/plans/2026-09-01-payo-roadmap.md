@@ -36,6 +36,15 @@ replica set (required for multi-doc transactions).
 | 6 | Polish + demo pass | `plans/2026-09-02-phase-6-polish-demo.md` | done |
 | R1–R7 | Revamp v2 (AI-first Home, phone auth, new design system) | `plans/2026-09-02-revamp-plan.md` | done 2026-09-03 |
 | V1–V5 | v3 — bank-aware sends, saved recipients, in-chat PIN, biller flow, Urdu fixes | `plans/2026-09-03-v3-plan.md` | done 2026-09-03 |
+| v4 | Hands-free conversation loop | `plans/2026-09-05-v4-plan.md` | done 2026-09-05 |
+| v5 | Full AI coverage — every classic action as a card, card-only replies, Urdu voice, live routing gate | `plans/2026-09-05-v5-plan.md` | done 2026-09-06 |
+| v6 | Trusted contact, scam check-in, proactive greeting | `plans/2026-09-06-v6-plan.md` | done 2026-09-06 |
+| v6.1 | Owner amendments — institution/biller logos, spoken outcome after PIN, age-based risk rules, scoped pressure flag | (in the v6 plan + QA addendum) | done 2026-09-06 |
+
+**Suites as of the last commit:** backend **154**, AI **325**, mobile **365**; mobile
+`tsc --noEmit` clean. QA evidence per version in `docs/qa/v3|v4|v5|v6/QA-REPORT.md` (the v6
+report carries the v6.1 addendum). Live routing gate:
+`cd services/ai && uv run python scripts/ai-smoke.py --language both`.
 
 Just-in-time plans MUST be written with the writing-plans skill, argue from this
 roadmap's contracts, and be saved next to the two existing phase plans before any code
@@ -186,9 +195,17 @@ type Card =
   | { kind: 'balance'; balancePaisa: number };
 ```
 
+> **Stale as written — kept for the original shape only.** The union above is the Phase-4
+> snapshot (8 kinds). Since v5/v6 there are **32 card kinds**. The source of truth is
+> `services/ai/app/cards.py`; the app's mirror is
+> `apps/mobile/src/components/cards/cardShapes.ts`, and
+> `cardShapes.parity.test.ts` fails the mobile suite if the two drift.
+> `contact_chips` has been replaced by `institution_chips` / `recipient_chips`.
+
 Card taps → app behavior: `confirmation` → speak summary aloud + تصدیق button → PIN pad
-→ `POST /actions/:id/execute`; `contact_chips` tap → sends chip text back into
-`/converse` as text turn; `statement` → download button hits `downloadUrl`.
+→ `POST /actions/:id/execute` (a spoken "yes" opens the PIN sheet by itself since v5);
+chip cards tap → send the chip's text back into `/converse` as a text turn; `statement` →
+download button hits `downloadUrl`.
 
 ## Contract 4 — Seeded demo world (Phase 2 seed script; all phases rely on it)
 

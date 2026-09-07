@@ -1,21 +1,38 @@
 # PAYO — Demo Script
 
-English-first pitch script for the five hero moments. Each step lists **what you say**
-(EN, with the UR line you can use in either language mode) and **what the audience
-sees**. Demo persona: **Ammi Jaan** — phone `+923001110001`, PIN `1234`, balance seeded
-with realistic history and a due K-Electric bill.
+English-first pitch script. Each step lists **what you say** (EN, with the UR line you can
+use in either language mode) and **what the audience sees**. Demo persona: **Ammi Jaan** —
+phone `+923001110001`, PIN `1234`, balance seeded with realistic history and a due
+K-Electric bill.
+
+**Run order and timing (~9 min):**
+
+| # | Flow | Time | The point |
+|---|---|---|---|
+| 0 | Opening | 30 s | Phone + PIN, greeting, talk to it like a phone call |
+| 1 | A — Send money like a wallet ⭐ | 2 min | Bank chips → resolve → PIN in chat → save |
+| 2 | B — Saved recipient + bill | 1 min | It remembers; three input languages |
+| 3 | C — The Urdu switch + two Munsifs | 1 min | RTL instantly; ambiguity becomes a question |
+| 4 | E — Ask it anything, as cards | 1 min | No menus; every screen has a spoken equivalent |
+| 5 | F — The guardian and the scam call ⭐ | 2 min | Two devices; one calm question stops a scam |
+| 6 | D — Classic layer | 45 s | Everything the AI does, your hands can do too |
+| 7 | Close | 20 s | — |
 
 **Setup (2 min before the demo):**
 ```bash
 docker compose up -d mongo
-cd services/backend && npm run seed && npm run dev        # :4000
-cd services/ai && uv run uvicorn app.main:app --port 8000  # needs GEMINI_API_KEY in .env
+cd services/backend && npm run seed                          # required after every pull
+cd services/backend && GUARDIAN_COOLING_MS=0 npm run dev      # :4000 — the backend does NOT read .env
+cd services/ai && uv run uvicorn app.main:app --port 8000     # needs GEMINI_API_KEY in .env
 # offline / no-key fallback instead:
 #   cd services/ai && uv run uvicorn mock_ai:app --port 8000 --app-dir ../../scripts/mock-ai
-cd apps/mobile && npx expo start                           # open on simulator/device
+cd apps/mobile && npx expo start                              # open on simulator/device
+# routing gate — run it before you present:
+cd services/ai && uv run python scripts/ai-smoke.py --language both
 ```
 Sign in as Ammi: phone → OTP (demo echoes the code back) → PIN `1234`. Land on Home,
-English mode.
+English mode. Flow F needs a **second simulator** signed in as Bilal (`+923001110002`,
+PIN `1234`).
 
 ---
 
@@ -148,6 +165,8 @@ to every screen, and a grandmother who never has to see a form. That's PAYO."
   own after two silent turns or after 12 spoken turns (credit guard). In a noisy room
   mute the Mac's input between flows — stray speech is a real turn and costs a Gemini +
   Cartesia call.
+- Re-running `npm run seed` mid-demo resets the world but also **wipes saved recipients and
+  billers** — Flow B depends on Flow A having saved one, so re-walk A before B after a reseed.
 - Wrong PIN on purpose is a nice extra beat: the pad shakes back with an inline error
   ("Wrong PIN, try again" / «پن غلط ہے، دوبارہ کوشش کریں») and nothing moves — the
   session stays signed in either way. This works identically whether the PIN sheet

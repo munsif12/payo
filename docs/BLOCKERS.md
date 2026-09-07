@@ -36,3 +36,18 @@ rules exist to protect it.**
   (regression-tested).
 - **`~/.cache` owned by root** on this machine → mongodb-memory-server binaries cache
   in `services/backend/node_modules/.cache`.
+
+## 4. Demo-time gotchas (not blockers, but they will bite)
+
+- **The backend does not read `.env`.** `GUARDIAN_COOLING_MS=0` (instant guardian changes for
+  the demo) must be passed in the environment: `GUARDIAN_COOLING_MS=0 npm run dev`. Without it
+  the production default of 24 h applies and Flow F stalls.
+- **`npm run seed` is required after every pull.** The seed now carries institution/biller
+  domains and dates of birth; an older seeded DB has neither, so logos and the age-based risk
+  rules behave wrongly. Reseeding also wipes saved recipients and billers — the demo script
+  re-creates them.
+- **Cartesia balance is low** (see §2). Every assistant turn synthesizes speech; a noisy room
+  keeps the hands-free loop alive and each turn costs a Gemini call plus a synthesis. Mute the
+  Mac's input between flows, or set `TTS_ENABLED=false` while rehearsing.
+- **Routing is probabilistic.** Run `uv run python scripts/ai-smoke.py --language both` in
+  `services/ai` before presenting; a full run still has about one intermittent miss.
