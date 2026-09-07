@@ -42,7 +42,7 @@ export default function More() {
               <Avatar name={name || '?'} size={56} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text variant="hl" numberOfLines={1}>{name}</Text>
-                <Text variant="foot" numberOfLines={1}>{ltrIsolate(user?.phone ?? '')}{user?.email ? ` · ${user.email}` : ''}</Text>
+                <Text variant="foot" numberOfLines={1}>{ltrIsolate(user?.phone ?? '')}</Text>
               </View>
             </Card>
           </Pressable>

@@ -1706,7 +1706,11 @@ function DigestCardView({ card, onChipTap }: Props) {
                 <Icon size={18} color={c.ink2} strokeWidth={2.2} />
               </View>
             }
-            title={bi(item.title)}
+            // Rendered as a node (not a string) so ListRow's default
+            // numberOfLines={1} doesn't apply — a digest title ("K-Electric
+            // bill is due Sep 10 — ₨4,500") is longer than a typical row
+            // title and needs the second line instead of truncating.
+            title={<Text variant="hl" numberOfLines={2}>{bi(item.title)}</Text>}
             subtitle={item.subtitle ? bi(item.subtitle) : undefined}
             right={item.amountPaisa != null ? <Text variant="hl">{ltrIsolate(formatPaisa(item.amountPaisa))}</Text> : undefined}
             showChevron={!!intent}

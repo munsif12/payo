@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'react-native-qrcode-svg';
-import { QrCode, ScanLine } from 'lucide-react-native';
+import { ChevronLeft, QrCode, ScanLine } from 'lucide-react-native';
 import { Screen, Text, Input, Card, Chip, Button } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
@@ -52,7 +52,10 @@ export default function Qr() {
 
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <Pressable testID="qr-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
+          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
+        </Pressable>
         <Chip
           testID="qr-tab-mine"
           label={t('qr.myCode')}

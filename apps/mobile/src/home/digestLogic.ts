@@ -3,6 +3,7 @@
 // same reason homeGreetingLogic.ts exists.
 import i18n from '../i18n';
 import { formatPaisa } from '../lib/money';
+import { formatShortDate } from '../lib/dates';
 import type { DigestItemDto } from '../api/types';
 import type { Bilingual, DigestCard, DigestItem } from '../components/cards/cardShapes';
 
@@ -152,7 +153,10 @@ export function toDigestCard(items: DigestItemDto[]): DigestCard {
           return {
             kind: item.kind, refId,
             title: bi('digest.row.billDue', { biller: item.biller?.name ?? '' }),
-            subtitle: item.dueDate ? bi('digest.row.billDueSub', { date: item.dueDate.slice(0, 10) }) : null,
+            // formatShortDate is the SAME helper the suggestion card uses (homeGreetingLogic's
+            // billSubtitle) — both must agree on the calendar day for the same ISO input, or
+            // the digest row and the suggestion card can disagree by a day near a timezone edge.
+            subtitle: item.dueDate ? bi('digest.row.billDueSub', { date: formatShortDate(item.dueDate) }) : null,
             amountPaisa: item.amountPaisa ?? null,
             intent: bi('digest.intent.billDue', { biller: item.biller?.name ?? '' }),
           };

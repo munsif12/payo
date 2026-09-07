@@ -1,5 +1,7 @@
 import { shouldFetchDigest, digestSpeech, capSpeech, toDigestCard, DIGEST_INTERVAL_MS } from '../digestLogic';
-import type { DigestItemDto } from '../../api/types';
+import { formatShortDate } from '../../lib/dates';
+import { billSubtitle } from '../homeGreetingLogic';
+import type { DigestItemDto, DueBill } from '../../api/types';
 
 const NOW = Date.parse('2026-09-06T12:00:00.000Z');
 
@@ -129,5 +131,31 @@ describe('toDigestCard guardian_notice branches (never "Rs 0")', () => {
     const row = toDigestCard([notice('reminder', { actionId: 'a1' })]).items[0];
     expect(row.subtitle?.en).not.toMatch(/₨|Rs/);
     expect(row.intent?.en).toBe(toDigestCard([{ kind: 'approval_waiting', payer: { name: 'x', phone: 'y' } }]).items[0].intent?.en);
+  });
+});
+
+// The digest row and the suggestion card render the same due date from two
+// separate code paths (toDigestCard vs. billSubtitle) — both must call the
+// SAME formatShortDate helper so a bill never shows "Due 2026-09-09" in one
+// place and "due Sep 10" in the other (a real one-day timezone mismatch).
+describe('digest due-date matches the suggestion card (no timezone-induced mismatch)', () => {
+  const t = (key: string, opts?: Record<string, unknown>) => (opts ? `${key}:${JSON.stringify(opts)}` : key);
+
+  const cases = [
+    ['plain date-only ISO', '2026-09-09'],
+    ['a timestamp just before UTC midnight', '2026-09-09T23:30:00.000Z'],
+    ['a timestamp exactly at UTC midnight', '2026-09-10T00:00:00.000Z'],
+  ] as const;
+
+  test.each(cases)('%s: digest row and suggestion card agree', (_label, dueDate) => {
+    const digestDate = toDigestCard([{ kind: 'bill_due', amountPaisa: 432000, biller: { id: 'b', name: 'K-Electric' }, dueDate }])
+      .items[0].subtitle?.en;
+    const dueBill: DueBill = {
+      billId: 'b1', biller: { id: 'b', name: 'K-Electric', urduName: 'کے الیکٹرک' }, consumerNo: '1', amountPaisa: 432000, dueDate, month: '2026-09',
+    };
+    const suggestionDate = billSubtitle(dueBill, false, t);
+
+    expect(digestDate).toContain(formatShortDate(dueDate));
+    expect(suggestionDate).toContain(formatShortDate(dueDate));
   });
 });

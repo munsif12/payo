@@ -2,7 +2,7 @@ import React from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react-native';
+import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Plus } from 'lucide-react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Screen, Text, ListRow, Pill, useIsUrdu } from '../../src/ui';
@@ -58,7 +58,12 @@ export default function Requests() {
   return (
     <Screen>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: space.l, marginBottom: space.l }}>
-        <Text variant="h1">{t('requests.title')}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m }}>
+          <Pressable testID="requests-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
+            <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
+          </Pressable>
+          <Text variant="h1">{t('requests.title')}</Text>
+        </View>
         <MiniButton testID="requests-new" label={t('requests.new')} icon={<Plus size={16} color={c.navy} strokeWidth={2.4} />} onPress={() => router.push('/requests/new')} />
       </View>
 

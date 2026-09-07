@@ -31,7 +31,6 @@ export default function Profile() {
       <Card style={{ alignItems: 'center', gap: space.s }}>
         <Avatar name={name ?? '?'} size={64} />
         <Text variant="h2" center>{name}</Text>
-        {user?.email ? <Text variant="foot" center>{user.email}</Text> : null}
         {user?.phone ? <Text variant="foot" center>{ltrIsolate(user.phone)}</Text> : null}
       </Card>
 

@@ -57,6 +57,12 @@ export default function Home() {
     loopRef.current = loop.handlers;
   }, [loop.handlers]);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  // Measured height of the composer block (VoiceStatusBar + input/mic row +
+  // hint line) so the scrollable content above it can reserve exactly that
+  // much bottom space — with a digest card on top of the suggestions, the
+  // greeting state's content can run long enough that its last card lands
+  // under the composer instead of stopping above it.
+  const [composerBlockHeight, setComposerBlockHeight] = useState(0);
 
   const live = loop.mode !== 'off';
 
@@ -126,18 +132,26 @@ export default function Home() {
             data={messages}
             keyExtractor={(m) => m.id}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-            contentContainerStyle={{ paddingHorizontal: space.gutter, paddingVertical: space.m, gap: space.s }}
+            contentContainerStyle={{
+              paddingHorizontal: space.gutter, paddingTop: space.m,
+              paddingBottom: space.m + composerBlockHeight, gap: space.s,
+            }}
             renderItem={({ item }) => <Bubble message={item} onChipTap={sendText} onAppendLocal={appendLocal} />}
             ListFooterComponent={status === 'thinking' ? <ThinkingBubble /> : null}
           />
         ) : (
           // Scrollable, not a plain View: the greeting + suggestions always fit,
           // but a digest card (spec §1 rule 12) can add several rows on top.
+          // paddingBottom reserves the measured composer height so the last
+          // suggestion card scrolls fully clear of it instead of landing underneath.
           <ScrollView
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.xs, paddingBottom: space.m, gap: space.m }}
+            contentContainerStyle={{
+              paddingHorizontal: space.gutter, paddingTop: space.xs,
+              paddingBottom: space.m + composerBlockHeight, gap: space.m,
+            }}
           >
             <Rise
               style={{
@@ -180,7 +194,10 @@ export default function Home() {
           </ScrollView>
         )}
 
-        <View style={{ paddingHorizontal: space.gutter, paddingBottom: space.s, paddingTop: space.s }}>
+        <View
+          style={{ paddingHorizontal: space.gutter, paddingBottom: space.s, paddingTop: space.s }}
+          onLayout={(e) => setComposerBlockHeight(e.nativeEvent.layout.height)}
+        >
           {live ? <VoiceStatusBar mode={loop.mode} onInterrupt={loop.interrupt} style={{ marginBottom: space.s }} /> : null}
           <Composer
             value={draft}

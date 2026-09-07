@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Smartphone } from 'lucide-react-native';
+import { ChevronLeft, Smartphone } from 'lucide-react-native';
 import { Screen, Text, Input, ListRow, Chip, Button, useIsUrdu } from '../src/ui';
 import { useTheme } from '../src/theme/useTheme';
 import { space } from '../src/theme/tokens';
@@ -37,7 +37,12 @@ export default function Recharge() {
 
   return (
     <Screen>
-      <Text variant="h1" style={{ paddingTop: space.l, marginBottom: space.l }}>{t('recharge.title')}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <Pressable testID="recharge-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
+          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
+        </Pressable>
+        <Text variant="h1">{t('recharge.title')}</Text>
+      </View>
       <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
         <Text variant="sub">{t('recharge.chooseTelco')}</Text>
         {(telcos?.items ?? []).map((tc) => (
