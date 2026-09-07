@@ -277,6 +277,26 @@
       });
     });
 
+    /* failsafe: anything already inside the viewport (direct anchor loads, hash jumps,
+       browsers that skip the first scroll event) is revealed without waiting for a trigger */
+    function revealVisible() {
+      $$('[data-reveal],[data-reveal-item]').forEach(function (el) {
+        var cs = getComputedStyle(el);
+        if (cs.visibility !== 'hidden' && cs.opacity !== '0') return;
+        var r = el.getBoundingClientRect();
+        if (r.top < window.innerHeight * 0.95 && r.bottom > 0) {
+          gsap.to(el, { autoAlpha: 1, y: 0, duration: 0.4, ease: EASE, overwrite: true });
+        }
+      });
+    }
+    window.addEventListener('load', function () {
+      ScrollTrigger.refresh();
+      setTimeout(revealVisible, 250);
+      setTimeout(revealVisible, 1500);
+    });
+    window.addEventListener('hashchange', function () { setTimeout(revealVisible, 450); });
+    setTimeout(revealVisible, 2500);
+
     /* the connector line draws as the flow scrolls through */
     var flow = $('.flow');
     var fline = $('.flowline line');
