@@ -481,3 +481,6 @@ ul.list li b{color:var(--ink);font-weight:800}
 /* version stamp */
 .ver{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;border:1px solid rgba(13,42,61,.25);font-size:12px;font-weight:700;text-decoration:none;color:inherit;opacity:.75}
 .ver:hover{opacity:1}
+
+/* 3D experience nav link */
+.navlinks .nav3d{color:var(--amber);font-weight:700}
