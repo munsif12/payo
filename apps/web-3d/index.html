@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PAYO 3D · Banking you can talk to</title>
+<meta name="description" content="A scroll-driven 3D walkthrough of PAYO, a wallet anyone can talk to. An AI assistant runs the whole app: 48 capabilities, 32 card types, English and Urdu, a working hackathon demo.">
+<meta name="theme-color" content="#0D2A3D">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PAYO">
+<meta property="og:title" content="PAYO 3D · Banking you can talk to">
+<meta property="og:description" content="An AI assistant runs the whole app. You talk, it acts, the wallet obeys. English, Urdu, Roman Urdu, spoken or typed.">
+<meta property="og:image" content="assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PAYO 3D · Banking you can talk to">
+<meta name="twitter:description" content="An AI assistant runs the whole app. You talk, it acts, the wallet obeys.">
+<meta name="twitter:image" content="assets/og.png">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%23F2A93B'/%3E%3Ctext x='32' y='45' font-family='Helvetica,Arial,sans-serif' font-size='40' font-weight='bold' fill='%23FFFFFF' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<script>document.documentElement.className += ' js';</script>
+</head>
+<body>
+
+<!-- ============ LOADER ============ -->
+<div id="loader" role="status" aria-live="polite">
+  <p class="ld-brand">PAY<span>O</span></p>
+  <p class="ld-sub">Building the scene</p>
+  <div class="ld-track"><i id="ldbar"></i></div>
+</div>
+
+<!-- ============ BACKDROP + CANVAS ============ -->
+<div id="bg" aria-hidden="true"></div>
+<canvas id="stage" aria-hidden="true"></canvas>
+<div id="grain" aria-hidden="true"></div>
+
+<!-- ============ NAV ============ -->
+<header class="nav">
+  <div class="navwrap">
+    <a class="brand" href="#ch1">PAY<span>O</span></a>
+    <nav class="navlinks" aria-label="Chapters">
+      <a href="#ch2">Problem</a>
+      <a href="#ch3">The AI</a>
+      <a href="#ch4">A turn</a>
+      <a href="#ch5">Safety</a>
+      <a href="#ch6">Real</a>
+      <a href="#ch7">Limits</a>
+    </nav>
+    <button id="motion" class="motionbtn" type="button" aria-pressed="false">Reduce motion</button>
+  </div>
+</header>
+
+<!-- ============ CHAPTER RAIL ============ -->
+<nav id="rail" aria-label="Chapter progress">
+  <button class="dot" type="button" data-go="1" aria-label="Chapter 1: Banking you can talk to"><i></i></button>
+  <button class="dot" type="button" data-go="2" aria-label="Chapter 2: The problem"><i></i></button>
+  <button class="dot" type="button" data-go="3" aria-label="Chapter 3: What the AI does"><i></i></button>
+  <button class="dot" type="button" data-go="4" aria-label="Chapter 4: How a turn works"><i></i></button>
+  <button class="dot" type="button" data-go="5" aria-label="Chapter 5: It stays safe"><i></i></button>
+  <button class="dot" type="button" data-go="6" aria-label="Chapter 6: What is real"><i></i></button>
+  <button class="dot" type="button" data-go="7" aria-label="Chapter 7: Limits and links"><i></i></button>
+</nav>
+
+<main id="story">
+
+<!-- ============ 1 · HOOK ============ -->
+<section class="ch ch1" id="ch1" data-ch="1" aria-labelledby="h1">
+  <div class="ch__in">
+    <div class="col col-l">
+      <p class="eyebrow">Hackathon 2026 · working demo</p>
+      <h1 id="h1"><span>Banking</span> <span>you</span> <span>can</span> <span>talk</span> <span>to.</span></h1>
+      <p class="lede big">An AI assistant runs the whole app. You talk, it acts, the wallet obeys.</p>
+      <p class="sub">A wallet anyone can talk to, in English or Urdu, spoken or typed. No forms, no menus.</p>
+      <div class="btns">
+        <a class="btn primary" href="demo.mp4">Watch the demo</a>
+        <a class="btn ghost" href="https://github.com/munsif12/payo">View the code</a>
+      </div>
+    </div>
+    <div class="fallshot" aria-hidden="true"><img src="assets/home-listening.webp" width="302" height="657" alt=""></div>
+  </div>
+  <p class="scrollhint" id="scrollhint" aria-hidden="true">Scroll
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+  </p>
+</section>
+
+<!-- ============ 2 · THE PROBLEM ============ -->
+<section class="ch ch2" id="ch2" data-ch="2" aria-labelledby="h2a">
+  <div class="ch__in">
+    <div class="col col-l">
+      <p class="eyebrow">The problem</p>
+      <h2 id="h2a">Every banking action is a stack of screens, taps and forms.</h2>
+      <div class="rule"></div>
+      <p class="lede">So we bank only when we can stop and stare at a phone. Hands wet, eyes on the road, a child on your hip, and the bank still asks you to read a menu and fill a field.</p>
+      <div class="glassgrid g3">
+        <div class="glass">
+          <h3>Menus assume reading</h3>
+          <p>Nobody wants to browse a bank. You want to ask a question and get an answer.</p>
+        </div>
+        <div class="glass">
+          <h3>Forms assume typing</h3>
+          <p>An IBAN field needs both hands and all your attention. It is where the conversation ends.</p>
+        </div>
+        <div class="glass">
+          <h3>Confirmations assume doubt</h3>
+          <p>Under pressure anyone taps yes. Another tap changes nothing.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 · WHAT THE AI DOES ============ -->
+<section class="ch ch3" id="ch3" data-ch="3" aria-labelledby="h3a">
+  <div class="ch__in">
+    <div class="col col-l wide">
+      <p class="eyebrow">What the AI does</p>
+      <h2 id="h3a">One assistant, <span class="num" id="n48">48</span> things it can do.</h2>
+      <div class="rule"></div>
+      <p class="lede">Every capability is a tool the assistant can reach for. It reads what you said, picks the tool, fills the gaps by asking, and hands the answer back as a card you can glance at.</p>
+      <p class="pills"><span class="pill"><b class="num" id="n32">32</b> card types</span><span class="pill">English</span><span class="pill">Urdu</span><span class="pill">Roman Urdu</span></p>
+      <div class="glassgrid g4 caps">
+        <div class="glass cap">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span>
+          <h3>Send money</h3>
+          <p>Any bank or wallet in the country, or a recipient you already saved by nickname.</p>
+        </div>
+        <div class="glass cap">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+          <h3>Bills and top-ups</h3>
+          <p>Electricity, gas, internet and a mobile top-up, asked for by name and paid in the thread.</p>
+        </div>
+        <div class="glass cap">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1.5"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg></span>
+          <h3>Pockets and savings</h3>
+          <p>Open a pocket, name it, move money into it, and ask later how much is sitting there.</p>
+        </div>
+        <div class="glass cap">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9 9 15"/><path d="M14 15H9V10"/></svg></span>
+          <h3>Requests</h3>
+          <p>Ask someone for money, then ask who paid and who is still sitting on it.</p>
+        </div>
+        <div class="glass cap">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></span>
+          <h3>Statements</h3>
+          <p>A PDF for the period you name, built on the spot and handed back in the conversation.</p>
+        </div>
+        <div class="glass cap">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.4"/><path d="M2 10h20"/><path d="M6 15h4"/></svg></span>
+          <h3>Card controls</h3>
+          <p>Freeze the card, unfreeze it, and read back what it has been used for.</p>
+        </div>
+        <div class="glass cap">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>
+          <h3>Guardian and approvals</h3>
+          <p>Add a trusted contact, then send the large or unusual ones for a second yes.</p>
+        </div>
+        <div class="glass cap">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg></span>
+          <h3>Language</h3>
+          <p>English, Urdu and Roman Urdu, spoken or typed, switching inside the same thread.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 · HOW A TURN WORKS ============ -->
+<section class="ch ch4" id="ch4" data-ch="4" aria-labelledby="h4a">
+  <div class="ch__in">
+    <div class="col col-l">
+      <p class="eyebrow">How a turn works</p>
+      <h2 id="h4a">You speak. It listens, understands, acts, and answers with a card.</h2>
+      <div class="rule"></div>
+      <div class="stations">
+        <div class="glass station" data-st="0">
+          <p class="fnum">01</p>
+          <h3>Listen</h3>
+          <p>One mic tap opens the loop. It closes itself on silence, so you never hunt for a stop button.</p>
+        </div>
+        <div class="glass station" data-st="1">
+          <p class="fnum">02</p>
+          <h3>Understand</h3>
+          <p>It works out what you meant and what is missing, then asks for the missing piece.</p>
+        </div>
+        <div class="glass station" data-st="2">
+          <p class="fnum">03</p>
+          <h3>Act</h3>
+          <p>It calls the wallet's own APIs. The same public endpoints the screens call, with your token.</p>
+        </div>
+        <div class="glass station" data-st="3">
+          <p class="fnum">04</p>
+          <h3>Card and reply</h3>
+          <p>A card lands in the thread and the gist is read out loud, so you can keep your eyes elsewhere.</p>
+        </div>
+        <div class="glass station" data-st="4">
+          <p class="fnum">05</p>
+          <h3>Keeps listening</h3>
+          <p>The loop stays open for the next thing you say, and closes when you stop talking.</p>
+        </div>
+      </div>
+      <p class="callout">The assistant holds only the user's own token. It can propose a money movement. It cannot execute one without the PIN.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 · IT STAYS SAFE ============ -->
+<section class="ch ch5" id="ch5" data-ch="5" aria-labelledby="h5a">
+  <div class="ch__in">
+    <div class="col col-l">
+      <p class="eyebrow">It stays safe</p>
+      <h2 id="h5a">The assistant can do everything the app does. It cannot move a single rupee.</h2>
+      <div class="rule"></div>
+      <div class="glassgrid g3">
+        <div class="glass">
+          <p class="stepnum">Prepare → PIN → execute once</p>
+          <h3>Three steps, one release</h3>
+          <p>A write tool creates a pending action and nothing else. The PIN sheet opens in the conversation, and the assistant never sees the PIN. Then one atomic, idempotent, single-use call. Unexecuted actions expire in two minutes.</p>
+        </div>
+        <div class="glass">
+          <p class="stepnum">Guardian · check-in · cooling</p>
+          <h3>A second pair of hands</h3>
+          <p>A trusted contact approves large or unusual sends from their own phone, with their own PIN. One calm question cancels a risky send. Loosening a limit cools off first; tightening is instant.</p>
+        </div>
+        <div class="glass">
+          <p class="stepnum">Mock bank core (simulated)</p>
+          <h3>The core still has to run</h3>
+          <p>The assistant holds the user's own token, calls the same public API as the app, and has no database access. Every write is a proposal the mock bank core (simulated) still has to run.</p>
+        </div>
+      </div>
+      <p class="callout">Deterministic guards sit around the model. It is allowed to be creative about <b>words</b>, never about <b>actions</b>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6 · WHAT IS REAL ============ -->
+<section class="ch ch6" id="ch6" data-ch="6" aria-labelledby="h6a">
+  <div class="ch__in">
+    <div class="col col-c">
+      <p class="eyebrow">Three magic moments</p>
+      <h2 id="h6a">What it looks like when you just talk.</h2>
+    </div>
+    <div class="shotcaps">
+      <p class="shotcap"><b>Send money</b><i>Chips instead of an IBAN field, the PIN inside the chat, the receipt as a card.</i></p>
+      <p class="shotcap"><b>The scam call</b><i>One calm question, a guardian on their own phone, then her PIN to release it.</i></p>
+      <p class="shotcap"><b>Your language, your pace</b><i>The whole app flips to Urdu, it speaks first, and the wallet is still there underneath.</i></p>
+    </div>
+    <div class="shots2d">
+      <figure><img src="assets/send-chips.webp" width="302" height="657" alt="Bank selection chips shown inside the chat"><figcaption>It asks which bank</figcaption></figure>
+      <figure><img src="assets/send-pin-sheet.webp" width="302" height="657" alt="PIN entry sheet for a send, opening inside the chat thread"><figcaption>The PIN opens in chat</figcaption></figure>
+      <figure><img src="assets/send-receipt.webp" width="302" height="657" alt="Rs 1,000 sent receipt shown as a card in the conversation"><figcaption>The receipt is a card</figcaption></figure>
+      <figure><img src="assets/checkin.webp" width="302" height="657" alt="Scam check-in card asking whether someone called and asked for this payment"><figcaption>One question, no lecture</figcaption></figure>
+      <figure><img src="assets/approvals-bilal.webp" width="302" height="657" alt="Guardian approval request on a second phone"><figcaption>The guardian decides</figcaption></figure>
+      <figure><img src="assets/approved-ammi.webp" width="302" height="657" alt="Approved payment returning to the payer for PIN entry"><figcaption>Approved, then her PIN</figcaption></figure>
+      <figure><img src="assets/urdu.webp" width="302" height="657" alt="The app rendered right-to-left in Urdu"><figcaption>The whole app flips</figcaption></figure>
+      <figure><img src="assets/digest.webp" width="302" height="657" alt="Spoken digest card summarising what changed since the last visit"><figcaption>It speaks first</figcaption></figure>
+      <figure><img src="assets/wallet.webp" width="302" height="657" alt="Classic wallet screen with balance and recent transactions"><figcaption>Hands still work</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7 · HONEST + CTA ============ -->
+<section class="ch ch7" id="ch7" data-ch="7" aria-labelledby="h7a">
+  <div class="ch__in">
+    <div class="col col-c narrow">
+      <p class="eyebrow">What this is not yet</p>
+      <h2 id="h7a">Everything above is real. Here is exactly what is not.</h2>
+      <ul class="limits">
+        <li><b>The world is seeded.</b> Balances, titles, bills and card numbers are deterministic fakes.</li>
+        <li><b>The institutions are simulated.</b> No rails, no settlement ledger, no KYC, no real SMS.</li>
+        <li><b>One platform.</b> Verified on the iOS simulator; Android has not been run in weeks.</li>
+        <li><b>Urdu trails English</b> by a turn on two flows, and routing stays probabilistic.</li>
+      </ul>
+      <p class="tiny">All of it is visible in the repo.</p>
+      <p class="signoff">Team PAYO<i>Hands-free banking, for everyone.</i></p>
+      <div class="btns center">
+        <a class="btn primary" href="https://github.com/munsif12/payo">Repo</a>
+        <a class="btn ghost" href="deck.pdf">Deck (PDF)</a>
+        <a class="btn ghost" href="demo.mp4">Demo (MP4)</a>
+        <a class="btn ghost" href="https://web-flax-beta-22.vercel.app">Standard site</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ CHAPTER 4 · LEADER LINES + CAPTIONS ============ -->
+<div id="ch4fx" aria-hidden="true">
+  <svg id="leadsvg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+    <path id="leadpath" d="M -50 -50 L -50 -50" fill="none" stroke="#C9D8E6" stroke-width="1.2"
+          stroke-dasharray="3 5" stroke-linecap="round"/>
+    <circle id="leaddot" cx="-50" cy="-50" r="3.2" fill="#F2A93B"/>
+  </svg>
+  <div id="ch4caps">
+    <p class="stcap" data-st="1">Urdu in, structure out.</p>
+    <p class="stcap sub" data-st="3"><i class="wf"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></i><span>Sent. One thousand rupees to Sara Khan.</span></p>
+    <p class="stcap" data-st="4">It ends where it began.</p>
+  </div>
+</div>
+
+<pre id="errlog" hidden></pre>
+
+<script>
+(function(){
+  var log=[];
+  function push(m){log.push(m);var e=document.getElementById('errlog');if(e){e.textContent=log.join('\n');}
+    window.__errors=log;}
+  window.addEventListener('error',function(e){push('ERROR: '+(e.message||'')+' @ '+(e.filename||'')+':'+(e.lineno||''));});
+  window.addEventListener('unhandledrejection',function(e){push('REJECT: '+((e.reason&&(e.reason.message||e.reason))||''));});
+  var ce=console.error;console.error=function(){push('CONSOLE: '+Array.prototype.join.call(arguments,' '));ce.apply(console,arguments);};
+  window.__errors=log;
+  /* if the 3D module never boots (CDN blocked, module error) fall back to the static page */
+  setTimeout(function(){
+    if(!window.__ready){
+      document.documentElement.classList.add('static');
+      var b=document.getElementById('motion'); if(b){b.setAttribute('aria-pressed','true');b.disabled=true;}
+      push('FALLBACK: the 3D module did not start, showing the static page');
+    }
+  },9000);
+  if(new URLSearchParams(location.search).get('debug')==='1'){var e=document.getElementById('errlog');e.hidden=false;e.textContent='(no errors)';}
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
+<script type="module" src="main.js"></script>
+
+</body>
+</html>
