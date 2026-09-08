@@ -1,6 +1,6 @@
 # Releasing the website
 
-The site is static (no build). Production is whatever is on `master` under `apps/web`; Vercel deploys it on every push (project `web`, Root Directory `apps/web`). Any other branch gets a preview URL automatically.
+The site is static (no build). Production is whatever is on `master` under `apps/web`; Vercel deploys it on every push (project `payo-classic`, Root Directory `apps/web`; the shared URL web-flax-beta-22.vercel.app serves the 3D site from `apps/web-3d` via project `web`). Any other branch gets a preview URL automatically.
 
 ## Cut a release
 1. Land your changes on `master` (commit them normally).
@@ -8,7 +8,7 @@ The site is static (no build). Production is whatever is on `master` under `apps
    `scripts/release-web.sh 1.1.0 "One or two sentences on what changed."`
    This bumps `version.json` and `version.js`, prepends `CHANGELOG.md`, regenerates `changelog.html`, updates the footer stamp, commits, and tags `web-v1.1.0`.
 3. Push: `git push origin master --tags`. Vercel builds production from the push.
-4. Check `https://web-flax-beta-22.vercel.app/version` shows the new number, and `/changelog` lists it.
+4. Check `https://payo-classic.vercel.app/version` shows the new number, and `/changelog` lists it.
 
 ## Roll back
 Vercel keeps every deployment. Dashboard: Deployments, pick the previous one, Promote to Production. CLI: `npx vercel rollback` from the repo root. Or `git revert` the release commit and push.

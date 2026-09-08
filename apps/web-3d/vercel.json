@@ -1,0 +1,25 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/deck",
+      "destination": "/deck.pdf"
+    },
+    {
+      "source": "/demo",
+      "destination": "/demo.mp4"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/changelog",
+      "destination": "https://payo-classic.vercel.app/changelog",
+      "permanent": false
+    },
+    {
+      "source": "/version",
+      "destination": "https://payo-classic.vercel.app/version",
+      "permanent": false
+    }
+  ]
+}
