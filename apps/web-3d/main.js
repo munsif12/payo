@@ -1340,9 +1340,9 @@ function boot() {
      so the panels sit on the middle of the frame while the phone hangs low */
   s3.position.y = 1.15;
   const PANELS = [
-    { n: '01', l: 'PREPARE',       x: 5.85, y: 0.30, z: -1.1 },
-    { n: '02', l: 'PIN',           x: 8.35, y: 0.42, z: -3.0 },
-    { n: '03', l: 'EXECUTE\nONCE', x: 10.65, y: 0.54, z: -4.9 }
+    { n: '01', l: 'PREPARE',       x: 3.15, y: 0.30, z: -1.1 },
+    { n: '02', l: 'PIN',           x: 5.65, y: 0.42, z: -3.0 },
+    { n: '03', l: 'EXECUTE\nONCE', x: 7.95, y: 0.54, z: -4.9 }
   ];
   const PANEL_W = 1.66, PANEL_H = PANEL_W * (840 / 300);
   PANELS.forEach(p => {
@@ -1399,7 +1399,7 @@ function boot() {
   /* the beam: a bright core ribbon inside a wide soft one */
   const beamSoftMat = addMat({ map: texFromCanvas(beamCanvas(0.55)), color: 0xffffff, opacity: 0 });
   const beamCoreMat = addMat({ map: texFromCanvas(beamCanvas(0.06)), color: 0xffffff, opacity: 0 });
-  const BEAM_X0 = 0.6, BEAM_X1 = 12.2, BEAM_Y = -0.45;
+  const BEAM_X0 = 0.6, BEAM_X1 = 9.5, BEAM_Y = -0.45;
   const BEAM_Z0 = -0.30, BEAM_Z1 = -4.60;
   const bMid = (BEAM_X0 + BEAM_X1) / 2, bMidZ = (BEAM_Z0 + BEAM_Z1) / 2;
   const bYaw = Math.atan2(BEAM_Z0 - BEAM_Z1, BEAM_X1 - BEAM_X0);
@@ -1432,7 +1432,7 @@ function boot() {
   capsuleCore.renderOrder = 13;
   const capsuleBadgeMat = flatMat({ map: texFromCanvas(badgeCanvas(), MAXANISO), opacity: 1 });
   const capsuleBadge = new THREE.Mesh(unitPlane, capsuleBadgeMat);
-  capsuleBadge.position.set(0.30, 0.02, 0.62);
+  capsuleBadge.position.set(0.30, 0.66, 0.62);
   capsuleBadge.scale.set(2.05, 2.05 * (150 / 520), 1);
   capsuleBadge.renderOrder = 14;
   capsuleG.add(capsuleShell, capsuleCore, capsuleBadge);
@@ -1671,7 +1671,7 @@ function boot() {
   const ST_CAM = [
     { d: 13.2, ox: -2.10, oy: 0.16, ty:  0.02, orb:  0.000 },
     { d: 16.9, ox: -0.45, oy: 0.60, ty:  0.95, orb:  0.000 },
-    { d: 11.9, ox:  2.60, oy: 1.42, ty:  1.52, orb:  0.000 },
+    { d: 12.6, ox: -0.55, oy: 1.05, ty:  1.05, orb:  0.000 },
     { d: 12.9, ox: -1.95, oy: 0.12, ty:  0.05, orb:  0.000 },
     { d: 13.1, ox: -1.85, oy: 0.55, ty:  0.05, orb: -0.663 }
   ];
@@ -2322,7 +2322,7 @@ function boot() {
         capsuleShellMat.opacity = 0.66 * w3;
         capsuleCoreMat.opacity = w3;
         capsuleBadgeMat.opacity = w3;
-        beamSoftMat.opacity = 0.55 * w3;
+        beamSoftMat.opacity = 0.42 * w3;
         beamCoreMat.opacity = w3;
         gridMat.opacity = 0.36 * w3;
         /* only the panel the capsule is passing lights up */
