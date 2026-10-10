@@ -59,6 +59,7 @@ call that tool — never answer with "I can help you with your banking needs"):
 | decline request <id> | decline_request(request_id) after a spoken yes | text |
 | show my QR code | get_my_qr | qr |
 | send money to X | search_recipients / list_institutions -> resolve_recipient -> send_money | confirmation (PIN) |
+| send money to my father / mother / son / daughter / brother / sister (abbu, ammi, beta, beti, bhai, baji, ابو, امی) | search_recipients(<the family word as said>) -> send_money(recipient_id) | confirmation (PIN) |
 | pay a bill | list_saved_billers -> lookup_bill -> pay_bill | confirmation (PIN) |
 | who is my trusted contact / guardian | get_guardian | guardian |
 | make X my trusted contact | set_guardian(phone) | guardian (pendingChange - the user confirms in Settings with their PIN) |
@@ -84,6 +85,9 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — گھر کے بزر�
 کام کے اصول:
 - اکاؤنٹ کی کوئی بھی بات (بیلنس، لین دین، بل) بتانے سے پہلے ٹول چلائیں — اندازہ کبھی نہیں۔
 - کارڈ آپ خود نہیں بنا سکتیں؛ کارڈ صرف ٹول سے بنتا ہے۔ «کارڈ دیکھ کر تصدیق کریں» تبھی کہیں جب اسی باری میں کوئی ایسا ٹول چلا ہو۔
+- گھر والے: «ابو / ابا / بابا / والد»، «امی / اماں / والدہ»، «بیٹا»، «بیٹی»، «بھائی»، «بہن / باجی» — اردو، انگریزی یا رومن اردو میں — محفوظ رابطے کا نام ہیں۔ جو لفظ صارف نے کہا وہی search_recipients کو دیں (search_recipients("ابو")): تلاش خود رشتے کے لفظ کو Abbu / Ammi جیسے نک نیم سے ملا لیتی ہے۔ ایک رابطہ ملے تو سیدھا رقم اور اسی recipient_id کے ساتھ send_money؛ کسی رشتہ دار کا نمبر تلاش سے پہلے کبھی نہ پوچھیں۔
+- محفوظ رابطہ = کوئی اضافی سوال نہیں۔ search_recipients سے ایک ہی recipient_id ملے اور رقم معلوم ہو تو اسی باری میں send_money(amount_paisa, recipient_id) چلائیں۔ «بھیج دوں؟» نہ پوچھیں، محفوظ رابطے کے لیے resolve_recipient نہ چلائیں، اور «کارڈ پر تصدیق کریں» تبھی کہیں جب اسی باری میں send_money چل چکا ہو — تصدیقی کارڈ اور PIN ہی تصدیق ہیں۔ صرف کئی ملتے جلتے نام ہوں تو پوچھیں۔
+- نام کی تلاش: search_recipients کو نام ویسا ہی دیں جیسا صارف نے کہا (اردو میں کہا تو اردو میں: search_recipients("بلال")) — تلاش اردو نام بھی سمجھتی ہے۔ کچھ نہ ملے تو ایک بار انگریزی حروف میں دوبارہ ڈھونڈیں (بلال → Bilal)، پھر ہی نمبر پوچھیں۔
 - پیسے تصدیق اور PIN کے بعد ہی جاتے ہیں۔ کبھی نہ کہیں کہ پیسے بھیج دیے گئے۔
 - پیسے بھیجنا: نام ملے تو پہلے search_recipients چلائیں — ایک رابطہ ملے تو اسی کا recipient_id لیں؛ کئی ملیں تو چپس کارڈ دکھا کر پوچھیں، خود نہ چنیں۔ صرف نمبر یا IBAN ملے اور بینک معلوم نہ ہو تو list_institutions چلائیں۔ بینک معلوم ہو تو resolve_recipient(institution_id, identifier) چلائیں۔ صارف صاف «جی ہاں» کہے، تبھی send_money — اور اسی institution_id اور identifier کے ساتھ۔ ایک بار حل شدہ جوڑے کو دوبارہ resolve نہ کریں، ورنہ صارف کو وہی کارڈ بار بار ملتا رہے گا۔
 - بل ادا کرنا: پہلے list_saved_billers۔ ایک بلر ہو تو فوراً lookup_bill پھر pay_bill — دوبارہ نہ پوچھیں۔ کئی ہوں تو پوچھیں کون سا۔ کوئی نہ ہو تو بلر اور کنزیومر نمبر پوچھیں۔
@@ -144,6 +148,17 @@ Rules:
   user's message (or, if only the bare nickname came back with no institution mentioned, ask them to
   say which one they meant instead of guessing) to the matching option's institution_id+identifier
   and call resolve_recipient with those directly.
+- FAMILY: "my father / dad / abbu / abba / baba", "my mother / mom / ammi / amma", "my son / beta",
+  "my daughter / beti", "my brother / bhai", "my sister / behen / baji" — in English, Urdu script
+  or Roman Urdu — name a SAVED recipient. Call search_recipients with the relationship word
+  exactly as said (search_recipients("father"), search_recipients("ammi")): the search itself
+  maps family words to nicknames like Abbu and Ammi. One match -> go straight to the amount and
+  send_money with its recipient_id; never ask a relative's phone number before searching.
+- SAVED RECIPIENT = NO EXTRA QUESTION. When search_recipients returns exactly one recipient_id and
+  the amount is known, call send_money(amount_paisa, recipient_id) in the SAME turn. Do not ask
+  "would you like to send it?", do not call resolve_recipient for a saved recipient, and never
+  say "confirm on the card" unless send_money has actually run this turn — the confirmation card
+  plus the PIN is the confirmation. Only an ambiguous name (several matches) gets a question.
 - Money moves only after the user taps confirm and enters their PIN. Never claim money was sent.
 - Never read a full card number aloud.
 - Say amounts in rupees.
@@ -815,6 +830,21 @@ async def run_agent(
         reply = strip_cards_marker(_last_reply(state))
         extra_invocations += 1
 
+    # Guard (v8): a SAVED recipient was found — exactly one — and the amount was said, yet
+    # the model stopped to ask "shall I send?" / "confirm on the card" instead of calling
+    # send_money. search_recipients ran, so turn_already_acted() is true and the generic
+    # card nudge above stays quiet; this one is gated on "no card yet" instead. Live smoke
+    # F2: "Send 500 rupees to Bilal" → search_recipients only, no confirmation card.
+    if extra_invocations < MAX_NUDGES and not cards:
+        saved = _single_saved_match(state)
+        if saved and _mentions_amount(user_text) and not _called_tool_named(state, "send_money"):
+            nudged = [*state["messages"], HumanMessage(content=_nudge(
+                SAVED_RECIPIENT_NUDGE.format(recipient_id=saved),
+                SAVED_RECIPIENT_NUDGE_UR.format(recipient_id=saved), language))]
+            state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+            reply = strip_cards_marker(_last_reply(state))
+            extra_invocations += 1
+
     # Guard: the model sometimes ASKS in prose for something a tool would answer with
     # tappable chips ("which bank or wallet?", "which biller / what reference number?").
     # Elderly voice-first users cannot type an institution id, so a prose question is a
@@ -923,6 +953,19 @@ NUDGE_UR = (
     "get_card — پھر جواب دیں۔ جو کارڈ موجود ہی نہیں اس کا ذکر کبھی نہ کریں۔"
 )
 URDU_LANGUAGE_NUDGE = "Answer in Urdu (Nastaliq script) only."
+SAVED_RECIPIENT_NUDGE = (
+    "[SYSTEM CHECK] search_recipients found exactly ONE saved recipient (recipient_id "
+    "{recipient_id}) and the user already said the amount, but you did not call send_money. "
+    "Do not ask whether to send and do not say 'confirm on the card' — call "
+    "send_money(amount_paisa=<amount × 100>, recipient_id='{recipient_id}') NOW; the "
+    "confirmation card it creates is how the user confirms. Then one short sentence."
+)
+SAVED_RECIPIENT_NUDGE_UR = (
+    "[SYSTEM CHECK] search_recipients کو بالکل ایک محفوظ رابطہ ملا (recipient_id {recipient_id}) "
+    "اور صارف رقم بھی بتا چکا ہے، مگر آپ نے send_money نہیں چلایا۔ «بھیج دوں؟» نہ پوچھیں اور "
+    "«کارڈ پر تصدیق کریں» نہ کہیں — ابھی send_money(amount_paisa=<رقم × 100>, "
+    "recipient_id='{recipient_id}') چلائیں؛ اس کا تصدیقی کارڈ ہی صارف کی تصدیق ہے۔ پھر ایک چھوٹا جملہ۔"
+)
 NO_MARKER_NUDGE_UR = (
     "[SYSTEM CHECK] آپ کا جواب اندرونی [cards] لائن تھا، بات نہیں۔ دوبارہ ایک دو سادہ بولے جانے "
     "والے جملوں میں جواب دیں — نہ [cards]، نہ ids، نہ JSON۔"
@@ -1339,6 +1382,35 @@ def _is_generic_nonanswer(reply: str) -> bool:
 def _mentions_card(reply: str) -> bool:
     low = reply.lower()
     return any(w in low for w in _CARD_WORDS)
+
+
+_SINGLE_SAVED_RE = re.compile(r"Found exactly one saved recipient:.*?recipient_id ([0-9a-f]{24})", re.S)
+_AMOUNT_RE = re.compile(
+    r"\d|[۰-۹]|\b(thousand|hundred|lakh|rupees?|rs\.?|hazaa?r|sau|dus|bees|pachas|so)\b"
+    r"|ہزار|سو|لاکھ|روپ[ےی]|دس|بیس|پچاس|پانچ|ایک|دو|تین|چار|چھ|سات|آٹھ|نو",
+    re.I,
+)
+
+
+def _single_saved_match(state: dict[str, Any]) -> str | None:
+    """The recipient_id search_recipients returned this turn when it found exactly one
+    saved recipient (the tool text is the contract — see tools.search_recipients)."""
+    for m in state.get("messages", []):
+        if isinstance(m, ToolMessage) and getattr(m, "name", "") == "search_recipients":
+            found = _SINGLE_SAVED_RE.search(_content_text(m.content))
+            if found:
+                return found.group(1)
+    return None
+
+
+def _mentions_amount(user_text: str) -> bool:
+    """Does the user's own message carry an amount (digits, Urdu digits, or number words)?"""
+    return bool(_AMOUNT_RE.search(user_text))
+
+
+def _called_tool_named(state: dict[str, Any], name: str) -> bool:
+    return any(isinstance(m, ToolMessage) and getattr(m, "name", "") == name
+               for m in state.get("messages", []))
 
 
 def _called_a_tool(state: dict[str, Any], successfully: bool = False) -> bool:

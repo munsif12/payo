@@ -1684,6 +1684,18 @@
         "totalOutPaisa": {
           "title": "Totaloutpaisa",
           "type": "integer"
+        },
+        "txnCount": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Txncount"
         }
       },
       "required": [

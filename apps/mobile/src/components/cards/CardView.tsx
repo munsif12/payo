@@ -3,6 +3,7 @@ import { Pressable, Share, View, type StyleProp, type ViewStyle } from 'react-na
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { useOpenStatementPdf } from '../../lib/openStatementPdf';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowDownLeft, ArrowDownRight, ArrowUpRight, BellRing, Check, ChevronRight, Clock, Download,
@@ -512,33 +513,67 @@ function StatementCardView({ card }: { card: ChatCard }) {
   const { t } = useTranslation();
   const { c } = useTheme();
   const urdu = useIsUrdu();
+  const openPdf = useOpenStatementPdf();
   const period = card.period as { en: string; ur: string };
+  const statementId = String(card.statementId);
+  const totalIn = Number(card.totalInPaisa);
+  const totalOut = Number(card.totalOutPaisa);
+  const txnCount = card.txnCount as number | undefined;
+  const row = { flexDirection: urdu ? 'row-reverse' : 'row' } as const;
+  // v8 (Direction A artboard): the card reads as the first page of the PDF —
+  // brand line, "PDF ready" pill, the period, the in/out tiles — and "Open PDF"
+  // opens the real file from the card, so a spoken "generate my statement"
+  // ends with the PDF in hand without leaving the conversation.
   return (
-    <CardShell style={{ alignItems: 'center', gap: space.s }}>
-      <FileText size={22} color={c.ink2} strokeWidth={2} />
-      <Text variant="hl" center>{urdu ? period.ur : period.en}</Text>
-      <Text variant="foot" center>
-        {ltrIsolate(`${t('statements.moneyIn')} ${formatPaisa(Number(card.totalInPaisa))} · ${t('statements.moneyOut')} ${formatPaisa(Number(card.totalOutPaisa))}`)}
-      </Text>
-      <StatementDownload statementId={String(card.statementId)} />
+    <CardShell style={{ paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden' }}>
+      <View style={{ backgroundColor: c.surface2, paddingHorizontal: CARD_PAD_H, paddingVertical: CARD_PAD_V, gap: space.s }}>
+        <View style={[row, { alignItems: 'center', justifyContent: 'space-between' }]}>
+          <Text variant="cap" color={c.navy} style={{ letterSpacing: 0.4 }}>{t('cards.statement.brand')}</Text>
+          <Pill
+            label={t('statements.ready')}
+            bg={c.greenTint}
+            color={c.green}
+            icon={<Check size={12} color={c.green} strokeWidth={3} />}
+          />
+        </View>
+        <Text variant="h2">{urdu ? period.ur : period.en}</Text>
+        {typeof txnCount === 'number' ? (
+          <Text variant="foot" color={c.ink3}>{ltrIsolate(t('statements.transactions', { count: txnCount }))}</Text>
+        ) : null}
+        <View style={[row, { gap: space.s }]}>
+          <StatementTotal label={t('statements.moneyIn')} value={'+' + formatPaisa(totalIn)} color={c.green} />
+          <StatementTotal label={t('statements.moneyOut')} value={'−' + formatPaisa(totalOut)} color={c.red} />
+        </View>
+      </View>
+      <View style={{ paddingHorizontal: CARD_PAD_H, paddingVertical: CARD_PAD_V, gap: space.s }}>
+        <Button
+          testID="chat-statement-download"
+          label={t('statements.open')}
+          icon={<FileText size={20} color={c.navy} strokeWidth={2} />}
+          onPress={() => { openPdf(statementId); }}
+          style={{ alignSelf: 'stretch' }}
+        />
+        <Button
+          testID="chat-statement-share"
+          variant="ghost"
+          label={t('statements.share')}
+          icon={<Share2 size={18} color={c.ink2} strokeWidth={2} />}
+          onPress={() => { openPdf(statementId); }}
+          style={{ alignSelf: 'stretch' }}
+        />
+      </View>
     </CardShell>
   );
 }
 
-// statementId is accepted for context/testability but unused — StatementCardView
-// only deep-links to the Statements list, matching the pre-restyle behaviour.
-function StatementDownload({ statementId: _statementId }: { statementId: string }) {
-  const { t } = useTranslation();
+/** One in/out tile on the statement card: label over a coloured, LTR-isolated amount. */
+function StatementTotal({ label, value, color }: { label: string; value: string; color: string }) {
   const { c } = useTheme();
-  const router = useRouter();
   return (
-    <Button
-      testID="chat-statement-download"
-      label={t('statements.download')}
-      icon={<Download size={20} color={c.navy} strokeWidth={2} />}
-      onPress={() => router.push('/statements')}
-      style={{ alignSelf: 'stretch' }}
-    />
+    <View style={{ flex: 1, backgroundColor: c.surface, borderRadius: radius.input, paddingHorizontal: 12, paddingVertical: 10, gap: 2 }}>
+      <Text variant="foot" color={c.ink3} numberOfLines={1}>{label}</Text>
+      <Text variant="hl" weight={800} color={color} numberOfLines={1}>{ltrIsolate(value)}</Text>
+    </View>
   );
 }
 

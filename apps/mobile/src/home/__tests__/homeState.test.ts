@@ -7,14 +7,14 @@ const at = (mode: Parameters<typeof headStatus>[0], messageCount: number, record
 const SHEET_OVERLAP = 14;
 
 test('head heights are the artboards navy heights', () => {
-  expect(HEAD_HEIGHT).toEqual({ greet: 330, listening: 350, conversation: 230 });
-  expect(headHeight('greet')).toBe(330);
+  expect(HEAD_HEIGHT).toEqual({ greet: 300, listening: 350, conversation: 230 });
+  expect(headHeight('greet')).toBe(300);
   expect(headHeight('listening')).toBe(350);
   expect(headHeight('conversation')).toBe(230);
 });
 
 test('the sheet lands on each artboards sheet top once it overlaps the head', () => {
-  expect(headHeight('greet') - SHEET_OVERLAP).toBe(316);
+  expect(headHeight('greet') - SHEET_OVERLAP).toBe(286);
   expect(headHeight('listening') - SHEET_OVERLAP).toBe(336);
   expect(headHeight('conversation') - SHEET_OVERLAP).toBe(216);
 });

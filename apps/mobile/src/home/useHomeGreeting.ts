@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Zap, Wallet, Smartphone, FileText, type LucideIcon } from 'lucide-react-native';
+import { Send, Zap, Wallet, Smartphone, FileText, HelpCircle, type LucideIcon } from 'lucide-react-native';
 import { useMeQuery, useDueBillsQuery } from '../api/client';
 import { greetingBucket, billSubtitle, firstName, type Translate } from './homeGreetingLogic';
 import type { DueBill } from '../api/types';
@@ -8,7 +8,7 @@ import type { DueBill } from '../api/types';
 export { greetingBucket, billSubtitle, firstName };
 
 export interface Suggestion {
-  key: 'send' | 'bill' | 'balance' | 'topup' | 'statement';
+  key: 'send' | 'bill' | 'balance' | 'topup' | 'statement' | 'help';
   icon: LucideIcon;
   title: string;
   subtitle: string;
@@ -16,7 +16,7 @@ export interface Suggestion {
   intent: string;
 }
 
-/** The five Home suggestion cards, in the brief's fixed order. Pure — takes a
+/** The six Home suggestion tiles, in the brief's fixed order (v8 adds Help). Pure — takes a
  * translator + plain data so it's testable without RTK/i18next context. */
 export function buildSuggestions(urdu: boolean, dueBill: DueBill | undefined, t: Translate): Suggestion[] {
   return [
@@ -44,6 +44,12 @@ export function buildSuggestions(urdu: boolean, dueBill: DueBill | undefined, t:
       key: 'statement', icon: FileText,
       title: t('home.suggest.statement.title'), subtitle: t('home.suggest.statement.subtitle'),
       intent: t('home.suggest.statement.intent'),
+    },
+    // v8: a sixth tile so the two-column grid is even; it opens the help card.
+    {
+      key: 'help', icon: HelpCircle,
+      title: t('home.suggest.help.title'), subtitle: t('home.suggest.help.title'),
+      intent: t('home.suggest.help.intent'),
     },
   ];
 }

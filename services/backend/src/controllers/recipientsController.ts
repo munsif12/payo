@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import mongoose from 'mongoose';
-import { Recipient, Institution } from '../models';
+import { Recipient, Institution, User } from '../models';
 import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { resolveRecipient } from '../lib/resolveRecipient';
 import { escapeRegExp } from '../lib/fmt';
 import { logoUrlFor } from '../lib/logos';
+import { relationAliases } from '../lib/relations';
 
 type RecipientDoc = InstanceType<typeof Recipient>;
 
@@ -34,7 +35,18 @@ export async function listRecipients(req: Request, res: Response) {
   const filter: Record<string, unknown> = { userId: req.userId };
   if (q) {
     const re = new RegExp(escapeRegExp(q), 'i');
-    filter.$or = [{ nickname: re }, { title: re }, { identifier: re }];
+    const or: Record<string, unknown>[] = [{ nickname: re }, { title: re }, { identifier: re }];
+    // "my father" / "ammi" / "والد": a family word matches every nickname that names that
+    // relationship (Abbu, Abba, Baba, …), so the AI can search with the word the user said.
+    const aliases = relationAliases(q);
+    if (aliases) or.push({ nickname: new RegExp(`^(${aliases.map(escapeRegExp).join('|')})(\\b|$)`, 'iu') });
+    // An Urdu-script query ("بلال") cannot match a Latin nickname or title, but a PAYO-linked
+    // recipient has a real user behind it whose urduName can — so "بلال کو بھیجو" finds Bilal.
+    if (/[\u0600-\u06FF]/u.test(q)) {
+      const linked = await User.find({ urduName: re }, { _id: 1 });
+      if (linked.length) or.push({ linkedUserId: { $in: linked.map((u) => u._id) } });
+    }
+    filter.$or = or;
   }
   const items = await Recipient.find(filter).sort({ lastUsedAt: -1 });
   const dtos = await Promise.all(items.map(recipientDto));

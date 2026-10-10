@@ -21,6 +21,20 @@ app (money received, bills due, approvals waiting — a setting, on by default).
 classic wallet UI (tabs: Home / Wallet / Pay / More) covers every capability by hand, in
 either language. Demo only: no real money movement, no payment gateways.
 
+**v8 (presentation build): family by voice, a docked voice bar, PDF-first statements.** The
+seed pre-saves each demo user's family (Abbu · Bilal · Sara · Ammi) with real PAYO titles, and
+`GET /recipients?q=` understands family words in English, Urdu script and Roman Urdu — *father*,
+*abbu*, *abba*, *baba*, *والد* all find the person saved as "Abbu"; an Urdu-script name (*بلال*)
+reaches a PAYO-linked recipient through their Urdu name. So **"Send 2,000 to my father"** goes
+straight to the confirmation card and the PIN sheet — no bank question, no "shall I send?", no
+phone number — and the card names them the way you do ("Abbu (Abdul Rehman)"). Home carries a
+**Family row** (tap Abbu → "Send money to Abbu"), a two-column grid of suggestion chips, and a
+**docked voice bar** (amber mic · hint · keyboard) in place of the floating mic. **"Generate my
+e-statement for last month"** answers with a card that reads like the PDF's first page (period,
+transaction count, money in/out) and whose *Open PDF* hands the real file to the iOS share sheet
+from inside the chat. Design samples for this build (three directions × four screens) are in
+`docs/design/v8-pen/` (Pencil file + PNG exports); the shipped UI is Direction A.
+
 **Send money works like a Pakistani wallet** (Easypaisa/JazzCash model): a recipient is
 *identifier + institution* — a phone number for PAYO/Easypaisa/JazzCash/SadaPay/NayaPay,
 or an IBAN/account number for a bank. The app (or the assistant, via chips) resolves the
@@ -57,8 +71,8 @@ Docs: see the **Documents** index at the end of this file.
 | AI fallback without keys | `cd services/ai && uv run uvicorn mock_ai:app --port 8000 --app-dir ../../scripts/mock-ai` |
 | Mobile (Metro :8081) | `cd apps/mobile && npx expo start` → open in Expo Go on the iOS simulator (`i`) / Android emulator (`a`) |
 
-**Sign in:** phone `+923001110001` (Ammi Jaan; five more seeded users, same pattern), OTP
-is echoed back by the demo backend (`demoOtp`), PIN `1234`. New phone numbers go through
+**Sign in:** phone `+923001110001` (Ammi Jaan; six more seeded users, same pattern — `…0007`
+is Abdul Rehman, "Abbu"), OTP is echoed back by the demo backend (`demoOtp`), PIN `1234`. New phone numbers go through
 Create PIN instead of Enter PIN. Then follow `docs/DEMO-SCRIPT.md`.
 
 ### API keys (`services/ai/.env`, gitignored)
@@ -106,6 +120,7 @@ cd services/ai && uv run python scripts/ai-smoke.py --language both
 | `docs/DEMO-SCRIPT.md` | The bilingual pitch script — flow order, what you say, what the audience sees, presenter recovery notes |
 | `docs/BLOCKERS.md` | Build blockers and the demo-time gotchas they left behind |
 | `docs/plans/2026-09-01-payo-roadmap.md` | Cross-service contracts (REST API, SSE protocol, card schemas, seed world) and the phase/status index |
+| `docs/design/v8-pen/` | v8 design samples — `payo-v8-samples.pen` (open in Pencil) and `exports/*.png`: Direction A (navy head, evolved — shipped), B (voice orb), C (daylight) |
 | `docs/plans/*.md` | Per-phase and per-version execution plans |
 
 Design specs (each builds on the one before; anything a later spec does not mention stays as built):

@@ -50,4 +50,9 @@ rules exist to protect it.**
   keeps the hands-free loop alive and each turn costs a Gemini call plus a synthesis. Mute the
   Mac's input between flows, or set `TTS_ENABLED=false` while rehearsing.
 - **Routing is probabilistic.** Run `uv run python scripts/ai-smoke.py --language both` in
-  `services/ai` before presenting; a full run still has about one intermittent miss.
+  `services/ai` before presenting; a full run still has about one intermittent miss. The v8 rows
+  are `F1` (my father), `F2` (a saved nickname) and `F3` (e-statement): `--rows F1,F2,F3`.
+- **Do not run the smoke script while you are on the OTP screen.** It requests a fresh demo OTP
+  for Ammi, which invalidates the code shown on the phone ("Wrong or expired OTP") — tap Resend.
+- **Reseeding signs every device out** (users get new ids → `SESSION_EXPIRED`). Seed before you
+  sign in, not during the demo. The family (Abbu · Bilal · Sara) is part of the seed.

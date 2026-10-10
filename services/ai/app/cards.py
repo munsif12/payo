@@ -67,6 +67,8 @@ class StatementCard(BaseModel):
     totalInPaisa: int
     totalOutPaisa: int
     downloadUrl: str
+    # v8: the chat card reads like the PDF's first page; the count is its subtitle.
+    txnCount: int | None = None
 
 
 class InstitutionRef(BaseModel):

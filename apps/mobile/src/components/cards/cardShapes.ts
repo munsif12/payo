@@ -151,6 +151,7 @@ export interface StatementCard {
   totalInPaisa: number;
   totalOutPaisa: number;
   downloadUrl: string;
+  txnCount?: number;
 }
 
 export interface BillCard {
