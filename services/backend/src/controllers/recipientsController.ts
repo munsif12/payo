@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import mongoose from 'mongoose';
-import { Recipient, Institution } from '../models';
+import { Recipient, Institution, User } from '../models';
 import { ApiError } from '../lib/apiError';
 import { ok } from '../lib/respond';
 import { resolveRecipient } from '../lib/resolveRecipient';
@@ -40,6 +40,12 @@ export async function listRecipients(req: Request, res: Response) {
     // relationship (Abbu, Abba, Baba, …), so the AI can search with the word the user said.
     const aliases = relationAliases(q);
     if (aliases) or.push({ nickname: new RegExp(`^(${aliases.map(escapeRegExp).join('|')})(\\b|$)`, 'iu') });
+    // An Urdu-script query ("بلال") cannot match a Latin nickname or title, but a PAYO-linked
+    // recipient has a real user behind it whose urduName can — so "بلال کو بھیجو" finds Bilal.
+    if (/[\u0600-\u06FF]/u.test(q)) {
+      const linked = await User.find({ urduName: re }, { _id: 1 });
+      if (linked.length) or.push({ linkedUserId: { $in: linked.map((u) => u._id) } });
+    }
     filter.$or = or;
   }
   const items = await Recipient.find(filter).sort({ lastUsedAt: -1 });

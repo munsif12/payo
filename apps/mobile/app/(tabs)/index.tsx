@@ -112,6 +112,9 @@ export default function Home() {
     const text = draft.trim();
     if (!text) return;
     setDraft('');
+    // v8: the keyboard goes away with the message, so the reply (and the PIN sheet
+    // that may follow) lands on a clear screen instead of under the keyboard.
+    setInputOpen(false);
     // Typing hands the conversation back to tap-per-turn (spec §1 rule 6).
     loop.onTextSend(text);
   };

@@ -12,7 +12,9 @@ export type HomeState = 'greet' | 'listening' | 'conversation';
  *  it: 330/316, 350/336, 230/216. These are the NAVY heights, so Home's
  *  `marginTop: -SHEET_OVERLAP` lands the sheet on the artboard's top edge. */
 export const HEAD_HEIGHT: Record<HomeState, number> = {
-  greet: 330,
+  // v8: the family row joined the sheet, so the greet head gives back 30 pt
+  // of the artboard's empty navy (330 → 300). Listening/conversation unchanged.
+  greet: 300,
   listening: 350,
   conversation: 230,
 };

@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { createApp } from '../../app';
 import { createVerifiedUser } from '../../testUtils/factories';
-import { Institution, Recipient } from '../../models';
+import { Institution, Recipient, User } from '../../models';
 
 const app = createApp();
 
@@ -133,6 +133,9 @@ test('recipients search understands family words: ?q=father finds the nickname "
   }
   // A relationship nobody is saved under finds nothing — never a guess.
   expect((await get('brother')).body.data.items).toHaveLength(0);
+  // An Urdu-script name reaches a PAYO-linked recipient through the linked user's urduName.
+  await User.updateOne({ _id: friend.userId }, { $set: { urduName: 'منصف' } });
+  expect((await get('منصف')).body.data.items.map((i: { nickname: string }) => i.nickname)).toEqual(['Munsif']);
   // Plain nicknames still match as before.
   expect((await get('munsif')).body.data.items).toHaveLength(1);
 });

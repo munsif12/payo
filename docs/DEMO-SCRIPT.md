@@ -5,15 +5,17 @@ use in either language mode) and **what the audience sees**. Demo persona: **Amm
 phone `+923001110001`, PIN `1234`, balance seeded with realistic history and a due
 K-Electric bill.
 
-**Run order and timing (~9 min):**
+**Run order and timing (~11 min):**
 
 | # | Flow | Time | The point |
 |---|---|---|---|
 | 0 | Opening | 30 s | Phone + PIN, greeting, talk to it like a phone call |
-| 1 | A — Send money like a wallet ⭐ | 2 min | Bank chips → resolve → PIN in chat → save |
+| 1 | A0 — "Send 2,000 to my father" ⭐ hands-free hero | 1 min | A family word → the saved person → confirmation card → PIN. No question asked |
+| 1b | A — Send money like a wallet ⭐ | 2 min | Bank chips → resolve → PIN in chat → save |
 | 2 | B — Saved recipient + bill | 1 min | It remembers; three input languages |
 | 3 | C — The Urdu switch + two Munsifs | 1 min | RTL instantly; ambiguity becomes a question |
 | 4 | E — Ask it anything, as cards | 1 min | No menus; every screen has a spoken equivalent |
+| 4b | S — "Generate my e-statement" | 45 s | A PDF-first card in the chat; Open PDF hands over the real file |
 | 5 | F — The guardian and the scam call ⭐ | 2 min | Two devices; one calm question stops a scam |
 | 6 | D — Classic layer | 45 s | Everything the AI does, your hands can do too |
 | 7 | Close | 20 s | — |
@@ -47,6 +49,24 @@ until your job is done."
 پاس ورڈ، نہ فارم — بس فون نمبر اور پن۔»
 **Audience sees:** Home screen — animated greeting ("Good morning, Ammi Jaan"), balance
 pill, five suggestion cards staggering in.
+
+## Flow A0 — "Send 2,000 to my father" (1 min) ⭐ the hands-free hero
+
+**Setup:** nothing — the seed pre-saves Ammi's family (Abbu · Bilal · Sara), shown as the
+**Family row** at the top of the Home sheet. Tap the mic once (the amber disc in the docked
+voice bar) so the conversation is hands-free, then just talk.
+**Say (en):** "Send two thousand rupees to my father." · **(اردو):** «ابو کو دو ہزار روپے بھیجو»
+**Audience sees:** PAYO looks the family word up itself — *father* finds the person saved as
+**Abbu** (English, Urdu script or Roman Urdu: abbu, abba, baba, والد all work) — and, because
+there is exactly one match and the amount was said, it goes **straight to the confirmation
+card**: "Send Rs 2,000 to Abbu", fee, total, and the PIN sheet opens by itself. No "which
+bank?", no "shall I send?", no phone number. Enter `1234` → green success card → PAYO *speaks*
+the outcome and keeps listening.
+**Say (en):** "That is the whole product in one sentence: she said what she wanted, in her own
+words, and the only thing she touched was her PIN. The assistant prepared it; her PIN sent it."
+**Also try:** tapping **Abbu** in the Family row — it sends the same turn ("Send money to Abbu")
+and PAYO asks only for the amount. "Send 500 to Bilal" / «بلال کو پانچ سو بھیجو» works the same
+way from a saved nickname, in either script.
 
 ## Flow A — Send money like a wallet: bank choice, PIN in chat, save (2 min) ⭐ the hero
 
@@ -115,6 +135,19 @@ here on. Try «مدد» for the help card, «میرے بچت والے پاکٹ �
 **Say (en):** "Every screen in the classic app has a spoken equivalent, and every answer
 is a card — because our users don't read menus, they ask."
 
+## Flow S — "Generate my e-statement" (45 s) — the PDF without the menu
+
+**Say (en):** *say:* "Generate my e-statement for last month." · **(اردو):** «پچھلے مہینے کی
+اسٹیٹمنٹ بنا دو»
+**Audience sees:** a **statement card** that reads like the first page of the PDF — the PAYO
+e-Statement brand line, a green "PDF ready" pill, the period ("September 2026"), the transaction
+count, and two tiles: money in (green) and money out (red). PAYO speaks the gist. Tap **Open PDF**:
+the real PDF (built on the spot by the backend) comes up in the iOS share sheet — AirDrop it,
+save it to Files, mail it — without leaving the conversation. "List my statements" shows every
+statement generated so far as rows with the same Open action.
+**Say (en):** "Statements are where every bank hides a form. Here it is one sentence, and the
+file is in your hand."
+
 ## Flow F — "Ask my son first": the guardian and the scam call (2 min) ⭐ for investors
 
 **Setup:** second phone/simulator signed in as Bilal (`3001110002`). Backend started with
@@ -167,6 +200,9 @@ to every screen, and a grandmother who never has to see a form. That's PAYO."
   Cartesia call.
 - Re-running `npm run seed` mid-demo resets the world but also **wipes saved recipients and
   billers** — Flow B depends on Flow A having saved one, so re-walk A before B after a reseed.
+  The family (Abbu · Bilal · Sara) is part of the seed, so Flow A0 survives a reseed.
+- The Family row on Home is the first four saved recipients, most recently used first; after a
+  live save (Flow A's "Munsif") that person joins the row.
 - Wrong PIN on purpose is a nice extra beat: the pad shakes back with an inline error
   ("Wrong PIN, try again" / «پن غلط ہے، دوبارہ کوشش کریں») and nothing moves — the
   session stays signed in either way. This works identically whether the PIN sheet

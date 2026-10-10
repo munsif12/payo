@@ -396,9 +396,16 @@ async def search_recipients(client: BackendClient, query: str) -> Result:
         )
     if len(items) == 1:
         r = items[0]
+        # A saved recipient needs no recipient card and no "shall I send?" — the
+        # confirmation card IS the question (live smoke F1/F2: the model narrated
+        # "please confirm on the card" and called nothing).
         return _ok(
-            f"Found one saved recipient: {r['nickname']} ({r['title']}) at {r['institution']['name']} — "
-            f"{r['identifier']}, recipient_id {r['id']}."
+            f"Found exactly one saved recipient: {r['nickname']} ({r['title']}) at {r['institution']['name']} — "
+            f"{r['identifier']}, recipient_id {r['id']}. NEXT STEP, in this same turn: if the user already "
+            f"said an amount, call send_money(amount_paisa=<amount in paisa>, recipient_id='{r['id']}') NOW — "
+            f"do NOT ask 'shall I send?', do NOT call resolve_recipient, do NOT say 'confirm on the card' "
+            f"before send_money has run (the confirmation card it creates is the user's confirmation). "
+            f"If no amount was given, ask only for the amount."
         )
     chips = [
         RecipientChip(

@@ -119,7 +119,9 @@ export async function runSeed() {
   await Bill.create({
     billerId: kElectric._id, consumerNo: AMMI.dueBillConsumerNo,
     consumerName: ammi.name, amountPaisa: AMMI.dueBillAmountPaisa,
-    dueDate: new Date(now.getFullYear(), now.getMonth(), 10),
+    // Five days out, so the digest and the Pay tile always say "due in a few days" on
+    // demo day rather than a date that has already passed.
+    dueDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 5, 12, 0),
     month: `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`,
     status: 'due',
     userId: ammi._id,

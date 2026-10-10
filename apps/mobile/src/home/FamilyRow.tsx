@@ -57,7 +57,7 @@ export function FamilyRow({ people, onIntent, testID = 'home-family' }: {
             sub={urdu && p.institution.urduName ? p.institution.urduName : p.institution.name}
             onPress={() => onIntent(t('home.family.intent', { name: p.nickname }))}
           >
-            <Avatar name={p.title || p.nickname} size={AVATAR} bg={tint(i, c).bg} color={tint(i, c).color} />
+            <Avatar name={p.nickname} size={AVATAR} bg={tint(i, c).bg} color={tint(i, c).color} />
           </PersonTile>
         ))}
         <PersonTile testID="home-family-add" label={t('home.family.add')} sub={t('home.family.addSub')} onPress={() => router.push('/send')}>
@@ -98,7 +98,7 @@ function PersonTile({ testID, label, sub, onPress, children }: {
     >
       {children}
       <Text variant="foot" weight={700} numberOfLines={1} center style={{ fontSize: 13 }}>{label}</Text>
-      <Text variant="cap" numberOfLines={1} center style={{ fontSize: 11, letterSpacing: 0, marginTop: -4 }}>{sub}</Text>
+      <Text variant="foot" numberOfLines={1} center style={{ fontSize: 11, lineHeight: 14, marginTop: -4 }}>{sub}</Text>
     </AnimatedPressable>
   );
 }

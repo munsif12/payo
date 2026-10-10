@@ -42,12 +42,14 @@ export async function createTransfer(req: Request, res: Response) {
   const { to, amountPaisa, riskFlags: clientRiskFlags, riskTarget } = bodySchema.parse(req.body);
 
   let institutionId: string; let identifier: string; let recipientId: string | undefined;
+  let nickname: string | undefined;
   if ('recipientId' in to) {
     const r = await Recipient.findOne({ _id: to.recipientId, userId: req.userId }).catch(() => null);
     if (!r) throw new ApiError(404, 'NOT_FOUND', 'Recipient not found');
     institutionId = String(r.institutionId);
     identifier = r.identifier;
     recipientId = String(r._id);
+    nickname = r.nickname;
   } else {
     institutionId = to.institutionId;
     identifier = to.identifier;
@@ -66,8 +68,13 @@ export async function createTransfer(req: Request, res: Response) {
     identifier: resolved.identifier, title: resolved.title, linkedUserId: resolved.linkedUserId, recipientId,
   };
 
+  // v8: a saved recipient is named the way the user names them — "Abbu (Abdul Rehman)" —
+  // so the confirmation card reads back the word they said, with the account title beside it.
+  const who = nickname && nickname.toLowerCase() !== resolved.title.toLowerCase()
+    ? `${nickname} (${resolved.title})`
+    : resolved.title;
   const lines = [
-    { label: LINE_TO, value: `${resolved.title} · ${resolved.institution.name} · ${maskIdentifier(resolved.identifier)}` },
+    { label: LINE_TO, value: `${who} · ${resolved.institution.name} · ${maskIdentifier(resolved.identifier)}` },
     { label: LINE_AMOUNT, value: fmtRs(amountPaisa) },
   ];
   if (feePaisa > 0) lines.push({ label: LINE_FEE, value: fmtRs(feePaisa) });
@@ -91,8 +98,8 @@ export async function createTransfer(req: Request, res: Response) {
     amountPaisa, feePaisa,
     approval: risk.approval, riskFlags: risk.riskFlags, expiryMs: risk.expiryMs,
     summary: {
-      en: `Send ${fmtRs(amountPaisa)} to ${resolved.title}`,
-      ur: `${resolved.title} کو ${fmtRs(amountPaisa)} بھیجیں`,
+      en: `Send ${fmtRs(amountPaisa)} to ${who}`,
+      ur: `${who} کو ${fmtRs(amountPaisa)} بھیجیں`,
     },
     lines,
   });

@@ -118,6 +118,11 @@ ROWS = [
      "list_transactions", "transactions", None),
     ("B3", "Show my saved billers", "میرے محفوظ بلر دکھائیں", "list_saved_billers", "billers", None),
     ("B4", "I want to top up a phone", "مجھے موبائل لوڈ کرانا ہے", "list_telcos", "telco_chips", None),
+    # v8 family: "my father" resolves through the backend's relation aliases to the seeded
+    # saved recipient "Abbu" — one match, so the assistant goes straight to the amount.
+    ("F1", "Send 2,000 rupees to my father", "ابو کو دو ہزار روپے بھیجو", "send_money", "confirmation", None),
+    ("F2", "Send 500 rupees to Bilal", "بلال کو پانچ سو روپے بھیجو", "send_money", "confirmation", None),
+    ("F3", "Generate my e-statement for last month", "پچھلے مہینے کی ای اسٹیٹمنٹ بنا دو", "get_statement", "statement", None),
     ("P1", "Show my savings pockets", "میری بچت پاکٹس دکھائیں", "list_pockets", "pockets", None),
     ("P2", "Make a Hajj pocket with a goal of two lakh", "دو لاکھ کے ہدف والی حج پاکٹ بنائیں",
      "create_pocket", "pocket", None),
