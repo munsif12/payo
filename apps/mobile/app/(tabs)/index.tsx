@@ -89,6 +89,10 @@ export default function Home() {
     loopRef.current = loop.handlers;
   }, [loop.handlers]);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  // The greet face is one screen tall by design (B11); a stale offset (the
+  // keyboard shrinking the sheet, a tab re-focus) must never hide the hint row
+  // under the greeting, so it snaps back to the top whenever it is shown.
+  const greetRef = useRef<ScrollView>(null);
 
   // Entrance choreography, once per mount (spec §3). The greeting words go
   // first, the sheet settles behind the last word, then the rows cascade.
@@ -134,6 +138,9 @@ export default function Home() {
       return () => orbBus.setHandler(null);
     }, [toggleLoop, startLoop]),
   );
+  useEffect(() => {
+    if (state === 'greet' && !inputOpen) greetRef.current?.scrollTo({ y: 0, animated: false });
+  }, [state, inputOpen]);
   // Mirror the loop so every orb shows the same face (Mic / AudioLines).
   useEffect(() => {
     orbBus.setState(orbStateFor(loop.mode, recording));
@@ -266,10 +273,11 @@ export default function Home() {
           // B11: hint + keyboard, the hero orb, the examples, FAMILY, the due
           // bill, the digest (when there is one), then the suggestion chips.
           <ScrollView
+            ref={greetRef}
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[{ gap: space.l, paddingTop: space.s }, contentPadding]}
+            contentContainerStyle={[{ gap: space.m, paddingTop: 0 }, contentPadding]}
           >
             <Rise delay={rowDelay(0)}>
               <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: space.m }}>
@@ -281,7 +289,7 @@ export default function Home() {
             </Rise>
 
             {/* The orb never mirrors (§6 rule 3): it is centred either way. */}
-            <View style={{ alignItems: 'center', paddingVertical: space.l }}>
+            <View style={{ alignItems: 'center', paddingVertical: space.s }}>
               <HeroOrb listening={listening} onPress={toggleLoop} label={orbLabel} testID={orbTestID} />
             </View>
 

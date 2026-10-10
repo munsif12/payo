@@ -69,6 +69,6 @@ test('dueBillTitle: biller + amount + short date (English)', () => {
 
 test('dueBillTitle: Urdu biller name, with the amount and date isolated LTR', () => {
   expect(dueBillTitle(bill, true, t)).toBe(
-    'home.orb.billTitle:' + JSON.stringify({ biller: 'کے الیکٹرک', amount: ltrIsolate('₨4,320'), date: ltrIsolate('Sep 10') }),
+    'home.orb.billTitle:' + JSON.stringify({ biller: 'کے الیکٹرک', amount: ltrIsolate('₨4,320'), date: ltrIsolate('10 ستمبر') }),
   );
 });

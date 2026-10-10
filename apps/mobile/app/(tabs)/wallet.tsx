@@ -210,7 +210,7 @@ export default function Wallet() {
               >
                 <Zap size={24} color={c.amber} strokeWidth={2.2} />
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text variant="hl" weight={600} color={c.ink} numberOfLines={1} style={{ lineHeight: urdu ? undefined : 22 }}>
+                  <Text variant="hl" weight={600} color={c.ink} numberOfLines={2} style={{ lineHeight: urdu ? undefined : 22 }}>
                     {t('wallet.dueBill.title', {
                       biller: urdu && dueBill.biller.urduName ? dueBill.biller.urduName : dueBill.biller.name,
                       date: formatShortDate(dueBill.dueDate, now, lang),

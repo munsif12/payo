@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
 import {
   PiggyBank, CreditCard, FileText, ArrowDownLeft, Languages, Shield, Bell, LifeBuoy, LogOut,
-  ChevronRight, Settings as SettingsIcon, type LucideIcon,
+  ChevronLeft, ChevronRight, Settings as SettingsIcon, type LucideIcon,
 } from 'lucide-react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -228,5 +228,8 @@ function IconSquare({ icon: Icon, tint }: { icon: LucideIcon; tint?: 'danger' })
 function Chevron() {
   const { c } = useTheme();
   const urdu = useIsUrdu();
-  return <ChevronRight size={20} color={c.ink3} strokeWidth={2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />;
+  // A flipped Svg does not render reliably — use the mirrored glyph instead.
+  return urdu
+    ? <ChevronLeft size={20} color={c.ink3} strokeWidth={2} />
+    : <ChevronRight size={20} color={c.ink3} strokeWidth={2} />;
 }

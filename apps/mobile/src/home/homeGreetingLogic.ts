@@ -42,7 +42,7 @@ export function billSubtitle(bill: DueBill | undefined, urdu: boolean, t: Transl
 export function dueBillTitle(bill: DueBill, urdu: boolean, t: Translate): string {
   const biller = urdu && bill.biller.urduName ? bill.biller.urduName : bill.biller.name;
   const amount = formatPaisa(bill.amountPaisa);
-  const date = formatShortDate(bill.dueDate);
+  const date = formatShortDate(bill.dueDate, undefined, urdu ? 'ur' : 'en');
   return t('home.orb.billTitle', {
     biller,
     amount: urdu ? ltrIsolate(amount) : amount,
