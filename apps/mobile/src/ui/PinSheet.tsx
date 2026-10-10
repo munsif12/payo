@@ -4,6 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from '
 import { useTranslation } from 'react-i18next';
 import { Lock } from 'lucide-react-native';
 import { useTheme } from '../theme/useTheme';
+import { glassTokens } from '../theme/tokens';
 import { D_SHEET, D_UI, D_MICRO, EASE_OUT, EASE_IN } from '../motion/config';
 import { useReducedMotion } from '../motion/useReducedMotion';
 import { usePressScale } from '../motion/usePressScale';
@@ -19,9 +20,9 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const easeOut = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
 const easeIn = Easing.bezier(EASE_IN[0], EASE_IN[1], EASE_IN[2], EASE_IN[3]);
 
-// HomePinSheet.dc.html geometry.
-/** Backdrop rgba(13,42,61,.45) — c.navy is #0D2A3D, so this is its opacity. */
-const BACKDROP_OPACITY = 0.45;
+// HomePinSheet.dc.html geometry, in the glass vocabulary (GLASS-SPEC §5).
+/** "Backdrop black 0.5" — the scrim fades up to this opacity. */
+const BACKDROP_OPACITY = glassTokens.backdrop.opacity;
 /** Sheet: 560 tall, 28 radius on the top corners, 14/20 padding, 22 at the foot. */
 const SHEET_HEIGHT = 560;
 const SHEET_RADIUS = 28;
@@ -57,9 +58,11 @@ export interface PinSheetProps {
   onClose: () => void;
 }
 
-// PinSheet — HomePinSheet.dc.html: a cream 560pt sheet with the grab handle, a
-// 56pt amberTint lock disc, "Enter your PIN" at 22/800 over the action summary,
-// the dots, the 72pt keypad and the Cancel foot, on a navy .45 backdrop.
+// PinSheet — GLASS-SPEC §5 "PIN sheet (B3 bottom)": a 560 pt `navyDeep` sheet,
+// top corners 28 with the 1 px glass line along the top edge, the grab handle,
+// a 56 pt amberTint lock disc (amber lock), the title at 22/800 over the
+// action summary, the dots, the 72 pt glass keypad and the Cancel foot, on a
+// black .5 backdrop.
 // Presentational only — all state (digits/submit/error/locked) lives in
 // usePinSheet's reducer, and the shake + lockout behaviour is unchanged.
 export function PinSheet({ visible, action, state, onDigit, onBackspace, onClose }: PinSheetProps) {
@@ -114,7 +117,7 @@ export function PinSheet({ visible, action, state, onDigit, onBackspace, onClose
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Animated.View
-          style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: c.navy }, scrimStyle]}
+          style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: glassTokens.backdrop.color }, scrimStyle]}
         >
           <Pressable
             testID="pin-sheet-backdrop"
@@ -134,7 +137,12 @@ export function PinSheet({ visible, action, state, onDigit, onBackspace, onClose
               // and an error/lockout line must push the sheet taller rather
               // than be clipped by it.
               minHeight: SHEET_HEIGHT,
-              backgroundColor: c.bg,
+              backgroundColor: c.navyDeep,
+              // The glass line follows the rounded top edge; the sheet's foot
+              // runs off the bottom of the screen, so no line there.
+              borderWidth: glassTokens.line,
+              borderBottomWidth: 0,
+              borderColor: c.separator,
               borderTopLeftRadius: SHEET_RADIUS,
               borderTopRightRadius: SHEET_RADIUS,
               paddingTop: SHEET_PAD_TOP,
@@ -154,7 +162,7 @@ export function PinSheet({ visible, action, state, onDigit, onBackspace, onClose
               marginTop: LOCK_MARGIN_TOP,
             }}
           >
-            <Lock size={LOCK_GLYPH} color={c.onAmber} strokeWidth={2} />
+            <Lock size={LOCK_GLYPH} color={c.amber} strokeWidth={2} />
           </View>
 
           <Text variant="h2" weight={800} center style={{ marginTop: SHEET_GAP }}>{t('pin.sheetTitle')}</Text>

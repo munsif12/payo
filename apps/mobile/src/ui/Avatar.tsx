@@ -10,7 +10,9 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// Avatar — Foundations.dc.html .avatar: 44pt circle, initials 15/700.
+// Avatar — GLASS-SPEC §2: 44 pt circle, initials 15/700. Default (self / list
+// rows): `avatarBlueTint` with `avatarBlue` initials. People you pay (family
+// tiles, confirmation card, Pay chips) pass `bg={c.cream} color={c.navy}`.
 export function Avatar({ name, size = 44, bg, color, style }: {
   name: string;
   size?: number;
@@ -26,7 +28,7 @@ export function Avatar({ name, size = 44, bg, color, style }: {
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: bg ?? c.amberTint,
+          backgroundColor: bg ?? c.avatarBlueTint,
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
@@ -34,7 +36,7 @@ export function Avatar({ name, size = 44, bg, color, style }: {
         style,
       ]}
     >
-      <Text variant="sub" weight={700} color={color ?? c.onAmber} style={{ lineHeight: undefined, fontSize: 15 }}>
+      <Text variant="sub" weight={700} color={color ?? c.avatarBlue} style={{ lineHeight: undefined, fontSize: 15 }}>
         {initials(name)}
       </Text>
     </View>

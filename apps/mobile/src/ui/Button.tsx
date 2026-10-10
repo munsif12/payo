@@ -3,7 +3,7 @@ import { Pressable, ActivityIndicator, StyleProp, ViewStyle } from 'react-native
 import * as Haptics from 'expo-haptics';
 import Animated from 'react-native-reanimated';
 import { useTheme } from '../theme/useTheme';
-import { radius, touch } from '../theme/tokens';
+import { radius, touch, glassTokens } from '../theme/tokens';
 import { usePressScale } from '../motion/usePressScale';
 import { Text } from './Text';
 
@@ -22,11 +22,10 @@ export interface ButtonProps {
   testID?: string;
 }
 
-// Button — Foundations.dc.html .btn (primary, amber pill 56pt) / .btn2
-// (secondary, surface2 pill 56pt) / .btnGhost (ghost, 52pt no fill); danger
-// mirrors the redTint/red status-pill pairing used elsewhere in the system.
-// Press feedback: scale 0.98 over 100ms + Haptics.selectionAsync, per
-// Motion.dc.html "Touch feedback".
+// Button — GLASS-SPEC §2: primary = amber pill, 56 pt, navy 700 text
+// (unchanged); secondary = glass fill + line, cream text; ghost = no fill,
+// ink2 (52 pt); danger = redTint fill, red text.
+// Press feedback: scale over D_MICRO + Haptics.selectionAsync (unchanged).
 export function Button({ label, onPress, variant = 'primary', disabled, loading, icon, style, testID }: ButtonProps) {
   const { c } = useTheme();
   const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
@@ -34,14 +33,16 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
   const height = variant === 'ghost' ? 52 : touch.primary;
   const bg =
     variant === 'primary' ? c.amber :
-    variant === 'secondary' ? c.surface2 :
+    variant === 'secondary' ? c.surface :
     variant === 'danger' ? c.redTint :
     'transparent';
   const textColor =
-    variant === 'primary' ? c.navy :
+    variant === 'primary' ? c.onAmber :
     variant === 'secondary' ? c.ink :
     variant === 'danger' ? c.red :
     c.ink2;
+  // Only the glass variant carries the line (§6 rule 2); amber and tints are flat.
+  const borderWidth = variant === 'secondary' ? glassTokens.line : 0;
 
   const handlePress = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -64,6 +65,8 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
           minHeight: touch.min,
           borderRadius: radius.button,
           backgroundColor: bg,
+          borderWidth,
+          borderColor: c.separator,
           opacity: disabled ? 0.4 : 1,
           alignItems: 'center',
           justifyContent: 'center',

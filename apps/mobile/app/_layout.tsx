@@ -10,6 +10,7 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import '../global.css';
 import '../src/i18n';
@@ -95,12 +96,16 @@ export default function RootLayout() {
   );
 }
 
+// GLASS-SPEC §1: the app is always dark navy and the status bar is always
+// light. Screens paint the gradient themselves (`Screen` / `GlassBackdropScope`);
+// the shell's flat navy is what shows between route transitions.
 function RootShell() {
   const { c } = useTheme();
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1, backgroundColor: c.navy }}>
+      <StatusBar style="light" />
       <AuthGate>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.navy } }} />
       </AuthGate>
     </View>
   );

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, Eye, EyeOff, Mic } from 'lucide-react-native';
 import { useSharedValue, type SharedValue } from 'react-native-reanimated';
-import { dark as onNavy, space, touch } from '../theme/tokens';
+import { space, touch } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { formatPaisa } from '../lib/money';
 import { ltrIsolate } from '../lib/bidi';
@@ -55,19 +55,29 @@ export interface NavyHeadProps {
   animateGreeting?: boolean;
   /** Delay before the first greeting word. */
   greetingOffset?: number;
+  /** GLASS-SPEC §2 "Head row": what sits at the trailing end of the avatar row —
+   *  the 56 pt mini orb on money screens, the round language toggle on Home.
+   *  Omitted: the decorative bell, as before. */
+  rightSlot?: React.ReactNode;
+  /** `center` centres the greeting, the balance line and the status row (the
+   *  Home greet state, B11). The avatar row stays edge-to-edge. Default `left`. */
+  align?: 'left' | 'center';
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
 
-// NavyHead — the navy head every "money" screen wears (spec §1 rule 3, §4).
-// It carries the avatar row, the greeting, the balance line and the assistant's
-// live status. Height is driven by the caller (316 greet / 350 listening / 230
-// conversation) and changes instantly: spec §3 forbids animating layout.
+// NavyHead — the head every "money" screen wears. Under Direction B
+// (GLASS-SPEC §1) it is transparent: the gradient behind the screen is the
+// ground, so the head carries no fill of its own. It holds the avatar row (with
+// its right slot), the greeting, the balance line and the assistant's live
+// status. Height is driven by the caller (316 greet / 350 listening / 230
+// conversation) and changes instantly: the motion spec forbids animating layout.
 export function NavyHead({
   name, greetingFoot, greeting,
   balancePaisa, balanceRevealed = true, onToggleBalance,
   status = 'none', level, onStatusPress,
   height, urdu = false, animateGreeting = false, greetingOffset = 0,
+  rightSlot, align = 'left',
   style, testID,
 }: NavyHeadProps) {
   const { t } = useTranslation();
@@ -78,6 +88,7 @@ export function NavyHead({
   // Waveform something to read.
   const restingLevel = useSharedValue(0);
 
+  const centered = align === 'center';
   const row: ViewStyle = { flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center' };
   const amount = formatPaisa(countedPaisa);
 
@@ -87,7 +98,7 @@ export function NavyHead({
       style={[
         {
           height,
-          backgroundColor: c.navy,
+          backgroundColor: 'transparent',
           paddingTop: insets.top + HEAD_PADDING_ABOVE_INSET,
           paddingHorizontal: space.gutter,
           gap: HEAD_GAP,
@@ -98,16 +109,18 @@ export function NavyHead({
       <View style={[row, { gap: 10 }]}>
         <Avatar name={name || 'PAYO'} size={AVATAR_SIZE} />
         <View>
-          <Text variant="foot" color={onNavy.ink2} style={{ fontSize: 12, lineHeight: urdu ? undefined : 16 }}>
+          <Text variant="foot" color={c.ink2} style={{ fontSize: 12, lineHeight: urdu ? undefined : 16 }}>
             {greetingFoot}
           </Text>
-          <Text variant="hl" weight={700} color={onNavy.ink} style={{ fontSize: 15, lineHeight: urdu ? undefined : 20 }}>
+          <Text variant="hl" weight={700} color={c.ink} style={{ fontSize: 15, lineHeight: urdu ? undefined : 20 }}>
             {name}
           </Text>
         </View>
         <View style={{ flex: 1 }} />
-        {/* Decorative, per the artboard: notifications live on their own screen. */}
-        <Bell size={20} color={onNavy.ink2} strokeWidth={2} />
+        {rightSlot !== undefined
+          ? rightSlot
+          // Decorative, per the artboard: notifications live on their own screen.
+          : <Bell size={20} color={c.ink2} strokeWidth={2} />}
       </View>
 
       <WordRise
@@ -116,16 +129,18 @@ export function NavyHead({
         animate={animateGreeting}
         offset={greetingOffset}
         urdu={urdu}
-        textStyle={
+        style={centered ? { justifyContent: 'center' } : undefined}
+        textStyle={[
           urdu
-            ? { fontSize: GREETING_SIZE, color: onNavy.ink }
+            ? { fontSize: GREETING_SIZE, color: c.ink }
             : {
               fontSize: GREETING_SIZE,
               lineHeight: GREETING_LINE_HEIGHT,
               letterSpacing: GREETING_LETTER_SPACING,
-              color: onNavy.ink,
-            }
-        }
+              color: c.ink,
+            },
+          centered ? { textAlign: 'center' } : null,
+        ]}
       />
 
       {balancePaisa != null ? (
@@ -135,36 +150,37 @@ export function NavyHead({
           accessibilityLabel={t('home.balance')}
           onPress={onToggleBalance}
           hitSlop={8}
-          style={[row, { alignItems: 'baseline', gap: space.s }]}
+          style={[row, { alignItems: 'baseline', gap: space.s, justifyContent: centered ? 'center' : 'flex-start' }]}
         >
           <Text
             variant="money"
-            color={onNavy.ink}
+            color={c.ink}
             weight={800}
             style={{ fontSize: BALANCE_SIZE, lineHeight: BALANCE_SIZE + 6, letterSpacing: undefined }}
           >
             {balanceRevealed ? (urdu ? ltrIsolate(amount) : amount) : '₨ ••••••'}
           </Text>
-          <Text variant="foot" color={onNavy.ink2} style={{ fontSize: 12, lineHeight: urdu ? undefined : 16 }}>
+          <Text variant="foot" color={c.ink2} style={{ fontSize: 12, lineHeight: urdu ? undefined : 16 }}>
             {t('home.balance')}
           </Text>
           {balanceRevealed
-            ? <EyeOff size={14} color={onNavy.ink2} strokeWidth={2} />
-            : <Eye size={14} color={onNavy.ink2} strokeWidth={2} />}
+            ? <EyeOff size={14} color={c.ink2} strokeWidth={2} />
+            : <Eye size={14} color={c.ink2} strokeWidth={2} />}
         </Pressable>
       ) : null}
 
       {status !== 'none' ? (
-        <StatusRow status={status} level={level ?? restingLevel} urdu={urdu} onPress={onStatusPress} />
+        <StatusRow status={status} level={level ?? restingLevel} urdu={urdu} centered={centered} onPress={onStatusPress} />
       ) : null}
     </View>
   );
 }
 
-function StatusRow({ status, level, urdu, onPress }: {
+function StatusRow({ status, level, urdu, centered, onPress }: {
   status: Exclude<NavyHeadStatus, 'none'>;
   level: SharedValue<number>;
   urdu: boolean;
+  centered: boolean;
   onPress?: () => void;
 }) {
   const { t } = useTranslation();
@@ -178,7 +194,7 @@ function StatusRow({ status, level, urdu, onPress }: {
 
   const glyph =
     status === 'listening' ? <Waveform level={level} color={c.amber} />
-      : status === 'thinking' ? <TypingDots color={onNavy.ink2} />
+      : status === 'thinking' ? <TypingDots color={c.ink2} />
         : status === 'speaking' ? <Mic size={16} color={c.amber} strokeWidth={2} />
           : null;
 
@@ -187,6 +203,7 @@ function StatusRow({ status, level, urdu, onPress }: {
       style={{
         flexDirection: urdu ? 'row-reverse' : 'row',
         alignItems: 'center',
+        justifyContent: centered ? 'center' : 'flex-start',
         gap: space.m,
         minHeight: STATUS_ROW_HEIGHT,
       }}
@@ -195,7 +212,7 @@ function StatusRow({ status, level, urdu, onPress }: {
       <Text
         variant="sub"
         weight={600}
-        color={onNavy.ink}
+        color={c.ink}
         style={{ fontSize: STATUS_SIZE, lineHeight: urdu ? undefined : 20 }}
       >
         {label}
