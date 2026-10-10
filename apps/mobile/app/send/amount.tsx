@@ -12,7 +12,8 @@ import { formatPaisa } from '../../src/lib/money';
 import { maskIdentifier } from '../../src/lib/mask';
 import { ltrIsolate } from '../../src/lib/bidi';
 
-const QUICK_RS = [500, 1000, 2000, 5000];
+// Three presets so the row never wraps and the keypad + Continue fit one screen (B18).
+const QUICK_RS = [500, 1000, 2000];
 /** B18: the amount at 48/800 — larger than the `money` variant's 40. */
 const AMOUNT_SIZE = 48;
 const AMOUNT_LINE_HEIGHT = 56;
@@ -95,7 +96,7 @@ export default function SendAmount() {
         <Text variant="h1" style={{ flex: 1 }}>{t('send.amount.howMuch')}</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.m, paddingBottom: space.xl }}>
         {/* B18: the recipient as a cream-avatar chip on a glass card. */}
         <Card padding={space.m} style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m, paddingHorizontal: space.l }}>
           <Avatar name={title ?? ''} bg={c.cream} color={c.navy} />

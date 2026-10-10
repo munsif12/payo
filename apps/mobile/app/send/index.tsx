@@ -78,7 +78,7 @@ function NewTile({ mode, Icon, selected, onPress }: { mode: NewMode; Icon: Lucid
       <View style={{ width: TILE_ICON, height: TILE_ICON, borderRadius: TILE_ICON_RADIUS, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
         <Icon size={22} color={c.amber} strokeWidth={2} />
       </View>
-      <Text variant="sub" weight={600} color={c.ink} numberOfLines={1}>{t(`send.new.${mode}`)}</Text>
+      <Text variant="sub" weight={600} color={c.ink} numberOfLines={2} style={{ fontSize: 13, lineHeight: urdu ? undefined : 17 }}>{t(`send.new.${mode}`)}</Text>
     </AnimatedPressable>
   );
 }

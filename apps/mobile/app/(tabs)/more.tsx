@@ -17,6 +17,7 @@ import { signedOut } from '../../src/store/authSlice';
 import { useMeQuery, usePocketsQuery, useRequestsQuery } from '../../src/api/client';
 import { formatPaisa } from '../../src/lib/money';
 import { ltrIsolate } from '../../src/lib/bidi';
+import { formatPhone } from '../../src/lib/mask';
 import i18n from '../../src/i18n';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -68,7 +69,7 @@ export default function More() {
           testID="more-profile-header"
           latinName={user?.name ?? ''}
           name={name}
-          sub={t('more.profileSub', { phone: ltrIsolate(user?.phone ?? '') })}
+          sub={t('more.profileSub', { phone: ltrIsolate(formatPhone(user?.phone ?? '')) })}
           onPress={() => router.push('/profile')}
         />
 

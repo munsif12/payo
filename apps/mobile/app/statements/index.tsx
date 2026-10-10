@@ -124,7 +124,7 @@ export default function Statements() {
                   <Text variant="h2" color={c.ink} numberOfLines={1} style={{ fontSize: 20, lineHeight: urdu ? undefined : 26 }}>
                     {label({ year: s.year, month: s.month })}
                   </Text>
-                  <Text variant="sub" color={c.ink2} numberOfLines={1} style={{ fontSize: 14, lineHeight: urdu ? undefined : 18 }}>
+                  <Text variant="sub" color={c.ink2} numberOfLines={2} style={{ fontSize: 13, lineHeight: urdu ? undefined : 17 }}>
                     {t('statements.in')}{' '}
                     <Text variant="sub" weight={600} color={c.green} style={{ fontSize: 14, lineHeight: urdu ? undefined : 18 }}>{ltrIsolate('+' + formatPaisa(s.totalInPaisa))}</Text>
                     {' · '}

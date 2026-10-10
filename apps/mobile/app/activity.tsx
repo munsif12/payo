@@ -174,8 +174,9 @@ function TxnRow({ txn, recipients, lang, separator, onPress }: {
         paddingVertical: space.l, borderBottomWidth: separator ? glassTokens.line : 0, borderBottomColor: c.separator,
       }}
     >
-      {txn.counterparty.institutionLogoUrl ? (
-        // A real mark beats the initials disc.
+      {txn.type !== 'p2p' && txn.counterparty.institutionLogoUrl ? (
+        // A real mark beats the initials disc — except for a person on PAYO (p2p),
+        // whose wallet logo says nothing about who they are.
         <InstitutionLogo size={40} shape="circle" name={txn.counterparty.name} logoUrl={txn.counterparty.institutionLogoUrl} />
       ) : (
         // Initials from the Latin name so the disc reads "AB" in both languages (B15).

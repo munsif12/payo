@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View,
+  FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from 'expo-router';
@@ -89,10 +89,6 @@ export default function Home() {
     loopRef.current = loop.handlers;
   }, [loop.handlers]);
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  // Measured height of the floating block (optional input row + composer bar)
-  // so the sheet's scrollable content reserves exactly that much bottom space
-  // and its last card stops above the block instead of landing under it.
-  const [composerBlockHeight, setComposerBlockHeight] = useState(0);
 
   // Entrance choreography, once per mount (spec §3). The greeting words go
   // first, the sheet settles behind the last word, then the rows cascade.
@@ -165,9 +161,9 @@ export default function Home() {
         : null;
 
   const onSuggestion = (intent: string) => (live ? loop.sendSuggestion(intent) : sendText(intent));
-  // The floating block (optional input row, composer bar) sits OVER the sheet,
-  // so everything scrollable inside the sheet reserves its measured height.
-  const contentPadding = { paddingBottom: composerBlockHeight + space.m };
+  // The composer block (optional input row, composer bar) sits UNDER the sheet
+  // in normal flow, so the lists only keep a small foot of their own.
+  const contentPadding = { paddingBottom: space.m };
 
   const orbLabel = live ? t('home.voice.hintLive') : t('home.hint.tap');
   /** `composer-mic` starts, `composer-stop-listening` ends — the v7 testIDs. */
@@ -175,8 +171,13 @@ export default function Home() {
 
   return (
     // Transparent: the tabs layout paints the gradient behind the scene AND
-    // the nav pill, so there is no tone step where the nav begins (§1).
-    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+    // the nav pill, so there is no tone step where the nav begins (§1). The
+    // whole face lives in one KeyboardAvoidingView so the keyboard shrinks the
+    // sheet instead of floating the composer over the transcript.
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1, backgroundColor: 'transparent' }}
+    >
       <NavyHead
         name={name}
         greetingFoot={greetingFoot}
@@ -328,16 +329,7 @@ export default function Home() {
         )}
       </Sheet>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        pointerEvents="box-none"
-        style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end' }]}
-      >
-        <View
-          pointerEvents="box-none"
-          style={{ paddingHorizontal: space.l, paddingBottom: space.m, gap: space.s }}
-          onLayout={(e) => setComposerBlockHeight(e.nativeEvent.layout.height)}
-        >
+      <View style={{ paddingHorizontal: space.l, paddingBottom: space.m, gap: space.s }}>
           {endedHint ? <Text variant="foot" center>{endedHint}</Text> : null}
 
           {inputOpen ? (
@@ -368,9 +360,8 @@ export default function Home() {
           {state === 'conversation' ? (
             <ComposerBar live={live} inputOpen={inputOpen} onKeyboard={toggleInput} />
           ) : null}
-        </View>
-      </KeyboardAvoidingView>
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
