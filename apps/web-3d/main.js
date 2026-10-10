@@ -93,11 +93,13 @@ function goStatic(reason) {
 const SEQ = [
   'home-greet',      /* 0 */
   'home-listening',  /* 1 */
-  'send-chips',      /* 2 */
-  'send-pin-sheet',  /* 3 */
-  'send-receipt',    /* 4 */
-  'urdu',            /* 5 */
-  'digest'           /* 6 */
+  'family-pin',      /* 2  v8: "send 2,000 to my father" → straight to the PIN */
+  'family-success',  /* 3 */
+  'statement',       /* 4  v8: "generate my e-statement" → the card */
+  'send-chips',      /* 5 */
+  'send-receipt',    /* 6 */
+  'urdu',            /* 7 */
+  'digest'           /* 8 */
 ];
 const IDX = {}; SEQ.forEach((n, i) => { IDX[n] = i; });
 const HOLD = 2.4, FADE = 0.5;
@@ -1554,9 +1556,9 @@ function boot() {
 
   /* ---------------- SCREENSHOT ARC (ch6) ---------------- */
   const SHOTS = [
-    'send-chips', 'send-pin-sheet', 'send-receipt',
-    'checkin', 'approvals-bilal', 'approved-ammi',
-    'urdu', 'digest', 'wallet'
+    'family-pin', 'family-success', 'statement',
+    'send-chips', 'checkin', 'approvals-bilal',
+    'approved-ammi', 'urdu', 'wallet'
   ];
   const shotsG = new THREE.Group();
   world.add(shotsG);
@@ -1676,8 +1678,8 @@ function boot() {
     { d: 13.1, ox: -1.85, oy: 0.55, ty:  0.05, orb: -0.663 }
   ];
   const ST_SCREEN = [
-    IDX['home-listening'], IDX['send-chips'], IDX['send-chips'],
-    IDX['send-receipt'], IDX['home-greet']
+    IDX['home-listening'], IDX['send-chips'], IDX['family-pin'],
+    IDX['family-success'], IDX['home-greet']
   ];
   const ST_W = [0, 0, 0, 0, 0];
   const RIG = { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0, s: 1 };
