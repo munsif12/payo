@@ -1443,3 +1443,21 @@ def test_last_reply_never_falls_back_to_the_previous_turn():
     state = {"messages": [*history, _HM(content="2000"), _AI(content="")]}
     assert _agent._last_reply(state, base_len=3) == ""
     assert _agent._last_reply(state) == "How much would you like to send to Abbu?"
+
+
+def test_one_breath_send_requests_parse_in_three_scripts():
+    assert _agent._parse_send_request("Send 2,000 rupees to my father") == ("father", 200_000)
+    assert _agent._parse_send_request("send two thousand to Abbu") == ("Abbu", 200_000)
+    assert _agent._parse_send_request("ابو کو دو ہزار روپے بھیجو") == ("ابو", 200_000)
+    assert _agent._parse_send_request("میرے ابو کو 2000 بھیج دو") == ("ابو", 200_000)
+    assert _agent._parse_send_request("abbu ko do hazaar bhejo") == ("abbu", 200_000)
+    assert _agent._parse_send_request("What is my balance") is None
+    assert _agent._parse_send_request("send money to abbu") is None  # no amount: the model asks
+
+
+def test_number_words_in_english_roman_urdu_and_urdu():
+    assert _agent._parse_amount_words("دو ہزار پانچ سو") == 2_500
+    assert _agent._parse_amount_words("twenty five thousand") == 25_000
+    assert _agent._parse_amount_words("ek lakh") == 100_000
+    assert _agent._parse_amount_words("do hazaar") == 2_000
+    assert _agent._parse_amount_words("hello") is None

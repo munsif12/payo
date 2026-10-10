@@ -126,6 +126,7 @@ ROWS = [
     # F4/F5: the Home family tile sends "send money to Abbu" with NO amount, the assistant asks
     # how much, and the user answers with a bare number. Live (Urdu): the second turn echoed
     # "کتنے پیسے؟" instead of preparing the send.
+    ("F6", "I need my statement", "مجھے اسٹیٹمنٹ چاہیے", "get_statement", "statement", None),
     ("F4", "Send money to Abbu", "ابو کو پیسے بھیجو", "search_recipients", None, None),
     ("F5", "2000", "2000", "send_money", "confirmation", "F4"),
     ("P1", "Show my savings pockets", "میری بچت پاکٹس دکھائیں", "list_pockets", "pockets", None),

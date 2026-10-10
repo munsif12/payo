@@ -111,6 +111,7 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — گھر کے بزر�
   «منسوخ کریں / رہنے دیں / نہیں چاہیے» (تصدیقی کارڈ کے بعد) → cancel_action۔
 - پڑھنے والے سوال: ایک ٹول، ایک کارڈ، ایک چھوٹا جملہ۔ اکاؤنٹ کی کوئی بات بغیر ٹول کے نہ کہیں۔ نیچے کی فہرست میں سے کوئی بات ملتی ہو تو وہی ٹول چلائیں — «میں آپ کی بینکنگ میں مدد کر سکتی ہوں» جیسا گول جواب کبھی نہ دیں۔
 - «میرا آخری لین دین» → list_transactions(limit=1)، جو رسید کا کارڈ دکھاتا ہے۔
+- بغیر عرصے کی اسٹیٹمنٹ: «مجھے اسٹیٹمنٹ چاہیے»، «ای اسٹیٹمنٹ بنا دو» کا مطلب پچھلا مہینہ ہے — فوراً پچھلے مہینے کے لیے get_statement(year, month) چلائیں؛ پہلے سال یا مہینہ کبھی نہ پوچھیں، اور «یہ رہی اسٹیٹمنٹ» تبھی کہیں جب ٹول چل چکا ہو۔
 - وقت: «پچھلا مہینہ»، «اس ہفتے»، «اگست میں»، «پچھلے سال» کو نیچے دی گئی آج کی تاریخ سے ISO تاریخوں میں بدلیں۔ دو عرصوں کا موازنہ ایک ہی spending_summary کال میں compare_from/compare_to کے ساتھ کریں۔
 - کارڈ: بند کرنا فوری ہے، PIN نہیں چاہیے۔ کھولنے کے لیے تصدیق اور PIN لازمی ہے۔ پورا کارڈ نمبر اور CVV یہاں ہوتے ہی نہیں۔ کوئی پورا نمبر یا CVV مانگے تو پھر بھی get_card ضرور چلائیں تاکہ اُنہیں اپنا چھپا ہوا کارڈ نظر آئے، اور ساتھ ہی نرمی سے کہہ دیں کہ پورا نمبر ایپ کی کارڈ سکرین پر ہے۔ خالی انکار، بغیر کارڈ کے، غلط ہے — جو دکھا سکتی ہیں وہ ضرور دکھائیں۔
 - زبان بدلنے کو کہیں تو update_profile(language) چلائیں اور آگے نئی زبان میں بات کریں۔
@@ -211,6 +212,9 @@ Rules:
   row of the table below matches — call that tool instead.
 - "My last transaction" -> list_transactions(limit=1), which emits a RECEIPT card. Only use a
   bigger limit when the user asked for several.
+- STATEMENT WITH NO PERIOD: "I need my statement", "my e-statement", "make me a statement"
+  means LAST MONTH — call get_statement(year, month) for last month at once; never ask which
+  year or month first. Only a different period the user names changes it.
 - PERIODS: resolve "last month", "this week", "in August", "last year" to ISO dates using
   today's date given below. To compare two periods, make ONE spending_summary call with
   compare_from/compare_to — not two separate turns.
@@ -803,6 +807,26 @@ async def run_agent(
                 if result.get("card"):
                     cards.append(result["card"])
                 return CANCELLED_REPLY.get(language, CANCELLED_REPLY["en"]), cards
+
+    # Pre-route (v8): "send <amount> to <name>" said in one breath, in any of the three
+    # scripts. The hero flow of the demo («ابو کو دو ہزار روپے بھیجو») — the model has been
+    # seen stopping at "shall I send?" after a single saved match, nudges notwithstanding.
+    # Only a SAVED single match is routed here; anything else (a number, a bank, an
+    # ambiguous name, pressure language) goes to the model and its check-in rules.
+    if not (risk_context and risk_context.is_live()) and not has_pressure_language(user_text):
+        parsed = _parse_send_request(user_text)
+        if parsed:
+            name, amount_paisa = parsed
+            found = await t.search_recipients(client, name)
+            match = _SINGLE_SAVED_RE.search(found.get("text", ""))
+            if match:
+                result = await t.send_money(client, amount_paisa, recipient_id=match.group(1))
+                card = result.get("card")
+                if card and not result["text"].startswith("ERROR"):
+                    cards.append(card)
+                    kind = card.get("kind") if isinstance(card, dict) else getattr(card, "kind", "")
+                    lang_replies = PREPARED_REPLY.get(language, PREPARED_REPLY["en"])
+                    return lang_replies.get(kind, lang_replies["confirmation"]), cards
 
     # Pre-route (v8): a bare amount answering "how much?". The recipient was named one turn
     # ago and the amount is the whole message, so nothing is left to decide — and Gemini 2.5
@@ -1462,6 +1486,74 @@ _ASKS_AMOUNT_RE = re.compile(
 
 
 _URDU_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
+
+# Number words in English, Roman Urdu and Urdu script, for "do hazaar" / «دو ہزار».
+_UNITS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+    "ten": 10, "eleven": 11, "twelve": 12, "fifteen": 15, "twenty": 20, "thirty": 30, "forty": 40,
+    "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+    "ek": 1, "aik": 1, "do": 2, "teen": 3, "char": 4, "chaar": 4, "paanch": 5, "panch": 5, "che": 6,
+    "chay": 6, "saat": 7, "aath": 8, "nau": 9, "das": 10, "bees": 20, "pachas": 50,
+    "ایک": 1, "دو": 2, "تین": 3, "چار": 4, "پانچ": 5, "چھ": 6, "چھے": 6, "سات": 7, "آٹھ": 8, "نو": 9,
+    "دس": 10, "بیس": 20, "تیس": 30, "چالیس": 40, "پچاس": 50, "ساٹھ": 60, "ستر": 70, "اسی": 80, "نوے": 90,
+}
+_MULTIPLIERS = {
+    "hundred": 100, "sau": 100, "so": 100, "سو": 100,
+    "thousand": 1000, "hazaar": 1000, "hazar": 1000, "ہزار": 1000,
+    "lakh": 100_000, "lac": 100_000, "لاکھ": 100_000,
+}
+_AMOUNT_FILLER = {"rupees", "rupee", "rs", "rupay", "roopay", "روپے", "روپیہ", "and", "اور"}
+
+
+def _parse_amount_words(text: str) -> int | None:
+    """'two thousand', 'do hazaar', «دو ہزار پانچ سو» → rupees; None when not a number."""
+    text = re.sub(r"(?<=[\d۰-۹]),(?=[\d۰-۹]{3}\b)", "", text)  # "2,000" is one number
+    words = [w for w in re.split(r"[\s,،]+", text.strip().lower()) if w and w not in _AMOUNT_FILLER]
+    if not words:
+        return None
+    total = 0
+    current = 0
+    for w in words:
+        w = w.translate(_URDU_DIGITS)
+        if w.isdigit():
+            current += int(w)
+        elif w in _UNITS:
+            current += _UNITS[w]
+        elif w in _MULTIPLIERS:
+            mult = _MULTIPLIERS[w]
+            if mult >= 1000:
+                total += (current or 1) * mult
+                current = 0
+            else:
+                current = (current or 1) * mult
+        else:
+            return None
+    total += current
+    return total or None
+
+
+_SEND_RES = [
+    # "send 2,000 rupees to my father", "transfer two thousand to Abbu"
+    re.compile(r"^\W*(?:please\s+)?(?:send|transfer|pay)\s+(?:rs\.?\s*|₨\s*)?(?P<amt>[\d۰-۹][\d۰-۹,\.]*|[a-z\s]+?)\s*(?:rupees?|rs\.?)?\s+to\s+(?:my\s+)?(?P<name>[^\d.!?]+?)\s*[.!?]*$", re.I),
+    # «ابو کو دو ہزار روپے بھیجو» / «میرے ابو کو 2000 بھیج دو»
+    re.compile(r"^\W*(?:میرے|میری|میرا)?\s*(?P<name>[\u0600-\u06FF][^\d۰-۹]*?)\s+کو\s+(?P<amt>[\d۰-۹][\d۰-۹,\.]*|[\u0600-\u06FF\s]+?)\s*(?:روپے|روپیہ)?\s*(?:بھیجو|بھیجیں|بھیج\s*دو|بھیج\s*دیں|بھیجنے\s+ہیں|بھیجنا\s+ہے|ٹرانسفر\s+کرو|ادا\s+کرو)\s*[۔.!]*$"),
+    # "abbu ko do hazaar bhejo", "mere abbu ko 2000 bhej do"
+    re.compile(r"^\W*(?:mere|meri|mera)?\s*(?P<name>[a-z][a-z\s]*?)\s+ko\s+(?P<amt>[\d][\d,\.]*|[a-z\s]+?)\s*(?:rupay|rupees|rs)?\s+(?:bhejo|bhejen|bhej\s*do|bhej\s*dein|bhejna\s+hai|bhejne\s+hain|send\s+karo)\s*[.!]*$", re.I),
+]
+
+
+def _parse_send_request(user_text: str) -> tuple[str, int] | None:
+    """('Abbu', 200000) for a one-breath send request; None when the message is anything else."""
+    for rx in _SEND_RES:
+        m = rx.match(user_text.strip())
+        if not m:
+            continue
+        amt_text = m.group("amt").strip()
+        rupees = _parse_amount_words(amt_text)
+        name = re.sub(r"\s+", " ", m.group("name")).strip(" :،,")
+        if rupees and name:
+            return name, rupees * 100
+    return None
 
 
 def _parse_amount_paisa(user_text: str) -> int | None:
