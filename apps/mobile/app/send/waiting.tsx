@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { BellRing, Clock, ShieldCheck } from 'lucide-react-native';
+import { BellRing, Clock, ShieldAlert, ShieldCheck } from 'lucide-react-native';
 import { Screen, Text, Card, Button, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space } from '../../src/theme/tokens';
+import { space, glassTokens } from '../../src/theme/tokens';
 import { takeAction } from '../../src/store/pendingActionHolder';
 import { usePinSheet } from '../../src/pin/usePinSheet';
 import { useActionQuery, useRemindGuardianMutation, useMeQuery, apiErr } from '../../src/api/client';
@@ -135,29 +135,52 @@ export default function SendWaiting() {
         ? gt('cards.waiting.declinedReason', { reason })
         : gt('cards.waiting.declined');
 
+  // GLASS-SPEC §5: a glass card with a tinted header strip that follows the
+  // outcome — amber while the guardian decides, green once approved, red for a
+  // decline or an expiry — over the summary and the amount.
+  const stripFill = outcome === 'approved' ? c.greenTint : outcome === 'waiting' ? c.amberTint : c.redTint;
+  const stripColor = outcome === 'approved' ? c.green : outcome === 'waiting' ? c.amber : c.red;
+  const stripLabel = outcome === 'approved'
+    ? t('cards.approvals.approved')
+    : outcome === 'waiting'
+      ? t('send.waiting.label')
+      : outcome === 'expired'
+        ? t('cards.waiting.expired')
+        : t('cards.approvals.declined');
+  const StripIcon = outcome === 'approved' ? ShieldCheck : outcome === 'waiting' ? Clock : ShieldAlert;
+
   return (
     <Screen>
       <View style={{ flex: 1, justifyContent: 'center', gap: space.xl }}>
-        <Card style={{ alignItems: 'center', gap: space.m }}>
-          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: outcome === 'approved' ? c.greenTint : c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
-            {outcome === 'approved'
-              ? <ShieldCheck size={26} color={c.green} strokeWidth={2.4} />
-              : <Clock size={26} color={c.amberDeep} strokeWidth={2.4} />}
+        <Card padding={0} style={{ overflow: 'hidden' }}>
+          <View
+            style={{
+              flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.s,
+              paddingHorizontal: space.xl, paddingVertical: space.m,
+              backgroundColor: stripFill,
+              borderBottomWidth: glassTokens.line, borderBottomColor: c.separator,
+            }}
+          >
+            <StripIcon size={22} color={stripColor} strokeWidth={2.4} />
+            <Text variant="hl" weight={700} color={stripColor} style={{ flex: 1 }}>{stripLabel}</Text>
+            {outcome === 'waiting' ? <ActivityIndicator size="small" color={c.amber} /> : null}
           </View>
-          <Text variant="hl" center>{urdu ? action.summary.ur : action.summary.en}</Text>
-          <Text variant="money" style={{ fontSize: 32, lineHeight: 38 }}>{ltrIsolate(formatPaisa(action.amountPaisa))}</Text>
-          {outcome === 'waiting' ? (
-            <>
-              <Text variant="sub" center>{gt('cards.waiting.body')}</Text>
-              <Text testID="send-waiting-countdown" variant="foot" center>
-                {t('cards.waiting.expiresIn', { time: ltrIsolate(countdown(Math.max(0, leftMs))) })}
+          <View style={{ padding: space.xl, alignItems: 'center', gap: space.m }}>
+            <Text variant="sub" color={c.ink2} center>{urdu ? action.summary.ur : action.summary.en}</Text>
+            <Text variant="money">{ltrIsolate(formatPaisa(action.amountPaisa))}</Text>
+            {outcome === 'waiting' ? (
+              <>
+                <Text variant="sub" center>{gt('cards.waiting.body')}</Text>
+                <Text testID="send-waiting-countdown" variant="foot" center>
+                  {t('cards.waiting.expiresIn', { time: ltrIsolate(countdown(Math.max(0, leftMs))) })}
+                </Text>
+              </>
+            ) : (
+              <Text testID="send-waiting-outcome" variant="sub" center color={outcome === 'approved' ? c.green : c.red}>
+                {settledText}
               </Text>
-            </>
-          ) : (
-            <Text testID="send-waiting-outcome" variant="sub" center color={outcome === 'approved' ? c.green : c.red}>
-              {settledText}
-            </Text>
-          )}
+            )}
+          </View>
         </Card>
 
         {error ? <Text variant="sub" color={c.red} center>{error}</Text> : null}

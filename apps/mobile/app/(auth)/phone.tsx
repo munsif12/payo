@@ -1,16 +1,62 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
-import { Wallet } from 'lucide-react-native';
-import { Screen, Text, Button, Keypad } from '../../src/ui';
+import { Mic } from 'lucide-react-native';
+import { Screen, Text, Button, Keypad, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space } from '../../src/theme/tokens';
+import { space, radius, glassTokens } from '../../src/theme/tokens';
 import { useRequestOtpMutation, apiErr } from '../../src/api/client';
 import { otpRequested } from '../../src/store/authSlice';
 
 const MAX_DIGITS = 10;
+
+// GLASS-SPEC §5 B7: the 72 pt logo orb (Mic 32 navy, the orb glow) next to the
+// "PAYO" wordmark, 28/800, letter-spacing 2, cream. Shared by the four sign-in
+// screens; it never mirrors in Urdu (§6 rule 3).
+const LOGO_ORB = 72;
+const LOGO_ORB_ICON = 32;
+const LOGO_ORB_HALO = Math.round(LOGO_ORB * glassTokens.orb.androidHaloScale);
+
+export function BrandMark({ center }: { center?: boolean }) {
+  const { c } = useTheme();
+  const { t } = useTranslation();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, alignSelf: center ? 'center' : 'flex-start' }}>
+      <View style={{ width: LOGO_ORB, height: LOGO_ORB, alignItems: 'center', justifyContent: 'center' }}>
+        {Platform.OS === 'android' ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: (LOGO_ORB - LOGO_ORB_HALO) / 2,
+              left: (LOGO_ORB - LOGO_ORB_HALO) / 2,
+              width: LOGO_ORB_HALO,
+              height: LOGO_ORB_HALO,
+              borderRadius: LOGO_ORB_HALO / 2,
+              backgroundColor: glassTokens.orb.androidHalo,
+            }}
+          />
+        ) : null}
+        <View
+          style={[
+            {
+              width: LOGO_ORB, height: LOGO_ORB, borderRadius: LOGO_ORB / 2, backgroundColor: c.amber,
+              alignItems: 'center', justifyContent: 'center',
+            },
+            Platform.OS === 'ios' ? glassTokens.orb.glow : null,
+          ]}
+        >
+          <Mic size={LOGO_ORB_ICON} color={c.onAmber} strokeWidth={2.4} />
+        </View>
+      </View>
+      <Text weight={800} color={c.ink} style={{ fontSize: 28, lineHeight: 34, letterSpacing: 2, writingDirection: 'ltr' }}>
+        {t('appName')}
+      </Text>
+    </View>
+  );
+}
 
 // Groups a run of up to 10 digits as "300 111 0001" — Phone.dc.html.
 function groupDigits(digits: string): string {
@@ -20,6 +66,7 @@ function groupDigits(digits: string): string {
 export default function Phone() {
   const { t } = useTranslation();
   const { c } = useTheme();
+  const urdu = useIsUrdu();
   const router = useRouter();
   const dispatch = useDispatch();
   const { expired } = useLocalSearchParams<{ expired?: string }>();
@@ -53,36 +100,37 @@ export default function Phone() {
 
   return (
     <Screen>
-      <View style={{ gap: 22, paddingTop: space.xxxl }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
-            <Wallet size={22} color={c.navy} strokeWidth={2} />
-          </View>
-          <Text weight={800} style={{ fontSize: 22 }}>{t('appName')}</Text>
-        </View>
+      <View style={{ gap: space.l, paddingTop: space.xl }}>
+        <BrandMark />
 
         <View>
-          <Text variant="h1">{t('auth.phone.title')}</Text>
-          <Text variant="sub" style={{ marginTop: 6 }}>{t('auth.phone.subtitle')}</Text>
+          <Text variant="h1" style={{ fontSize: 32, lineHeight: urdu ? undefined : 38 }}>{t('auth.phone.title')}</Text>
+          <Text variant="body" color={c.ink2} style={{ marginTop: 6 }}>{t('auth.phone.subtitle')}</Text>
         </View>
 
         {/* A phone number reads left-to-right regardless of UI language (Foundations.dc.html
-            `.num`), so this row is deliberately NOT mirrored for Urdu/RTL. */}
+            `.num`), so this field is deliberately NOT mirrored for Urdu/RTL. It is the only
+            input on the screen, so it always wears the amber focus line (§2 Input). */}
         <View
           style={{
-            height: 56, borderRadius: 16, backgroundColor: c.surface,
-            borderWidth: 2, borderColor: c.amber,
-            flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12,
+            height: 56, borderRadius: radius.input, backgroundColor: c.surface,
+            borderWidth: glassTokens.inputFocusLine, borderColor: c.amber,
+            flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 12,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 12, borderRightWidth: 1, borderRightColor: c.separator }}>
-            <Text variant="hl" weight={600} style={{ writingDirection: 'ltr', textAlign: 'left' }}>PK +92</Text>
+          <View
+            style={{
+              height: 36, paddingHorizontal: 12, borderRadius: 18, backgroundColor: c.surface2,
+              borderWidth: glassTokens.line, borderColor: c.separator, justifyContent: 'center',
+            }}
+          >
+            <Text variant="sub" weight={700} color={c.ink} style={{ lineHeight: undefined, writingDirection: 'ltr', textAlign: 'left' }}>PK +92</Text>
           </View>
           <Text
-            variant="hl"
             weight={600}
             color={digits ? c.ink : c.ink3}
-            style={{ fontSize: 20, letterSpacing: 1, fontVariant: ['tabular-nums'], writingDirection: 'ltr', textAlign: 'left' }}
+            numberOfLines={1}
+            style={{ flex: 1, fontSize: 28, lineHeight: 34, letterSpacing: 1, fontVariant: ['tabular-nums'], writingDirection: 'ltr', textAlign: 'left' }}
             testID="phone-digits"
           >
             {digits ? groupDigits(digits) : '300 000 0000'}
@@ -90,12 +138,12 @@ export default function Phone() {
         </View>
 
         {error ? (
-          <View style={{ backgroundColor: c.redTint, borderRadius: 16, padding: 14 }}>
+          <View style={{ backgroundColor: c.redTint, borderRadius: radius.input, padding: 14 }}>
             <Text variant="sub" color={c.red} center>{error}</Text>
           </View>
         ) : null}
 
-        <Keypad onDigit={onDigit} onBackspace={onBackspace} disabled={isLoading} />
+        <Keypad size={64} onDigit={onDigit} onBackspace={onBackspace} disabled={isLoading} />
 
         <Button
           testID="phone-submit"
@@ -105,7 +153,7 @@ export default function Phone() {
           loading={isLoading}
         />
 
-        <Text variant="foot" center>{t('auth.phone.terms')}</Text>
+        <Text variant="foot" color={c.ink3} center>{t('auth.phone.terms')}</Text>
       </View>
     </Screen>
   );

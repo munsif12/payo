@@ -23,7 +23,8 @@ registerExecutor('send_money', async (session, a) => {
 
   const out = await postTransaction(session, {
     userId: String(a.userId), type: 'p2p', direction: 'out', amountPaisa: a.amountPaisa, feePaisa: a.feePaisa,
-    counterparty: { name: p.title, detail: p.identifier, institutionId: p.institutionId, institutionLogoUrl: p.institutionLogoUrl },
+    // v8 (Urdu QA): the Urdu activity rows name the person in Urdu — carry the linked user's urduName.
+    counterparty: { name: p.title, urduName: recipient.urduName ?? undefined, detail: p.identifier, institutionId: p.institutionId, institutionLogoUrl: p.institutionLogoUrl },
     category: 'transfer',
   });
   await postTransaction(session, {

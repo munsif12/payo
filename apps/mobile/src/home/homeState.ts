@@ -1,26 +1,14 @@
-// Pure Home state machine — which of the three Home faces is showing, how tall
-// the navy head is, and what the head's status row says. No React and no RN
-// imports, so the mapping the artboards fix (Main 316 / HomeListening 350 /
-// HomeConversation 230) is testable on its own.
+// Pure Home state machine — which of the three Home faces is showing, what the
+// head's sub-line says, and what the orb bus should mirror. No React and no RN
+// imports, so the mapping is testable on its own. (Under Direction B the head
+// sizes to its content, so there is no per-state height here any more.)
 import type { VoiceLoopMode } from '../voice/voiceLoopReducer';
+import type { OrbState } from '../voice/orbBus';
 
 export type HomeState = 'greet' | 'listening' | 'conversation';
 
-/** Navy-head height per state — Main.dc.html / HomeListening.dc.html /
- *  HomeConversation.dc.html. Each artboard draws the navy `SHEET_OVERLAP` (14 pt)
- *  taller than the sheet's top edge, because the sheet's 28 pt corners sit over
- *  it: 330/316, 350/336, 230/216. These are the NAVY heights, so Home's
- *  `marginTop: -SHEET_OVERLAP` lands the sheet on the artboard's top edge. */
-export const HEAD_HEIGHT: Record<HomeState, number> = {
-  // v8: the family row joined the sheet, so the greet head gives back 30 pt
-  // of the artboard's empty navy (330 → 300). Listening/conversation unchanged.
-  greet: 300,
-  listening: 350,
-  conversation: 230,
-};
-
-/** The status row the head shows for the current voice-loop mode. `none` renders
- *  no row at all — the greet head with the loop off. */
+/** The status the head's sub-line shows for the current voice-loop mode. `none`
+ *  falls back to the balance line — the greet head with the loop off. */
 export type HeadStatus = 'none' | 'listening' | 'thinking' | 'speaking' | 'paused';
 
 export interface HomeStateInput {
@@ -36,8 +24,8 @@ export interface HomeStateInput {
  * greet → listening → conversation.
  *
  * Once there is a single message the screen stays in `conversation` for the rest
- * of the session: the transcript is the content, and the head shrinks to 230 to
- * give it the room (HomeConversation.dc.html).
+ * of the session: the transcript is the content, and the head shrinks to its
+ * compact form (B3) to give it the room.
  */
 export function homeState({ mode, messageCount, recording }: HomeStateInput): HomeState {
   if (messageCount > 0) return 'conversation';
@@ -45,11 +33,15 @@ export function homeState({ mode, messageCount, recording }: HomeStateInput): Ho
   return 'greet';
 }
 
-export function headHeight(state: HomeState): number {
-  return HEAD_HEIGHT[state];
-}
-
 export function headStatus(mode: VoiceLoopMode, recording: boolean): HeadStatus {
   if (mode === 'off') return recording ? 'listening' : 'none';
   return mode;
+}
+
+/** What Home mirrors into `orbBus.setState` so every orb (hero, mini, nav) shows
+ *  the same face: `listening` while the mic is open, `live` for the rest of a
+ *  conversation (thinking / speaking / paused), `idle` with the loop off. */
+export function orbStateFor(mode: VoiceLoopMode, recording: boolean): OrbState {
+  if (recording || mode === 'listening') return 'listening';
+  return mode === 'off' ? 'idle' : 'live';
 }

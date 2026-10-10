@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronLeft, StickyNote } from 'lucide-react-native';
 import { Screen, Text, Card, Avatar, Chip, Input, Keypad, Button, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space } from '../../src/theme/tokens';
+import { space, touch, glassTokens } from '../../src/theme/tokens';
 import { useCreateTransferMutation, useMeQuery, apiErr } from '../../src/api/client';
 import { holdAction } from '../../src/store/pendingActionHolder';
 import { formatPaisa } from '../../src/lib/money';
@@ -13,6 +13,30 @@ import { maskIdentifier } from '../../src/lib/mask';
 import { ltrIsolate } from '../../src/lib/bidi';
 
 const QUICK_RS = [500, 1000, 2000, 5000];
+/** B18: the amount at 48/800 — larger than the `money` variant's 40. */
+const AMOUNT_SIZE = 48;
+const AMOUNT_LINE_HEIGHT = 56;
+
+/** GLASS-SPEC §5 B18: the 44 pt round glass back button in the head. */
+function BackButton({ testID, onPress }: { testID: string; onPress: () => void }) {
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      onPress={onPress}
+      hitSlop={8}
+      style={{
+        width: touch.min, height: touch.min, borderRadius: touch.min / 2,
+        backgroundColor: c.surface, borderWidth: glassTokens.line, borderColor: c.separator,
+        alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />
+    </Pressable>
+  );
+}
 
 export default function SendAmount() {
   const { t } = useTranslation();
@@ -66,42 +90,40 @@ export default function SendAmount() {
 
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
-        <Pressable testID="amount-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
-        </Pressable>
-        <Text variant="h2">{t('send.amount.title')}</Text>
+      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <BackButton testID="amount-back" onPress={() => router.back()} />
+        <Text variant="h1" style={{ flex: 1 }}>{t('send.amount.howMuch')}</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
+        {/* B18: the recipient as a cream-avatar chip on a glass card. */}
         <Card padding={space.m} style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m, paddingHorizontal: space.l }}>
-          <Avatar name={title ?? ''} />
-          <View style={{ flex: 1 }}>
-            <Text variant="hl" numberOfLines={1}>{title}</Text>
-            <Text variant="foot" numberOfLines={1}>{subtitle}</Text>
+          <Avatar name={title ?? ''} bg={c.cream} color={c.navy} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="hl" weight={700} numberOfLines={1}>{title}</Text>
+            <Text variant="foot" color={c.ink2} numberOfLines={1}>{subtitle}</Text>
           </View>
-          <Pressable testID="amount-change" onPress={() => router.back()} hitSlop={8}>
-            <Text variant="sub" weight={600} color={c.amberDeep}>{t('send.amount.change')}</Text>
+          <Pressable testID="amount-change" accessibilityRole="button" onPress={() => router.back()} hitSlop={8}>
+            <Text variant="sub" weight={600} color={c.amber}>{t('send.amount.change')}</Text>
           </Pressable>
         </Card>
 
-        <View style={{ alignItems: 'center', paddingTop: space.m }}>
+        <View style={{ alignItems: 'center', paddingTop: space.s }}>
           <Text variant="cap">{t('send.amount.youSend')}</Text>
-          {/* SendAmount.dc.html: 48/800 tabular, larger than the standard
-              `money` variant's 40pt. */}
+          {/* `money` is always LTR; the string is Latin-only so it never takes the Urdu face. */}
           <Text
             variant="money"
-            style={{ fontSize: 48, lineHeight: 56, marginTop: 6 }}
+            style={{ fontSize: AMOUNT_SIZE, lineHeight: AMOUNT_LINE_HEIGHT, marginTop: 6 }}
             color={amountPaisa > 0 ? c.ink : c.ink3}
           >
             {formatPaisa(amountPaisa)}
           </Text>
-          <Text variant="foot" style={{ marginTop: 6 }}>
-            {t('send.amount.available', { amount: formatPaisa(availablePaisa) })}
+          <Text variant="foot" color={c.ink3} center style={{ marginTop: 6 }}>
+            {t('send.amount.available', { amount: ltrIsolate(formatPaisa(availablePaisa)) })}
           </Text>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
           {QUICK_RS.map((rs) => (
             <Chip key={rs} testID={`amount-quick-${rs}`} label={formatPaisa(rs * 100)} selected={rupees === String(rs)} onPress={() => setRupees(String(rs))} />
           ))}
@@ -119,7 +141,7 @@ export default function SendAmount() {
 
         <Keypad onDigit={onDigit} onBackspace={onBackspace} disabled={isLoading} />
 
-        <Button testID="amount-next" label={t('common.next')} onPress={submit} disabled={amountPaisa <= 0} loading={isLoading} />
+        <Button testID="amount-next" label={t('common.continue')} onPress={submit} disabled={amountPaisa <= 0} loading={isLoading} />
       </ScrollView>
     </Screen>
   );

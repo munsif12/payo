@@ -11,9 +11,10 @@ import {
   Sparkles, TrendingUp, Users, Zap, type LucideIcon,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Card as NewCard, Button, Input, Pill, Avatar, InstitutionLogo, ListRow, useIsUrdu } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
-import { space, radius, touch } from '../../theme/tokens';
+import { space, radius, touch, glassTokens } from '../../theme/tokens';
 import { usePressScale } from '../../motion/usePressScale';
 import { IconSwap } from '../../motion/IconSwap';
 import { useActionDone, markActionDone } from '../../store/pendingActionHolder';
@@ -52,12 +53,27 @@ import type {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Cards.dc.html geometry. Every chat card is the shared Card shell (radius 20 +
-// the card shadow token) with the artboard's 12/14 padding — not the 20pt
-// screen padding a full-width card gets, because a card in the conversation is
-// already inset to 86% of the list by the bubble around it.
+// Chat-card geometry. Every chat card is the shared glass Card shell
+// (GLASS-SPEC §2: `surface` fill, 1 px `separator` line, radius 24, no shadow)
+// with the artboard's 12/14 padding — not the 20pt screen padding a full-width
+// card gets, because a card in the conversation is already inset to 86% of the
+// list by the bubble around it.
 const CARD_PAD_V = 12;
 const CARD_PAD_H = 14;
+
+/**
+ * Who (or what) an action is aimed at, read off its first backend line — the
+ * transfer's "To" line is "Abbu (Abdul Rehman) · PAYO · ···0007", so the first
+ * segment is the name and the rest becomes the sub line (B3 head row). Pure;
+ * the classic confirm screen reads the same line the same way.
+ */
+export function actionHead(lines: PendingAction['lines'] | undefined): { name: string; sub: string } | null {
+  const first = lines?.[0]?.value?.trim();
+  if (!first) return null;
+  const [name, ...rest] = first.split(' · ');
+  if (!name) return null;
+  return { name, sub: rest.join(' · ') };
+}
 /** Receipt avatar / check-in shield / waiting clock disc. */
 const ICON_CIRCLE = 44;
 /** Icon drawn inside ICON_CIRCLE. */
@@ -77,7 +93,7 @@ const BODY_14 = 14;
 /** Cards.dc.html footnote (expiry, fee/total line). */
 const FOOT_12 = 12;
 
-/** The white card every chat card is drawn on (Cards.dc.html). */
+/** The glass card every chat card is drawn on (GLASS-SPEC §2 "Assistant bubble"). */
 function CardShell({ children, style }: {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -255,23 +271,41 @@ function ConfirmationCardView({ card, onAppendLocal, live }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card.actionId]);
 
-  // HomeConversation.dc.html confirmation card: centred summary in ink2, the
-  // amount at 32/800, the fee/total foot, then the amber CTA.
+  // B3 confirmation card: the person as a head row (cream avatar, name 17/700,
+  // institution · masked id in ink2), "Sending" over the amount at 40/800 with
+  // the fee line in ink3 beside it, then the amber CTA. An action with no head
+  // line (card_unfreeze…) lets the summary carry the whole message instead.
+  // The card does not say whether the person is saved family, so no pill.
   const amountPaisa = Number(card.amountPaisa);
   const feePaisa = Number(card.feePaisa ?? 0);
   const showAmount = showConfirmationAmount(amountPaisa);
-  const feeLine = `${t('common.fee')} ${formatPaisa(feePaisa)} · ${t('confirm.total')} ${formatPaisa(amountPaisa + feePaisa)}`;
+  const head = actionHead(card.lines as PendingAction['lines'] | undefined);
+  const feeLine = feePaisa > 0
+    ? t('confirm.feeTotal', { fee: ltrIsolate(formatPaisa(feePaisa)), total: ltrIsolate(formatPaisa(amountPaisa + feePaisa)) })
+    : t('confirm.feeInstant', { fee: ltrIsolate(formatPaisa(0)) });
+  const row = { flexDirection: urdu ? 'row-reverse' : 'row' } as const;
 
   return (
-    <CardShell style={{ alignItems: 'center' }}>
-      <Text variant="foot" color={c.ink2} center>{urdu ? summary.ur : summary.en}</Text>
+    <CardShell style={{ gap: space.m }}>
+      {head ? (
+        <View style={[row, { alignItems: 'center', gap: space.m }]}>
+          <Avatar name={head.name} size={ICON_CIRCLE} bg={c.cream} color={c.navy} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="hl" weight={700} numberOfLines={1}>{head.name}</Text>
+            {head.sub ? <Text variant="foot" color={c.ink2} numberOfLines={1}>{ltrIsolate(head.sub)}</Text> : null}
+          </View>
+        </View>
+      ) : (
+        <Text variant="sub" color={c.ink2} center>{urdu ? summary.ur : summary.en}</Text>
+      )}
       {showAmount ? (
-        <>
-          <Text variant="money" style={{ fontSize: 32, lineHeight: 38, marginTop: 6, marginBottom: 2 }}>
-            {ltrIsolate(formatPaisa(amountPaisa))}
-          </Text>
-          <Text variant="foot" center style={{ fontSize: FOOT_12, lineHeight: 16 }}>{ltrIsolate(feeLine)}</Text>
-        </>
+        <View style={[row, { alignItems: 'flex-end', justifyContent: 'space-between', gap: space.s }]}>
+          <View>
+            <Text variant="foot" color={c.ink2}>{t('confirm.sending')}</Text>
+            <Text variant="money">{ltrIsolate(formatPaisa(amountPaisa))}</Text>
+          </View>
+          <Text variant="foot" color={c.ink3} numberOfLines={1} style={{ flexShrink: 1 }}>{feeLine}</Text>
+        </View>
       ) : null}
       <Button
         testID={done ? 'chat-confirm-done' : 'chat-confirm'}
@@ -280,7 +314,7 @@ function ConfirmationCardView({ card, onAppendLocal, live }: {
         onPress={onConfirm}
         disabled={done}
         loading={confirming}
-        style={{ alignSelf: 'stretch', marginTop: 10 }}
+        style={{ alignSelf: 'stretch' }}
       />
     </CardShell>
   );
@@ -296,9 +330,9 @@ function BalanceCardView({ card }: { card: ChatCard }) {
   );
 }
 
-/** Cards.dc.html gives a chip three looks: the amber-bordered option chip the
+/** A chip has three looks (GLASS-SPEC §2 "Chip"): the glass option chip the
  *  disambiguation lists use, and — on the recipient card — an amber "Yes,
- *  continue" pill beside a surface2 "No". */
+ *  continue" pill beside a `surface2` glass "No". */
 type ChipTone = 'outline' | 'primary' | 'secondary';
 
 function ChipRow({ label, detail, logo, onPress, testID, tone = 'outline' }: {
@@ -325,11 +359,12 @@ function ChipRow({ label, detail, logo, onPress, testID, tone = 'outline' }: {
       onPressOut={onPressOut}
       style={[
         {
-          backgroundColor: tone === 'primary' ? c.amber : c.surface2,
+          backgroundColor: tone === 'primary' ? c.amber : tone === 'secondary' ? c.surface2 : c.surface,
           borderRadius: radius.pill,
-          borderWidth: tone === 'outline' ? 1 : 0,
-          borderColor: c.amber,
-          paddingHorizontal: tone === 'outline' ? space.m : space.l,
+          // The glass tones carry the 1 px line (§6 rule 2); amber is flat.
+          borderWidth: tone === 'primary' ? 0 : glassTokens.line,
+          borderColor: c.separator,
+          paddingHorizontal: space.l,
           paddingVertical: space.s,
           // A one-line chip is ~36pt tall from padding alone; the floor + centring
           // brings every chip (telco/institution/biller/recipient) up to the 44pt
@@ -520,36 +555,35 @@ function StatementCardView({ card }: { card: ChatCard }) {
   const totalOut = Number(card.totalOutPaisa);
   const txnCount = card.txnCount as number | undefined;
   const row = { flexDirection: urdu ? 'row-reverse' : 'row' } as const;
-  // v8 (Direction A artboard): the card reads as the first page of the PDF —
-  // brand line, "PDF ready" pill, the period, the in/out tiles — and "Open PDF"
-  // opens the real file from the card, so a spoken "generate my statement"
-  // ends with the PDF in hand without leaving the conversation.
+  // B4: the card reads as the first page of the PDF — the brand line with the
+  // "PDF ready" pill, the month at 28/800, the transaction count, the two glass
+  // received/paid tiles — and "Open PDF" opens the real file from the card, so a
+  // spoken "generate my statement" ends with the PDF in hand without leaving
+  // the conversation.
   return (
-    <CardShell style={{ paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden' }}>
-      <View style={{ backgroundColor: c.surface2, paddingHorizontal: CARD_PAD_H, paddingVertical: CARD_PAD_V, gap: space.s }}>
-        <View style={[row, { alignItems: 'center', justifyContent: 'space-between' }]}>
-          <Text variant="cap" color={c.navy} style={{ letterSpacing: 0.4 }}>{t('cards.statement.brand')}</Text>
-          <Pill
-            label={t('statements.ready')}
-            bg={c.greenTint}
-            color={c.green}
-            icon={<Check size={12} color={c.green} strokeWidth={3} />}
-          />
-        </View>
-        <Text variant="h2">{urdu ? period.ur : period.en}</Text>
-        {typeof txnCount === 'number' ? (
-          <Text variant="foot" color={c.ink3}>{ltrIsolate(t('statements.transactions', { count: txnCount }))}</Text>
-        ) : null}
-        <View style={[row, { gap: space.s }]}>
-          <StatementTotal label={t('statements.moneyIn')} value={'+' + formatPaisa(totalIn)} color={c.green} />
-          <StatementTotal label={t('statements.moneyOut')} value={'−' + formatPaisa(totalOut)} color={c.red} />
-        </View>
+    <CardShell style={{ gap: space.s }}>
+      <View style={[row, { alignItems: 'center', justifyContent: 'space-between', gap: space.s }]}>
+        <Text variant="foot" weight={600} color={c.ink3}>{t('cards.statement.brand')}</Text>
+        <Pill
+          label={t('statements.ready')}
+          bg={c.greenTint}
+          color={c.green}
+          icon={<Check size={12} color={c.green} strokeWidth={3} />}
+        />
       </View>
-      <View style={{ paddingHorizontal: CARD_PAD_H, paddingVertical: CARD_PAD_V, gap: space.s }}>
+      <Text variant="h1">{urdu ? period.ur : period.en}</Text>
+      {typeof txnCount === 'number' ? (
+        <Text variant="sub" color={c.ink2}>{ltrIsolate(t('statements.transactions', { count: txnCount }))}</Text>
+      ) : null}
+      <View style={[row, { gap: space.s, marginTop: space.xs }]}>
+        <StatementTotal label={t('cards.statement.received')} value={'+' + formatPaisa(totalIn)} color={c.green} />
+        <StatementTotal label={t('cards.statement.paid')} value={'−' + formatPaisa(totalOut)} color={c.red} />
+      </View>
+      <View style={{ gap: space.s, marginTop: space.xs }}>
         <Button
           testID="chat-statement-download"
           label={t('statements.open')}
-          icon={<FileText size={20} color={c.navy} strokeWidth={2} />}
+          icon={<FileText size={20} color={c.onAmber} strokeWidth={2} />}
           onPress={() => { openPdf(statementId); }}
           style={{ alignSelf: 'stretch' }}
         />
@@ -566,12 +600,18 @@ function StatementCardView({ card }: { card: ChatCard }) {
   );
 }
 
-/** One in/out tile on the statement card: label over a coloured, LTR-isolated amount. */
+/** One received/paid tile on the statement card (B4): a glass tile with the
+ *  label in ink2 over a coloured, LTR-isolated amount. */
 function StatementTotal({ label, value, color }: { label: string; value: string; color: string }) {
   const { c } = useTheme();
   return (
-    <View style={{ flex: 1, backgroundColor: c.surface, borderRadius: radius.input, paddingHorizontal: 12, paddingVertical: 10, gap: 2 }}>
-      <Text variant="foot" color={c.ink3} numberOfLines={1}>{label}</Text>
+    <View
+      style={{
+        flex: 1, borderRadius: radius.input, paddingHorizontal: 12, paddingVertical: 10, gap: 2,
+        backgroundColor: c.surface, borderWidth: glassTokens.line, borderColor: c.separator,
+      }}
+    >
+      <Text variant="foot" color={c.ink2} numberOfLines={1}>{label}</Text>
       <Text variant="hl" weight={800} color={color} numberOfLines={1}>{ltrIsolate(value)}</Text>
     </View>
   );
@@ -764,9 +804,10 @@ function ReceiptCardView({ card }: { card: ChatCard }) {
   return (
     <CardShell>
       <View style={{ alignItems: 'center' }}>
+        {/* A person you paid wears the cream avatar (GLASS-SPEC §2 "Avatar"). */}
         {txn.counterparty.institutionLogoUrl
           ? <InstitutionLogo size={LOGO_CARD} shape="circle" name={name} logoUrl={txn.counterparty.institutionLogoUrl} />
-          : <Avatar name={name} size={ICON_CIRCLE} />}
+          : <Avatar name={name} size={ICON_CIRCLE} bg={c.cream} color={c.navy} />}
         <Text variant="sub" weight={600} color={c.ink} center style={{ marginTop: space.s }}>{headline}</Text>
         <Text variant="money" style={{ fontSize: 28, lineHeight: 34 }} color={amountColor}>
           {ltrIsolate(sign + formatPaisa(txn.amountPaisa))}
@@ -964,9 +1005,10 @@ function HelpCardView({ card, onChipTap }: Props) {
   );
 }
 
-// card — the gradient-less navy card visual from app/card.tsx. Only ever
-// renders `maskedPan`: the full pan and the CVV are not in this contract, and
-// a payload that smuggled them in still would not display them.
+// card — the navy → navyDeep gradient card visual with a 1 px glass line
+// (GLASS-SPEC §5 B21), as on app/card.tsx. Only ever renders `maskedPan`: the
+// full pan and the CVV are not in this contract, and a payload that smuggled
+// them in still would not display them.
 function CardCardView({ card }: { card: ChatCard }) {
   const { t } = useTranslation();
   const { c } = useTheme();
@@ -976,11 +1018,14 @@ function CardCardView({ card }: { card: ChatCard }) {
   const holder = (shape.holder ?? '').toUpperCase();
   return (
     <View style={{ marginTop: space.s, gap: space.s }}>
-      <View
+      <LinearGradient
         testID="chat-card-visual"
+        colors={shape.frozen ? [c.ink3, c.ink3] : [c.navy, c.navyDeep]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={{
-          height: 190, borderRadius: 24, padding: 20,
-          backgroundColor: shape.frozen ? c.ink3 : c.navy,
+          height: 190, borderRadius: radius.card, padding: 20,
+          borderWidth: glassTokens.line, borderColor: c.separator,
           overflow: 'hidden', justifyContent: 'space-between',
         }}
       >
@@ -988,7 +1033,7 @@ function CardCardView({ card }: { card: ChatCard }) {
           <Text weight={800} color={c.white} style={{ letterSpacing: 1.5 }}>PAYO</Text>
           <Pill
             label={shape.frozen ? t('card.frozen') : t('cards.card.active')}
-            bg="rgba(255,255,255,0.14)"
+            bg={c.surface2}
             color={c.white}
           />
         </View>
@@ -1006,16 +1051,16 @@ function CardCardView({ card }: { card: ChatCard }) {
         >
           {holder ? (
             <View>
-              <Text variant="cap" color="rgba(255,255,255,0.55)">{t('card.holder')}</Text>
+              <Text variant="cap" color={c.ink3}>{t('card.holder')}</Text>
               <Text color={c.white} weight={600} style={{ marginTop: 2 }}>{holder}</Text>
             </View>
           ) : null}
           <View>
-            <Text variant="cap" color="rgba(255,255,255,0.55)">{t('card.expiry')}</Text>
+            <Text variant="cap" color={c.ink3}>{t('card.expiry')}</Text>
             <Text color={c.white} weight={600} style={{ marginTop: 2 }}>{ltrIsolate(shape.expiry)}</Text>
           </View>
         </View>
-      </View>
+      </LinearGradient>
       <Text variant="foot" center>{t('cards.card.hint')}</Text>
     </View>
   );
@@ -1319,21 +1364,23 @@ function QrCardView({ card }: { card: ChatCard }) {
 
 // ---- v6: guardian, scam interruption, proactive greeting (spec §4) ----
 
-/** Human label for a risk flag. Unknown flags render as nothing rather than as
- *  a raw enum — a card from a newer AI service must never leak `snake_case`. */
+/** Human label for a risk flag, as a red-tinted pill (B9). Unknown flags render
+ *  as nothing rather than as a raw enum — a card from a newer AI service must
+ *  never leak `snake_case`. */
 function RiskFlags({ flags, center }: { flags?: string[]; center?: boolean }) {
   const { t } = useTranslation();
   const { c } = useTheme();
+  const urdu = useIsUrdu();
   const known = (flags ?? []).filter((f) => f === 'new_recipient_large' || f === 'pressure_language');
   if (!known.length) return null;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, justifyContent: center ? 'center' : 'flex-start' }}>
+    <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: space.xs, justifyContent: center ? 'center' : 'flex-start' }}>
       {known.map((f) => (
         <Pill
           key={f}
           label={t(f === 'new_recipient_large' ? 'risk.newRecipientLarge' : 'risk.pressureLanguage')}
-          bg={c.amberTint}
-          color={c.amberDeep}
+          bg={c.redTint}
+          color={c.red}
         />
       ))}
     </View>
@@ -1425,14 +1472,16 @@ function CheckInCardView({ card, onAppendLocal, live }: {
     }
   };
 
-  // Cards.dc.html check-in: a 44pt shield in amberTint, the question at 17/700,
-  // the risk flag pill, then the two stacked 56pt answers. Answering "yes" keeps
-  // the same card and swaps the shield for the green ShieldCheck (IconSwap) —
-  // one card, one state change, so the change is visible rather than a cut.
+  // B9 check-in: a glass card whose line is amber-tinted (the due-bill tint)
+  // around a 44pt amber shield, the question at 17/700, the red risk-flag pills,
+  // then the two stacked 56pt answers — "Yes" in the danger tint (it cancels the
+  // send), "No" as glass. Answering "yes" keeps the same card: the line turns
+  // green and the shield swaps for the green ShieldCheck (IconSwap) — one card,
+  // one state change, so the change is visible rather than a cut.
   const stopped = answered === 'yes';
 
   return (
-    <CardShell style={{ alignItems: 'center' }}>
+    <CardShell style={{ alignItems: 'center', borderColor: stopped ? c.green : glassTokens.dueBill.line }}>
       {stopped ? <View testID="check-in-cancelled" /> : null}
       <View
         style={{
@@ -1444,11 +1493,11 @@ function CheckInCardView({ card, onAppendLocal, live }: {
         <IconSwap
           active={stopped}
           size={ICON_GLYPH}
-          from={<ShieldAlert size={ICON_GLYPH} color={c.amberDeep} strokeWidth={2.4} />}
+          from={<ShieldAlert size={ICON_GLYPH} color={c.amber} strokeWidth={2.4} />}
           to={<ShieldCheck size={ICON_GLYPH} color={c.green} strokeWidth={2.4} />}
         />
       </View>
-      <Text variant="hl" weight={700} center style={{ marginTop: space.s, marginBottom: space.xs }}>
+      <Text variant="hl" weight={700} center color={stopped ? c.green : c.ink} style={{ marginTop: space.s, marginBottom: space.xs }}>
         {stopped ? t('cards.checkIn.stopped') : bi(shape.prompt)}
       </Text>
       {stopped ? (
@@ -1461,6 +1510,7 @@ function CheckInCardView({ card, onAppendLocal, live }: {
           <View style={{ alignSelf: 'stretch', marginTop: space.m, gap: space.s }}>
             <Button
               testID="check-in-yes"
+              variant="danger"
               label={t('cards.checkIn.yes')}
               onPress={() => answer(true)}
               loading={busy && answered === null}
@@ -1877,8 +1927,8 @@ function DigestCardView({ card, onChipTap }: Props) {
             key={`${item.kind}-${item.refId ?? i}`}
             testID={`digest-${item.kind}-${item.refId ?? i}`}
             left={
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon size={18} color={c.ink2} strokeWidth={2.2} />
+              <View style={{ width: ROW_LOGO, height: ROW_LOGO, borderRadius: ROW_LOGO / 2, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={18} color={c.amber} strokeWidth={2.2} />
               </View>
             }
             // Rendered as a node (not a string) so ListRow's default

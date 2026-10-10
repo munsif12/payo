@@ -1,22 +1,27 @@
 import React, { useRef, useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { ChevronLeft, Check, Shield } from 'lucide-react-native';
-import { Screen, Text, Button, Card, Chip, Pill, PinDots, Keypad } from '../../src/ui';
+import { Screen, Text, Button, Card, Chip, Pill, PinDots, Keypad, useIsUrdu } from '../../src/ui';
 import type { PinDotsHandle } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space } from '../../src/theme/tokens';
+import { space, radius, touch, glassTokens } from '../../src/theme/tokens';
 import type { RootState } from '../../src/store';
 import { useSetPinMutation, apiErr } from '../../src/api/client';
 import { signedIn, cacheUserName, otpVerified, pendingCleared } from '../../src/store/authSlice';
+import { BrandMark } from './phone';
 
 const PIN_LENGTH = 4;
 
+// Create PIN — GLASS-SPEC §5: the same vocabulary as B8 — orb + wordmark, title,
+// the two dot rows (new / confirm) in one glass card, the 72 pt glass keypad and
+// the amber Finish button.
 export default function CreatePin() {
   const { t } = useTranslation();
   const { c } = useTheme();
+  const urdu = useIsUrdu();
   const router = useRouter();
   const dispatch = useDispatch();
   const otpToken = useSelector((s: RootState) => s.auth.otpToken);
@@ -88,54 +93,66 @@ export default function CreatePin() {
   };
 
   const canFinish = newComplete && confirmPin.length === PIN_LENGTH && confirmPin === newPin;
+  const rowDir = urdu ? 'row-reverse' : 'row';
 
   return (
     <Screen>
-      <View style={{ paddingTop: space.xl, gap: 22 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Pressable testID="create-pin-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12} style={{ paddingVertical: 4 }}>
-            <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
-          </Pressable>
+      <ScrollView bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, paddingTop: space.l, paddingBottom: space.l, gap: space.m }}>
+        <View style={{ flexDirection: rowDir, alignItems: 'center', justifyContent: 'space-between', gap: space.m }}>
+          <View style={{ flexDirection: rowDir, alignItems: 'center', gap: space.m }}>
+            <Pressable
+              testID="create-pin-back"
+              accessibilityRole="button"
+              onPress={() => router.back()}
+              hitSlop={8}
+              style={{
+                width: touch.min, height: touch.min, borderRadius: touch.min / 2, backgroundColor: c.surface,
+                borderWidth: glassTokens.line, borderColor: c.separator, alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <ChevronLeft size={22} color={c.ink} strokeWidth={2.2} />
+            </Pressable>
+            <BrandMark />
+          </View>
           <Chip label={t('auth.pin.step', { n: 3, total: 3 })} />
         </View>
 
         <View>
-          <Text variant="h1">{t('auth.pin.createTitle')}</Text>
-          <Text variant="sub" style={{ marginTop: 6 }}>{t('auth.pin.createSubtitle')}</Text>
+          <Text variant="h1" style={{ fontSize: 32, lineHeight: urdu ? undefined : 38 }}>{t('auth.pin.createTitle')}</Text>
+          <Text variant="body" color={c.ink2} style={{ marginTop: 6 }}>{t('auth.pin.createSubtitle')}</Text>
         </View>
 
-        <Card style={{ gap: 14 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Card padding={space.l} style={{ gap: space.m }}>
+          <View style={{ flexDirection: rowDir, alignItems: 'center', justifyContent: 'space-between', gap: space.m }}>
             <Text variant="hl">{t('auth.pin.newPin')}</Text>
-            {newComplete ? (
-              <Pill label={t('auth.pin.set')} bg={c.greenTint} color={c.green} icon={<Check size={14} color={c.green} strokeWidth={3} />} />
-            ) : (
-              <Text variant="foot">{t('auth.pin.progress', { n: newPin.length })}</Text>
-            )}
+            <View style={{ flexDirection: rowDir, alignItems: 'center', gap: space.m }}>
+              {newComplete ? (
+                <Pill label={t('auth.pin.set')} bg={c.greenTint} color={c.green} icon={<Check size={14} color={c.green} strokeWidth={3} />} />
+              ) : null}
+              <PinDots filled={newPin.length} size={16} gap={12} />
+            </View>
           </View>
-          <PinDots filled={newPin.length} gap={16} />
 
-          <View style={{ height: 1, backgroundColor: c.separator }} />
+          <View style={{ height: glassTokens.line, backgroundColor: c.separator }} />
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: rowDir, alignItems: 'center', justifyContent: 'space-between', gap: space.m }}>
             <Text variant="hl">{t('auth.pin.confirmPin')}</Text>
-            <Text variant="foot">{t('auth.pin.progress', { n: confirmPin.length })}</Text>
+            <PinDots ref={confirmDotsRef} filled={confirmPin.length} size={16} gap={12} />
           </View>
-          <PinDots ref={confirmDotsRef} filled={confirmPin.length} gap={16} />
         </Card>
 
         {error ? (
-          <View style={{ backgroundColor: c.redTint, borderRadius: 16, padding: 14 }}>
+          <View style={{ backgroundColor: c.redTint, borderRadius: radius.input, padding: 14 }}>
             <Text variant="sub" color={c.red} center>{error}</Text>
           </View>
         ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 4 }}>
+          <View style={{ flexDirection: rowDir, alignItems: 'center', gap: 10, paddingHorizontal: 4 }}>
             <Shield size={18} color={c.ink3} strokeWidth={2} />
             <Text variant="foot" style={{ flex: 1 }}>{t('auth.pin.tip')}</Text>
           </View>
         )}
 
-        <Keypad onDigit={onDigit} onBackspace={onBackspace} disabled={isLoading} />
+        <Keypad size={72} onDigit={onDigit} onBackspace={onBackspace} disabled={isLoading} />
 
         <Button
           testID="create-pin-finish"
@@ -144,7 +161,7 @@ export default function CreatePin() {
           disabled={!canFinish}
           loading={isLoading}
         />
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

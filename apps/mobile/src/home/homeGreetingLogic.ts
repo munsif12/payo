@@ -3,6 +3,7 @@
 // lucide ESM package outside a React Native module render).
 import { formatPaisa } from '../lib/money';
 import { formatShortDate } from '../lib/dates';
+import { ltrIsolate } from '../lib/bidi';
 import type { DueBill } from '../api/types';
 
 export type GreetingBucket = 'morning' | 'afternoon' | 'evening';
@@ -32,5 +33,19 @@ export function billSubtitle(bill: DueBill | undefined, urdu: boolean, t: Transl
     biller,
     amount: formatPaisa(bill.amountPaisa),
     date: formatShortDate(bill.dueDate),
+  });
+}
+
+/** The Home due-bill card's title (GLASS-SPEC §5 B11): "K-Electric ₨4,320 due
+ *  Oct 12". In Urdu the biller takes its Urdu name and the amount and date —
+ *  Latin runs inside an RTL sentence — are isolated so bidi cannot reorder them. */
+export function dueBillTitle(bill: DueBill, urdu: boolean, t: Translate): string {
+  const biller = urdu && bill.biller.urduName ? bill.biller.urduName : bill.biller.name;
+  const amount = formatPaisa(bill.amountPaisa);
+  const date = formatShortDate(bill.dueDate);
+  return t('home.orb.billTitle', {
+    biller,
+    amount: urdu ? ltrIsolate(amount) : amount,
+    date: urdu ? ltrIsolate(date) : date,
   });
 }

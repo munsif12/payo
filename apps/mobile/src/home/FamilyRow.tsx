@@ -7,28 +7,20 @@ import * as Haptics from 'expo-haptics';
 import { Plus } from 'lucide-react-native';
 import { Text, Avatar, useIsUrdu } from '../ui';
 import { useTheme } from '../theme/useTheme';
-import { space, touch } from '../theme/tokens';
+import { glassTokens, radius, space, touch } from '../theme/tokens';
 import { usePressScale } from '../motion/usePressScale';
 import type { RecipientDto } from '../api/types';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const AVATAR = 52;
-
-/** Direction A artboard: Abbu amber, Bilal blue, Sara violet, then amber again. */
-function tint(index: number, c: ReturnType<typeof useTheme>['c']): { bg: string; color: string } {
-  const tints = [
-    { bg: c.amberTint, color: c.onAmber },
-    { bg: c.avatarBlueTint, color: c.avatarBlue },
-    { bg: c.avatarVioletTint, color: c.avatarViolet },
-  ];
-  return tints[index % tints.length]!;
-}
+/** GLASS-SPEC §5 B11: cream 56 pt avatars with navy initials, label 15/700. */
+const AVATAR = 56;
 
 /**
- * The family row on Home (v8, Direction A): the people you pay, one tap from a
- * spoken-style turn — tapping Abbu sends "Send money to Abbu" exactly as if it
- * had been said, so the assistant's own recipient → amount → PIN flow runs.
- * The "+" tile opens the classic Send flow, where new people get saved.
+ * The family row on Home (Direction B, B11): the people you pay as four equal
+ * glass tiles, one tap from a spoken-style turn — tapping Abbu sends "Send money
+ * to Abbu" exactly as if it had been said, so the assistant's own recipient →
+ * amount → PIN flow runs. The "Add" tile opens the classic Send flow, where new
+ * people get saved. The row reads as a sentence, so it mirrors in Urdu.
  */
 export function FamilyRow({ people, onIntent, testID = 'home-family' }: {
   people: RecipientDto[];
@@ -43,33 +35,36 @@ export function FamilyRow({ people, onIntent, testID = 'home-family' }: {
   return (
     <View testID={testID} style={{ gap: space.m }}>
       <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text variant="cap" style={{ letterSpacing: 0.96 }}>{t('home.family.label')}</Text>
+        <Text variant="cap" style={{ letterSpacing: 0.96 }}>{t('home.family.title')}</Text>
         <Pressable testID="home-family-manage" accessibilityRole="button" hitSlop={8} onPress={() => router.push('/send')}>
-          <Text variant="foot" weight={700} color={c.amberDeep}>{t('home.family.manage')}</Text>
+          <Text variant="foot" weight={700} color={c.amber}>{t('home.family.manage')}</Text>
         </Pressable>
       </View>
-      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between', gap: space.s }}>
-        {people.map((p, i) => (
-          <PersonTile
-            key={p.id}
-            testID={`home-family-${p.nickname}`}
-            // In Urdu a PAYO-linked person is named in Urdu (بلال), and the spoken-style
-            // turn carries that name too, so the assistant's search runs in the user's script.
-            label={urdu ? (p.urduNickname || p.urduTitle || p.nickname) : p.nickname}
-            sub={urdu && p.institution.urduName ? p.institution.urduName : p.institution.name}
-            onPress={() => onIntent(t('home.family.intent', { name: urdu ? (p.urduNickname || p.urduTitle || p.nickname) : p.nickname }))}
-          >
-            <Avatar name={p.nickname} size={AVATAR} bg={tint(i, c).bg} color={tint(i, c).color} />
-          </PersonTile>
-        ))}
-        <PersonTile testID="home-family-add" label={t('home.family.add')} sub={t('home.family.addSub')} onPress={() => router.push('/send')}>
+      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s }}>
+        {people.map((p) => {
+          // In Urdu a PAYO-linked person is named in Urdu (بلال), and the spoken-style
+          // turn carries that name too, so the assistant's search runs in the user's script.
+          const label = urdu ? (p.urduNickname || p.urduTitle || p.nickname) : p.nickname;
+          return (
+            <PersonTile
+              key={p.id}
+              testID={`home-family-${p.nickname}`}
+              label={label}
+              hint={urdu && p.institution.urduName ? p.institution.urduName : p.institution.name}
+              onPress={() => onIntent(t('home.family.intent', { name: label }))}
+            >
+              <Avatar name={p.nickname} size={AVATAR} bg={c.cream} color={c.navy} />
+            </PersonTile>
+          );
+        })}
+        <PersonTile testID="home-family-add" label={t('home.family.add')} hint={t('home.family.addSub')} onPress={() => router.push('/send')}>
           <View
             style={{
-              width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: c.surface,
-              borderWidth: 1.5, borderColor: c.separator, alignItems: 'center', justifyContent: 'center',
+              width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2,
+              backgroundColor: c.avatarBlueTint, alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <Plus size={22} color={c.ink3} strokeWidth={2.2} />
+            <Plus size={22} color={c.ink} strokeWidth={2.2} />
           </View>
         </PersonTile>
       </View>
@@ -77,30 +72,49 @@ export function FamilyRow({ people, onIntent, testID = 'home-family' }: {
   );
 }
 
-function PersonTile({ testID, label, sub, onPress, children }: {
+/** One glass tile: radius 20, the 1 px line, the avatar over a one-line 15/700 label. */
+function PersonTile({ testID, label, hint, onPress, children }: {
   testID: string;
   label: string;
-  sub: string;
+  hint: string;
   onPress: () => void;
   children: React.ReactNode;
 }) {
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
   const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
   return (
     <AnimatedPressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={hint}
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});
         onPress();
       }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      style={[{ alignItems: 'center', gap: 6, width: 72, minHeight: touch.min }, pressStyle]}
+      style={[
+        {
+          flex: 1,
+          minHeight: touch.min,
+          backgroundColor: c.surface,
+          borderWidth: glassTokens.line,
+          borderColor: c.separator,
+          borderRadius: radius.tile,
+          paddingVertical: space.m,
+          paddingHorizontal: space.xs,
+          alignItems: 'center',
+          gap: space.s,
+        },
+        pressStyle,
+      ]}
     >
       {children}
-      <Text variant="foot" weight={700} numberOfLines={1} center style={{ fontSize: 13 }}>{label}</Text>
-      <Text variant="foot" numberOfLines={1} center style={{ fontSize: 11, lineHeight: 14, marginTop: -4 }}>{sub}</Text>
+      <Text variant="sub" weight={700} color={c.ink} numberOfLines={1} center style={{ fontSize: 15, lineHeight: urdu ? undefined : 20 }}>
+        {label}
+      </Text>
     </AnimatedPressable>
   );
 }
