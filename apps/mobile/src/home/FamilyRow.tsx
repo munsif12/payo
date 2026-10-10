@@ -53,9 +53,11 @@ export function FamilyRow({ people, onIntent, testID = 'home-family' }: {
           <PersonTile
             key={p.id}
             testID={`home-family-${p.nickname}`}
-            label={p.nickname}
+            // In Urdu a PAYO-linked person is named in Urdu (بلال), and the spoken-style
+            // turn carries that name too, so the assistant's search runs in the user's script.
+            label={urdu ? (p.urduNickname || p.urduTitle || p.nickname) : p.nickname}
             sub={urdu && p.institution.urduName ? p.institution.urduName : p.institution.name}
-            onPress={() => onIntent(t('home.family.intent', { name: p.nickname }))}
+            onPress={() => onIntent(t('home.family.intent', { name: urdu ? (p.urduNickname || p.urduTitle || p.nickname) : p.nickname }))}
           >
             <Avatar name={p.nickname} size={AVATAR} bg={tint(i, c).bg} color={tint(i, c).color} />
           </PersonTile>

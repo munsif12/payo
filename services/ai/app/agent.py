@@ -86,6 +86,7 @@ SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — گھر کے بزر�
 - اکاؤنٹ کی کوئی بھی بات (بیلنس، لین دین، بل) بتانے سے پہلے ٹول چلائیں — اندازہ کبھی نہیں۔
 - کارڈ آپ خود نہیں بنا سکتیں؛ کارڈ صرف ٹول سے بنتا ہے۔ «کارڈ دیکھ کر تصدیق کریں» تبھی کہیں جب اسی باری میں کوئی ایسا ٹول چلا ہو۔
 - گھر والے: «ابو / ابا / بابا / والد»، «امی / اماں / والدہ»، «بیٹا»، «بیٹی»، «بھائی»، «بہن / باجی» — اردو، انگریزی یا رومن اردو میں — محفوظ رابطے کا نام ہیں۔ جو لفظ صارف نے کہا وہی search_recipients کو دیں (search_recipients("ابو")): تلاش خود رشتے کے لفظ کو Abbu / Ammi جیسے نک نیم سے ملا لیتی ہے۔ ایک رابطہ ملے تو سیدھا رقم اور اسی recipient_id کے ساتھ send_money؛ کسی رشتہ دار کا نمبر تلاش سے پہلے کبھی نہ پوچھیں۔
+- صرف رقم والا جواب: آپ نے «کتنے پیسے؟» پوچھا اور صارف نے صرف عدد کہا («2000»، «دو ہزار») — یہی اس ادائیگی کی رقم ہے جو آپ تیار کر رہی تھیں۔ دوبارہ کبھی نہ پوچھیں: اسی نام سے search_recipients، پھر اسی باری میں send_money۔
 - محفوظ رابطہ = کوئی اضافی سوال نہیں۔ search_recipients سے ایک ہی recipient_id ملے اور رقم معلوم ہو تو اسی باری میں send_money(amount_paisa, recipient_id) چلائیں۔ «بھیج دوں؟» نہ پوچھیں، محفوظ رابطے کے لیے resolve_recipient نہ چلائیں، اور «کارڈ پر تصدیق کریں» تبھی کہیں جب اسی باری میں send_money چل چکا ہو — تصدیقی کارڈ اور PIN ہی تصدیق ہیں۔ صرف کئی ملتے جلتے نام ہوں تو پوچھیں۔
 - نام کی تلاش: search_recipients کو نام ویسا ہی دیں جیسا صارف نے کہا (اردو میں کہا تو اردو میں: search_recipients("بلال")) — تلاش اردو نام بھی سمجھتی ہے۔ کچھ نہ ملے تو ایک بار انگریزی حروف میں دوبارہ ڈھونڈیں (بلال → Bilal)، پھر ہی نمبر پوچھیں۔
 - پیسے تصدیق اور PIN کے بعد ہی جاتے ہیں۔ کبھی نہ کہیں کہ پیسے بھیج دیے گئے۔
@@ -154,6 +155,9 @@ Rules:
   exactly as said (search_recipients("father"), search_recipients("ammi")): the search itself
   maps family words to nicknames like Abbu and Ammi. One match -> go straight to the amount and
   send_money with its recipient_id; never ask a relative's phone number before searching.
+- AMOUNT-ONLY ANSWERS: when you asked "how much?" and the user replies with just a number
+  ("2000", "do hazaar", «دو ہزار»), that IS the amount for the send you were preparing. Never
+  ask again: call search_recipients with the name you used, then send_money, in the same turn.
 - SAVED RECIPIENT = NO EXTRA QUESTION. When search_recipients returns exactly one recipient_id and
   the amount is known, call send_money(amount_paisa, recipient_id) in the SAME turn. Do not ask
   "would you like to send it?", do not call resolve_recipient for a saved recipient, and never
@@ -800,12 +804,34 @@ async def run_agent(
                     cards.append(result["card"])
                 return CANCELLED_REPLY.get(language, CANCELLED_REPLY["en"]), cards
 
+    # Pre-route (v8): a bare amount answering "how much?". The recipient was named one turn
+    # ago and the amount is the whole message, so nothing is left to decide — and Gemini 2.5
+    # Flash has been seen returning an EMPTY response (output_tokens 0, finish STOP) to a bare
+    # "2000" three invocations running, nudges included, which no re-prompt can fix. The
+    # hero flow (family tile → "how much?" → amount → PIN) must not depend on that.
+    # Not while a pressure flag is live: that send must go through the model's check-in rules.
+    if (_is_bare_amount(user_text) and _asked_for_amount(history)
+            and not (risk_context and risk_context.is_live())):
+        amount_paisa = _parse_amount_paisa(user_text)
+        name = _recipient_name_from_history(history)
+        if amount_paisa and name:
+            found = await t.search_recipients(client, name)
+            match = _SINGLE_SAVED_RE.search(found.get("text", ""))
+            if match:
+                result = await t.send_money(client, amount_paisa, recipient_id=match.group(1))
+                card = result.get("card")
+                if card and not result["text"].startswith("ERROR"):
+                    cards.append(card)
+                    kind = card.get("kind") if isinstance(card, dict) else getattr(card, "kind", "")
+                    return PREPARED_REPLY.get(language, PREPARED_REPLY["en"]).get(kind, PREPARED_REPLY[language if language in PREPARED_REPLY else "en"]["confirmation"]), cards
+
     model = model or build_model()
     agent = create_react_agent(
         model, build_tools(client, cards, resolved_pairs, risk_context))
     messages: list[BaseMessage] = [SystemMessage(content=system_prompt(language)), *history, HumanMessage(content=user_text)]
+    base_len = len(messages)
     state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
-    reply = strip_cards_marker(_last_reply(state))
+    reply = strip_cards_marker(_last_reply(state, base_len))
     extra_invocations = 0  # capped at MAX_NUDGES across the two content nudges below
 
     # Guard: refusing INSTEAD of flagging. Live defect (spec §1.8, "never overrules the user;
@@ -818,7 +844,7 @@ async def run_agent(
         nudged = [*state["messages"],
                   HumanMessage(content=_nudge(PRESSURE_SEND_NUDGE, PRESSURE_SEND_NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-        reply = strip_cards_marker(_last_reply(state))
+        reply = strip_cards_marker(_last_reply(state, base_len))
         extra_invocations += 1
 
     # Guard: the model must not promise a card it never created. If it talks about a
@@ -827,7 +853,7 @@ async def run_agent(
     if not turn_already_acted() and _mentions_card(reply):
         nudged = [*state["messages"], HumanMessage(content=_nudge(NUDGE, NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-        reply = strip_cards_marker(_last_reply(state))
+        reply = strip_cards_marker(_last_reply(state, base_len))
         extra_invocations += 1
 
     # Guard (v8): a SAVED recipient was found — exactly one — and the amount was said, yet
@@ -842,8 +868,21 @@ async def run_agent(
                 SAVED_RECIPIENT_NUDGE.format(recipient_id=saved),
                 SAVED_RECIPIENT_NUDGE_UR.format(recipient_id=saved), language))]
             state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-            reply = strip_cards_marker(_last_reply(state))
+            reply = strip_cards_marker(_last_reply(state, base_len))
             extra_invocations += 1
+
+    # Guard (v8): the user answered "how much?" with a bare amount ("2000", «دو ہزار») and
+    # the model asked again instead of preparing the send. Live (Urdu): the Home family tile
+    # sent «ابو کو پیسے بھیجو», the assistant asked «کتنے پیسے؟», "2000" got the same question
+    # back verbatim. The amount is the whole message, so there is nothing to clarify.
+    if (extra_invocations < MAX_NUDGES and not cards and not _called_tool_named(state, "send_money")
+            and _is_bare_amount(user_text) and _asked_for_amount(history)):
+        nudged = [*state["messages"], HumanMessage(content=_nudge(
+            AMOUNT_FOLLOWUP_NUDGE.format(amount=user_text.strip()),
+            AMOUNT_FOLLOWUP_NUDGE_UR.format(amount=user_text.strip()), language))]
+        state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
+        reply = strip_cards_marker(_last_reply(state, base_len))
+        extra_invocations += 1
 
     # Guard: the model sometimes ASKS in prose for something a tool would answer with
     # tappable chips ("which bank or wallet?", "which biller / what reference number?").
@@ -857,7 +896,7 @@ async def run_agent(
             break
         nudged = [*state["messages"], HumanMessage(content=prose_nudge)]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-        reply = strip_cards_marker(_last_reply(state))
+        reply = strip_cards_marker(_last_reply(state, base_len))
         extra_invocations += 1
 
     # Guard: echoing the PREVIOUS answer. Live: after a spending card, "what can you do"
@@ -867,7 +906,7 @@ async def run_agent(
         nudged = [*state["messages"],
                   HumanMessage(content=_nudge(ECHO_NUDGE, ECHO_NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-        reply = strip_cards_marker(_last_reply(state))
+        reply = strip_cards_marker(_last_reply(state, base_len))
         extra_invocations += 1
 
     # Guard: announcing data no tool fetched — "Here is your card." / "Here are your last
@@ -882,7 +921,7 @@ async def run_agent(
                      else f" ابھی {tool_hint} چلائیں۔")
         nudged = [*state["messages"], HumanMessage(content=base)]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-        reply = strip_cards_marker(_last_reply(state))
+        reply = strip_cards_marker(_last_reply(state, base_len))
         extra_invocations += 1
 
     # Guard: the generic "I can help you with your banking needs…" non-answer. The spec
@@ -894,7 +933,7 @@ async def run_agent(
         nudged = [*state["messages"],
                   HumanMessage(content=_nudge(GENERIC_NONANSWER_NUDGE, GENERIC_NONANSWER_NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-        reply = strip_cards_marker(_last_reply(state))
+        reply = strip_cards_marker(_last_reply(state, base_len))
         extra_invocations += 1
 
     # If the model's whole reply WAS the imitated marker, sanitizing left nothing to speak.
@@ -906,7 +945,7 @@ async def run_agent(
         nudged = [*state["messages"],
                   HumanMessage(content=_nudge(NO_MARKER_NUDGE, NO_MARKER_NUDGE_UR, language))]
         state = await agent.ainvoke({"messages": nudged}, config={"recursion_limit": 12})
-        reply = strip_cards_marker(_last_reply(state))
+        reply = strip_cards_marker(_last_reply(state, base_len))
         extra_invocations += 1
 
     # Guard: the reply-language rule is a hard requirement. If the UI language is Urdu
@@ -917,7 +956,7 @@ async def run_agent(
             and extra_invocations < MAX_NUDGES and not turn_already_acted()):
         lang_nudged = [*state["messages"], HumanMessage(content=URDU_LANGUAGE_NUDGE)]
         state = await agent.ainvoke({"messages": lang_nudged}, config={"recursion_limit": 12})
-        reply = strip_cards_marker(_last_reply(state))
+        reply = strip_cards_marker(_last_reply(state, base_len))
         extra_invocations += 1
     # Fallback: the model asked "which network?" in prose and never called list_telcos —
     # nudging it did not work live (it repeated the question). A voice user cannot type a
@@ -953,6 +992,20 @@ NUDGE_UR = (
     "get_card — پھر جواب دیں۔ جو کارڈ موجود ہی نہیں اس کا ذکر کبھی نہ کریں۔"
 )
 URDU_LANGUAGE_NUDGE = "Answer in Urdu (Nastaliq script) only."
+AMOUNT_FOLLOWUP_NUDGE = (
+    "[SYSTEM CHECK] The user just answered your 'how much?' with the amount: {amount}. That is "
+    "the amount for the send you were preparing — do NOT ask for it again. Find the person you "
+    "named in your previous reply with search_recipients(<that name, as the user said it>), then "
+    "call send_money(amount_paisa=<amount × 100>, recipient_id=...) in this same turn. The "
+    "confirmation card is how the user confirms. Then one short sentence."
+)
+AMOUNT_FOLLOWUP_NUDGE_UR = (
+    "[SYSTEM CHECK] صارف نے آپ کے «کتنے پیسے؟» کا جواب رقم سے دیا ہے: {amount}۔ یہی اس ادائیگی کی "
+    "رقم ہے جو آپ تیار کر رہی تھیں — دوبارہ ہرگز نہ پوچھیں۔ جس شخص کا نام آپ نے پچھلے جواب میں لیا "
+    "اسے search_recipients(<وہی نام جیسے صارف نے کہا>) سے ڈھونڈیں، پھر اسی باری میں "
+    "send_money(amount_paisa=<رقم × 100>, recipient_id=...) چلائیں۔ تصدیقی کارڈ ہی صارف کی تصدیق ہے۔ "
+    "پھر ایک چھوٹا جملہ۔"
+)
 SAVED_RECIPIENT_NUDGE = (
     "[SYSTEM CHECK] search_recipients found exactly ONE saved recipient (recipient_id "
     "{recipient_id}) and the user already said the amount, but you did not call send_money. "
@@ -1392,6 +1445,110 @@ _AMOUNT_RE = re.compile(
 )
 
 
+_BARE_AMOUNT_RE = re.compile(
+    r"^\W*(?:rs\.?|₨|روپے|rupees?)?\s*[\d۰-۹][\d۰-۹,\.]*\s*(?:rupees?|rs\.?|روپے|rupay|roopay)?\W*$",
+    re.I,
+)
+_NUMBER_WORDS = {
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "twenty", "fifty",
+    "hundred", "thousand", "lakh", "and", "rupees", "rupee", "rs",
+    "ek", "do", "teen", "char", "chaar", "paanch", "panch", "das", "bees", "pachas", "sau", "so",
+    "hazaar", "hazar", "rupay", "roopay",
+    "ایک", "دو", "تین", "چار", "پانچ", "چھ", "سات", "آٹھ", "نو", "دس", "بیس", "پچاس", "سو", "ہزار", "لاکھ", "روپے",
+}
+_ASKS_AMOUNT_RE = re.compile(
+    r"how much|what amount|which amount|کتنے پیسے|کتنی رقم|کتنے روپے|کتنا|kitne|kitni|kitna", re.I,
+)
+
+
+_URDU_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
+
+
+def _parse_amount_paisa(user_text: str) -> int | None:
+    """Digits (ASCII or Urdu) with separators → paisa. Number words fall through (None)."""
+    digits = re.sub(r"[^\d.]", "", user_text.translate(_URDU_DIGITS))
+    if not digits:
+        return None
+    try:
+        rupees = float(digits)
+    except ValueError:
+        return None
+    paisa = int(round(rupees * 100))
+    return paisa if paisa > 0 else None
+
+
+_NAME_FROM_USER_RES = [
+    re.compile(r"^(?P<name>.+?)\s+(?:کو|ko)\b", re.I),                 # «ابو کو پیسے بھیجو» / "abbu ko paise bhejo"
+    re.compile(r"\b(?:to|for)\s+(?P<name>[^\d,.!?]+?)\s*[.!?]*$", re.I),  # "send money to Abbu"
+]
+_NAME_FROM_AI_RES = [
+    re.compile(r".*\bto\s+(?P<name>[A-Za-z\u0600-\u06FF][^?,.!]*?)\s*\?", re.I),  # the LAST "to X?": "...to send to Abbu?"
+    re.compile(r"(?P<name>[\u0600-\u06FF]+)\s+کو\s+(?:پیسے\s+)?بھیج", re.I),     # «ابو کو بھیج دیتے ہیں»
+]
+_NAME_STOP_WORDS = {
+    "money", "rupees", "rs", "paise", "paisay", "پیسے", "روپے", "some",
+    "send", "pay", "transfer", "bhejo", "bhejna", "bhejni", "بھیجو", "بھیجیں", "بھیجنا", "بھیجنے", "to",
+}
+
+
+def _recipient_name_from_history(history: Sequence[BaseMessage]) -> str | None:
+    """Who the user was sending to, one turn ago: from their own message first, then from
+    the assistant's "how much ... to X?"."""
+    last_user = next((m for m in reversed(list(history)) if isinstance(m, HumanMessage)), None)
+    last_ai = next((m for m in reversed(list(history)) if isinstance(m, AIMessage)), None)
+    candidates: list[str] = []
+    if last_user:
+        text = _content_text(last_user.content).strip()
+        for rx in _NAME_FROM_USER_RES:
+            m = rx.search(text)
+            if m:
+                candidates.append(m.group("name"))
+    if last_ai:
+        text = strip_cards_marker(_content_text(last_ai.content))
+        for rx in _NAME_FROM_AI_RES:
+            m = rx.search(text)
+            if m:
+                candidates.append(m.group("name"))
+    for raw in candidates:
+        words = [w for w in re.split(r"\s+", raw.strip(" :،,")) if w and w.lower() not in _NAME_STOP_WORDS]
+        if words:
+            return " ".join(words)
+    return None
+
+
+PREPARED_REPLY = {
+    "en": {
+        "confirmation": "Here it is — please confirm on the card and enter your PIN.",
+        "check_in": "One question first — it is on the card.",
+        "waiting_approval": "Your trusted contact needs to approve this first — I have sent it to them.",
+    },
+    "ur": {
+        "confirmation": "جی، تیار ہے — کارڈ پر دیکھ کر تصدیق کریں اور PIN ڈالیں۔",
+        "check_in": "پہلے ایک سوال — کارڈ پر ہے۔",
+        "waiting_approval": "پہلے آپ کے بھروسے والے فرد کی منظوری چاہیے — میں نے انہیں بھیج دیا ہے۔",
+    },
+}
+
+
+def _is_bare_amount(user_text: str) -> bool:
+    """Is the whole message an amount — digits, Urdu digits, or number words only?"""
+    text = user_text.strip()
+    if not text:
+        return False
+    if _BARE_AMOUNT_RE.match(text):
+        return True
+    words = [w for w in re.split(r"[\s,،]+", text.lower()) if w]
+    return bool(words) and all(w in _NUMBER_WORDS for w in words)
+
+
+def _asked_for_amount(history: Sequence[BaseMessage]) -> bool:
+    """Did the assistant's last turn ask the user how much to send?"""
+    for message in reversed(list(history)):
+        if isinstance(message, AIMessage):
+            return bool(_ASKS_AMOUNT_RE.search(strip_cards_marker(_content_text(message.content))))
+    return False
+
+
 def _single_saved_match(state: dict[str, Any]) -> str | None:
     """The recipient_id search_recipients returned this turn when it found exactly one
     saved recipient (the tool text is the contract — see tools.search_recipients)."""
@@ -1450,8 +1607,11 @@ def _content_text(content: Any) -> str:
     return str(content)
 
 
-def _last_reply(state: dict[str, Any]) -> str:
-    for m in reversed(state["messages"]):
+def _last_reply(state: dict[str, Any], base_len: int = 0) -> str:
+    """The assistant's text from THIS turn — messages appended after the input (`base_len`).
+    Scanning the whole state fell back to the PREVIOUS turn's reply whenever the model
+    returned an empty message, so the app showed the same bubble twice (live, Urdu)."""
+    for m in reversed(state["messages"][base_len:]):
         if isinstance(m, AIMessage):
             text = strip_cards_marker(_content_text(m.content))
             if text:

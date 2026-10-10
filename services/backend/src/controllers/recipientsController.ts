@@ -18,8 +18,13 @@ type RecipientDoc = InstanceType<typeof Recipient>;
 async function recipientDto(r: RecipientDoc) {
   const institution = await Institution.findById(r.institutionId);
   if (!institution) return null;
+  // v8: a PAYO-linked recipient carries the linked user's Urdu name, so the Urdu UI can
+  // show "بلال" rather than a Latin nickname on the family row.
+  const linked = r.linkedUserId ? await User.findById(r.linkedUserId, { urduName: 1 }) : null;
   return {
     id: String(r._id), nickname: r.nickname,
+    urduNickname: r.urduNickname || undefined,
+    urduTitle: linked?.urduName || undefined,
     institution: {
       id: String(institution._id), name: institution.name, urduName: institution.urduName, kind: institution.kind,
       domain: institution.domain, logoUrl: logoUrlFor(institution.domain),
@@ -43,6 +48,7 @@ export async function listRecipients(req: Request, res: Response) {
     // An Urdu-script query ("بلال") cannot match a Latin nickname or title, but a PAYO-linked
     // recipient has a real user behind it whose urduName can — so "بلال کو بھیجو" finds Bilal.
     if (/[\u0600-\u06FF]/u.test(q)) {
+      or.push({ urduNickname: re });
       const linked = await User.find({ urduName: re }, { _id: 1 });
       if (linked.length) or.push({ linkedUserId: { $in: linked.map((u) => u._id) } });
     }
