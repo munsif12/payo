@@ -3,6 +3,9 @@
 All notable changes to the landing site (apps/web). Format: one entry per release, newest first.
 Release with `scripts/release-web.sh <version> "<notes>"` from the repo root.
 
+## 1.2.0 (2026-10-11)
+Family by voice: a fourth magic moment with the new v8 captures (home with the family row, the PIN opened from a spoken sentence, the e-statement card), and the 15-slide October pitch deck at /deck.
+
 ## 1.1.0 (2026-09-08)
 Sharper product images from full-resolution captures, embedded demo video, and a link to the new 3D experience.
 
