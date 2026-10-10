@@ -166,6 +166,10 @@ export interface BillerSuggestion {
 
 export interface RecipientDto {
   id: string; nickname: string; title: string;
+  /** The linked PAYO user's Urdu name, when the recipient is a PAYO account (v8). */
+  urduTitle?: string;
+  /** How the user says this person's name in Urdu (seeded family: ابو, بلال) (v8). */
+  urduNickname?: string;
   institution: { id: string; name: string; urduName?: string; kind: 'wallet' | 'bank'; code?: string; logoUrl?: string; domain?: string };
   identifier: string; linkedUserId?: string; lastUsedAt?: string;
 }

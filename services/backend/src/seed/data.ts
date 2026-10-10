@@ -17,19 +17,19 @@ export const SEED_USERS = [
  * with a real account title, so the hero demo never stops to ask for a phone number.
  * Everything else a user saves (Flow A's "Munsif", billers) is still built up live.
  */
-export const SEED_FAMILY: readonly { owner: string; nickname: string; phone: string }[] = [
-  { owner: 'ammi@payo.demo', nickname: 'Abbu', phone: '+923001110007' },
-  { owner: 'ammi@payo.demo', nickname: 'Bilal', phone: '+923001110002' },
-  { owner: 'ammi@payo.demo', nickname: 'Sara', phone: '+923001110003' },
-  { owner: 'bilal@payo.demo', nickname: 'Ammi', phone: '+923001110001' },
-  { owner: 'bilal@payo.demo', nickname: 'Abbu', phone: '+923001110007' },
-  { owner: 'bilal@payo.demo', nickname: 'Sara', phone: '+923001110003' },
-  { owner: 'abbu@payo.demo', nickname: 'Ammi', phone: '+923001110001' },
-  { owner: 'abbu@payo.demo', nickname: 'Bilal', phone: '+923001110002' },
-  { owner: 'abbu@payo.demo', nickname: 'Sara', phone: '+923001110003' },
-  { owner: 'sara.khan@payo.demo', nickname: 'Ammi', phone: '+923001110001' },
-  { owner: 'sara.khan@payo.demo', nickname: 'Abbu', phone: '+923001110007' },
-  { owner: 'sara.khan@payo.demo', nickname: 'Bilal', phone: '+923001110002' },
+export const SEED_FAMILY: readonly { owner: string; nickname: string; urduNickname: string; phone: string }[] = [
+  { owner: 'ammi@payo.demo', nickname: 'Abbu', urduNickname: 'ابو', phone: '+923001110007' },
+  { owner: 'ammi@payo.demo', nickname: 'Bilal', urduNickname: 'بلال', phone: '+923001110002' },
+  { owner: 'ammi@payo.demo', nickname: 'Sara', urduNickname: 'سارہ', phone: '+923001110003' },
+  { owner: 'bilal@payo.demo', nickname: 'Ammi', urduNickname: 'امی', phone: '+923001110001' },
+  { owner: 'bilal@payo.demo', nickname: 'Abbu', urduNickname: 'ابو', phone: '+923001110007' },
+  { owner: 'bilal@payo.demo', nickname: 'Sara', urduNickname: 'سارہ', phone: '+923001110003' },
+  { owner: 'abbu@payo.demo', nickname: 'Ammi', urduNickname: 'امی', phone: '+923001110001' },
+  { owner: 'abbu@payo.demo', nickname: 'Bilal', urduNickname: 'بلال', phone: '+923001110002' },
+  { owner: 'abbu@payo.demo', nickname: 'Sara', urduNickname: 'سارہ', phone: '+923001110003' },
+  { owner: 'sara.khan@payo.demo', nickname: 'Ammi', urduNickname: 'امی', phone: '+923001110001' },
+  { owner: 'sara.khan@payo.demo', nickname: 'Abbu', urduNickname: 'ابو', phone: '+923001110007' },
+  { owner: 'sara.khan@payo.demo', nickname: 'Bilal', urduNickname: 'بلال', phone: '+923001110002' },
 ];
 
 // Wallets + banks per spec §2 — 5 wallets + 33 banks. `popular` = the 5 wallets plus

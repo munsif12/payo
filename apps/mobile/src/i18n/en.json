@@ -248,7 +248,7 @@
   "home.suggest.send.intent": "I want to send money",
   "home.suggest.send.subtitle": "To a contact or a bank account",
   "home.suggest.send.title": "Send money",
-  "home.suggest.statement.intent": "I need my statement",
+  "home.suggest.statement.intent": "Generate my e-statement for last month",
   "home.suggest.statement.subtitle": "Monthly or yearly PDF",
   "home.suggest.statement.title": "E-statement",
   "home.suggest.topup.intent": "I want to top up a phone",

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text as RNText, TextStyle, StyleProp } from 'react-native';
+import { Text as RNText, TextStyle, StyleProp, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../theme/useTheme';
 import { type, type Palette } from '../theme/tokens';
@@ -28,6 +28,35 @@ export function textDirectionFor(variant: TextVariant, urdu: boolean): 'ltr' | '
 }
 
 type FontWeightKey = 400 | 500 | 600 | 700 | 800;
+
+const ARABIC_SCRIPT_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+/** The plain text inside `children`, for the script check; elements contribute nothing. */
+function childrenText(children: React.ReactNode): string {
+  if (typeof children === 'string' || typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(childrenText).join('');
+  return '';
+}
+
+/**
+ * v8 (Urdu QA): a string with no Arabic-script letters at all — "₨2,000", "2000",
+ * "PAYO-96XSZXJ36G" — is set in Plus Jakarta Sans even on an Urdu screen. Nastaliq
+ * has no Latin glyphs or tabular figures, so such strings fell back to a system face
+ * with Nastaliq's tall metrics and came out clipped and mismatched (live: the
+ * confirmation amount lost the top of its digits). Pure, exported for the unit test.
+ */
+export function isLatinOnly(text: string): boolean {
+  return text.length > 0 && !ARABIC_SCRIPT_RE.test(text);
+}
+
+/**
+ * Nastaliq needs ~1.9× line height or the dots above ف / ق / ت are cut off. Callers
+ * that pass an explicit (Latin) `lineHeight` in `style` used to override the Urdu one;
+ * now the Urdu minimum wins (live: «فیس ₨0 · کل رقم» read as «سیس ۰ · ل رم»).
+ */
+export function urduLineHeight(fontSize: number, requested: number | undefined): number {
+  return Math.max(requested ?? 0, fontSize * type.urduLineHeightMult);
+}
 
 export interface TextProps {
   variant?: TextVariant;
@@ -58,24 +87,32 @@ export function Text({ variant = 'body', color, weight, children, style, center,
   const scale = type[variant];
   const resolvedColor = color ?? c[VARIANT_COLOR[variant] ?? 'ink'];
   const weightKey: FontWeightKey = weight ?? (Number(scale.fontWeight) as FontWeightKey);
+  // Urdu face only for text that actually carries Urdu letters (see isLatinOnly).
+  const urduFace = urdu && !isLatinOnly(childrenText(children));
 
   const textStyle: TextStyle = {
     fontSize: scale.fontSize,
-    lineHeight: urdu ? scale.fontSize * type.urduLineHeightMult : scale.lineHeight,
-    fontWeight: urdu ? undefined : (String(weightKey) as TextStyle['fontWeight']),
-    letterSpacing: urdu ? undefined : ('letterSpacing' in scale ? scale.letterSpacing : undefined),
-    fontFamily: urdu ? type.urduFontFamily : type.fontFamily[weightKey],
+    lineHeight: urduFace ? scale.fontSize * type.urduLineHeightMult : scale.lineHeight,
+    fontWeight: urduFace ? undefined : (String(weightKey) as TextStyle['fontWeight']),
+    letterSpacing: urduFace ? undefined : ('letterSpacing' in scale ? scale.letterSpacing : undefined),
+    fontFamily: urduFace ? type.urduFontFamily : type.fontFamily[weightKey],
     color: resolvedColor,
     textAlign: center ? 'center' : urdu ? 'right' : 'left',
-    writingDirection: textDirectionFor(variant, urdu),
+    writingDirection: urduFace ? textDirectionFor(variant, urdu) : 'ltr',
     textTransform: variant === 'cap' ? 'uppercase' : undefined,
     fontVariant: variant === 'money' ? ['tabular-nums'] : undefined,
   };
 
+  // The caller's style wins — except that Nastaliq keeps its minimum line height.
+  const merged = StyleSheet.flatten([textStyle, style]) as TextStyle;
+  if (urduFace) {
+    merged.lineHeight = urduLineHeight(merged.fontSize ?? scale.fontSize, merged.lineHeight);
+  }
+
   return (
     <RNText
       testID={testID}
-      style={[textStyle, style]}
+      style={merged}
       numberOfLines={numberOfLines}
       adjustsFontSizeToFit={adjustsFontSizeToFit}
       minimumFontScale={adjustsFontSizeToFit ? 0.8 : undefined}

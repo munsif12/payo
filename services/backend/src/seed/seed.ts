@@ -138,7 +138,7 @@ export async function runSeed() {
     if (!owner) throw new Error(`SEED_FAMILY owner not seeded: ${fam.owner}`);
     const resolved = await resolveRecipient(String(payo._id), fam.phone, String(owner._id));
     await Recipient.create({
-      userId: owner._id, nickname: fam.nickname, institutionId: payo._id,
+      userId: owner._id, nickname: fam.nickname, urduNickname: fam.urduNickname, institutionId: payo._id,
       identifier: resolved.identifier, title: resolved.title, linkedUserId: resolved.linkedUserId,
       // A week old, most-recent-first order preserved — so a live save lands on top.
       lastUsedAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000 - i * 60_000),

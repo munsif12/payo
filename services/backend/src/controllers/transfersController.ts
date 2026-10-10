@@ -43,6 +43,7 @@ export async function createTransfer(req: Request, res: Response) {
 
   let institutionId: string; let identifier: string; let recipientId: string | undefined;
   let nickname: string | undefined;
+  let urduNickname: string | undefined;
   if ('recipientId' in to) {
     const r = await Recipient.findOne({ _id: to.recipientId, userId: req.userId }).catch(() => null);
     if (!r) throw new ApiError(404, 'NOT_FOUND', 'Recipient not found');
@@ -50,6 +51,7 @@ export async function createTransfer(req: Request, res: Response) {
     identifier = r.identifier;
     recipientId = String(r._id);
     nickname = r.nickname;
+    urduNickname = r.urduNickname || undefined;
   } else {
     institutionId = to.institutionId;
     identifier = to.identifier;
@@ -73,6 +75,11 @@ export async function createTransfer(req: Request, res: Response) {
   const who = nickname && nickname.toLowerCase() !== resolved.title.toLowerCase()
     ? `${nickname} (${resolved.title})`
     : resolved.title;
+  // The Urdu line prefers Urdu names: the saved Urdu nickname (ابو) with the linked user's
+  // Urdu name (عبدالرحمٰن) beside it; a wallet/bank recipient keeps its resolved title.
+  const linkedUser = resolved.linkedUserId ? await User.findById(resolved.linkedUserId, { urduName: 1 }) : null;
+  const urduTitle = linkedUser?.urduName || resolved.title;
+  const whoUr = urduNickname ? `${urduNickname} (${urduTitle})` : urduTitle;
   const lines = [
     { label: LINE_TO, value: `${who} · ${resolved.institution.name} · ${maskIdentifier(resolved.identifier)}` },
     { label: LINE_AMOUNT, value: fmtRs(amountPaisa) },
@@ -99,7 +106,7 @@ export async function createTransfer(req: Request, res: Response) {
     approval: risk.approval, riskFlags: risk.riskFlags, expiryMs: risk.expiryMs,
     summary: {
       en: `Send ${fmtRs(amountPaisa)} to ${who}`,
-      ur: `${who} کو ${fmtRs(amountPaisa)} بھیجیں`,
+      ur: `${whoUr} کو ${fmtRs(amountPaisa)} بھیجیں`,
     },
     lines,
   });

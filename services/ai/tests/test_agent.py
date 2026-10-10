@@ -1396,3 +1396,68 @@ async def test_a_bogus_recipient_id_is_not_guessed_when_several_were_resolved(fa
                                                     ("easypaisa", "03001110002")})
     assert cards == []  # ambiguous: ask, never pick for the user
     await client.aclose()
+
+
+# --- v8: a bare amount answering "how much?" is routed without the model -------------------
+
+from langchain_core.messages import AIMessage as _AI, HumanMessage as _HM
+from app import agent as _agent
+
+
+def test_bare_amount_detector_accepts_digits_and_number_words_only():
+    assert _agent._is_bare_amount("2000")
+    assert _agent._is_bare_amount("Rs 2,000")
+    assert _agent._is_bare_amount("۲۰۰۰ روپے")
+    assert _agent._is_bare_amount("do hazaar")
+    assert _agent._is_bare_amount("دو ہزار روپے")
+    assert not _agent._is_bare_amount("send 2000 to abbu")
+    assert not _agent._is_bare_amount("what is my balance")
+
+
+def test_asked_for_amount_reads_the_assistants_last_turn():
+    ur = [_HM(content="ابو کو پیسے بھیجو"), _AI(content="جی، ابو کو بھیج دیتے ہیں۔ کتنے پیسے بھیجنے ہیں؟")]
+    en = [_HM(content="Send money to Abbu"), _AI(content="How much would you like to send to Abbu?")]
+    assert _agent._asked_for_amount(ur) and _agent._asked_for_amount(en)
+    assert not _agent._asked_for_amount([_AI(content="Here is your balance.")])
+
+
+def test_recipient_name_comes_from_the_users_own_words_first():
+    assert _agent._recipient_name_from_history(
+        [_HM(content="ابو کو پیسے بھیجو"), _AI(content="کتنے پیسے بھیجنے ہیں؟")]) == "ابو"
+    assert _agent._recipient_name_from_history(
+        [_HM(content="Send money to Abbu"), _AI(content="How much would you like to send to Abbu?")]) == "Abbu"
+    assert _agent._recipient_name_from_history(
+        [_HM(content="I want to send money"), _AI(content="How much would you like to send to Bilal?")]) == "Bilal"
+    assert _agent._recipient_name_from_history([_HM(content="hello"), _AI(content="Hi!")]) is None
+
+
+def test_amount_parser_handles_urdu_digits_and_separators():
+    assert _agent._parse_amount_paisa("2000") == 200_000
+    assert _agent._parse_amount_paisa("Rs 2,000") == 200_000
+    assert _agent._parse_amount_paisa("۲۰۰۰") == 200_000
+    assert _agent._parse_amount_paisa("do hazaar") is None
+
+
+def test_last_reply_never_falls_back_to_the_previous_turn():
+    history = [_HM(content="Send money to Abbu"), _AI(content="How much would you like to send to Abbu?")]
+    state = {"messages": [*history, _HM(content="2000"), _AI(content="")]}
+    assert _agent._last_reply(state, base_len=3) == ""
+    assert _agent._last_reply(state) == "How much would you like to send to Abbu?"
+
+
+def test_one_breath_send_requests_parse_in_three_scripts():
+    assert _agent._parse_send_request("Send 2,000 rupees to my father") == ("father", 200_000)
+    assert _agent._parse_send_request("send two thousand to Abbu") == ("Abbu", 200_000)
+    assert _agent._parse_send_request("ابو کو دو ہزار روپے بھیجو") == ("ابو", 200_000)
+    assert _agent._parse_send_request("میرے ابو کو 2000 بھیج دو") == ("ابو", 200_000)
+    assert _agent._parse_send_request("abbu ko do hazaar bhejo") == ("abbu", 200_000)
+    assert _agent._parse_send_request("What is my balance") is None
+    assert _agent._parse_send_request("send money to abbu") is None  # no amount: the model asks
+
+
+def test_number_words_in_english_roman_urdu_and_urdu():
+    assert _agent._parse_amount_words("دو ہزار پانچ سو") == 2_500
+    assert _agent._parse_amount_words("twenty five thousand") == 25_000
+    assert _agent._parse_amount_words("ek lakh") == 100_000
+    assert _agent._parse_amount_words("do hazaar") == 2_000
+    assert _agent._parse_amount_words("hello") is None
