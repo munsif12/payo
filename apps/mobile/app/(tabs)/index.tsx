@@ -6,14 +6,17 @@ import { useTranslation } from 'react-i18next';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronRight, Keyboard as KeyboardIcon, Mic, Send, X } from 'lucide-react-native';
+import { Send } from 'lucide-react-native';
 import { Text, Card, Input, Sheet, NavyHead, useIsUrdu, SHEET_OVERLAP } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space, radius, touch, shadow } from '../../src/theme/tokens';
+import { space, radius, touch } from '../../src/theme/tokens';
 import {
-  Rise, TypingDots, ListeningRings, IconSwap, useFirstPaint,
+  Rise, TypingDots, useFirstPaint,
   wordRiseEnd, splitWords, usePressScale, motionConfig,
 } from '../../src/motion';
+import { FamilyRow } from '../../src/home/FamilyRow';
+import { useFamily } from '../../src/home/useFamily';
+import { VoiceBar, VOICE_BAR_HEIGHT } from '../../src/home/VoiceBar';
 import { CardView } from '../../src/components/cards/CardView';
 import { useConverse, type ChatMessage } from '../../src/voice/useConverse';
 import { showBubbleText } from '../../src/voice/bubbleText';
@@ -28,14 +31,12 @@ import { useRegisterOutcomePlayer } from '../../src/voice/OutcomeSpeechProvider'
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const { D_SHEET, STAGGER } = motionConfig;
-/** Main.dc.html: the amber mic is a 64 pt floating button, bottom-right. */
-const FAB_SIZE = 64;
 const KEY_BUTTON = 44;
 /** What the floating block occupies before onLayout has measured it: the 64 pt
- *  FAB plus the 16 pt gap the artboard leaves under it. The measured height
- *  wins as soon as it arrives — this is only the floor, so the last card is
- *  never briefly stuck under the mic on the very first frame. */
-const FAB_CLEARANCE = FAB_SIZE + space.l;
+ *  voice bar plus the 16 pt gap the artboard leaves under it. The measured
+ *  height wins as soon as it arrives — this is only the floor, so the last
+ *  card is never briefly stuck under the bar on the very first frame. */
+const FAB_CLEARANCE = VOICE_BAR_HEIGHT + space.l;
 
 // Home — Main.dc.html (greet) / HomeListening.dc.html (listening) /
 // HomeConversation.dc.html (conversation): a navy head over a cream sheet, with
@@ -49,6 +50,8 @@ export default function Home() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { greetingFoot, name, greetingMessage, suggestions, balancePaisa } = useHomeGreeting();
+  // v8: the people you pay, one tap from a spoken-style turn.
+  const family = useFamily();
   const [balanceRevealed, setBalanceRevealed] = useState(false);
   const [draft, setDraft] = useState('');
   /** The composer input is opened by the keyboard icon (spec §1 rule 1). */
@@ -190,22 +193,34 @@ export default function Home() {
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={[{ gap: space.s }, contentPadding]}
           >
-            {digestCard ? (
+            {family.length > 0 ? (
               <Rise delay={rowDelay(0)}>
+                <FamilyRow people={family} onIntent={onSuggestion} />
+              </Rise>
+            ) : null}
+
+            {digestCard ? (
+              <Rise delay={rowDelay(1)}>
                 <CardView card={digestCard} onChipTap={onSuggestion} />
               </Rise>
             ) : null}
 
             <SheetLabel>{t('home.sheet.sayOrTap')}</SheetLabel>
 
-            {suggestions.map((s, i) => (
-              <SuggestionCard
-                key={s.key}
-                suggestion={s}
-                delay={rowDelay(i + 1)}
-                // A suggestion tap keeps the conversation live (spec §1 rule 6).
-                onPress={() => onSuggestion(s.intent)}
-              />
+            {/* v8 (Direction A): a two-column grid of chips instead of a stack of
+                full-width cards — the family row above took the vertical room. */}
+            {chunkPairs(suggestions).map((pair, row) => (
+              <View key={pair.map((s) => s.key).join('+')} style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s }}>
+                {pair.map((s) => (
+                  <SuggestionTile
+                    key={s.key}
+                    suggestion={s}
+                    delay={rowDelay(row + 2)}
+                    // A suggestion tap keeps the conversation live (spec §1 rule 6).
+                    onPress={() => onSuggestion(s.intent)}
+                  />
+                ))}
+              </View>
             ))}
           </ScrollView>
         )}
@@ -249,30 +264,15 @@ export default function Home() {
             </View>
           ) : null}
 
-          {/* HomeUrdu.dc.html keeps the mic bottom-RIGHT in Urdu too, so this
-              row is the one thing on Home that does not mirror. */}
-          <View pointerEvents="box-none" style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <RoundButton
-              testID="composer-keyboard"
-              label={t('home.hint.askPayo')}
-              bg={c.surface}
-              onPress={() => setInputOpen((s) => !s)}
-              style={shadow.card.light}
-            >
-              <IconSwap
-                active={inputOpen}
-                size={22}
-                from={<KeyboardIcon size={22} color={c.ink2} strokeWidth={2} />}
-                to={<X size={22} color={c.ink2} strokeWidth={2} />}
-              />
-            </RoundButton>
-            <View style={{ flex: 1 }} />
-            <MicFab
-              live={live}
-              listening={loop.mode === 'listening'}
-              onPress={() => (live ? loop.stop('user') : loop.start())}
-            />
-          </View>
+          {/* v8: one docked voice bar (mic · hint · keyboard). Like the v7 FAB it
+              keeps the mic on the same side in Urdu — the bar does not mirror. */}
+          <VoiceBar
+            live={live}
+            listening={loop.mode === 'listening'}
+            inputOpen={inputOpen}
+            onMic={() => (live ? loop.stop('user') : loop.start())}
+            onKeyboard={() => setInputOpen((s) => !s)}
+          />
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -287,52 +287,11 @@ function SheetLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The amber mic (Main.dc.html): 64 pt, bottom-right, amber glow. Rings only
- *  while the loop is actually listening (spec §3) — nothing loops otherwise. */
-function MicFab({ live, listening, onPress }: { live: boolean; listening: boolean; onPress: () => void }) {
-  const { c } = useTheme();
-  const { t } = useTranslation();
-  const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
-
-  return (
-    <View style={{ width: FAB_SIZE, height: FAB_SIZE }}>
-      {listening ? (
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <ListeningRings size={FAB_SIZE} color={c.amber} />
-        </View>
-      ) : null}
-      <AnimatedPressable
-        testID={live ? 'composer-stop-listening' : 'composer-mic'}
-        accessibilityRole="button"
-        accessibilityLabel={live ? t('home.voice.hintLive') : t('home.hint.tap')}
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {});
-          onPress();
-        }}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        style={[
-          {
-            width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2,
-            backgroundColor: c.amber, alignItems: 'center', justifyContent: 'center',
-            shadowColor: 'rgba(242,169,59,1)',
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.45,
-            shadowRadius: 20,
-            elevation: 6,
-          },
-          pressStyle,
-        ]}
-      >
-        <IconSwap
-          active={live}
-          size={28}
-          from={<Mic size={28} color={c.navy} strokeWidth={2.4} />}
-          to={<X size={26} color={c.navy} strokeWidth={2.6} />}
-        />
-      </AnimatedPressable>
-    </View>
-  );
+/** Two suggestions per row; an odd last one stands alone at half width. */
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
 }
 
 function RoundButton({ testID, label, bg, onPress, children, style }: {
@@ -367,15 +326,16 @@ function RoundButton({ testID, label, bg, onPress, children, style }: {
   );
 }
 
-/** Main.dc.html suggestion row: white card radius 18, 40 pt amber icon tile,
- *  15/600 title over a 13 pt subtitle, chevron. */
-function SuggestionCard({ suggestion, delay, onPress }: { suggestion: Suggestion; delay: number; onPress: () => void }) {
+/** v8 suggestion tile (Direction A chip grid): a white pill, 48 pt tall, a
+ *  32 pt amber icon tile and the title at 14/600 — two per row. The testID is
+ *  the v7 one (`home-suggestion-<key>`) so the QA scripts keep working. */
+function SuggestionTile({ suggestion, delay, onPress }: { suggestion: Suggestion; delay: number; onPress: () => void }) {
   const { c } = useTheme();
   const urdu = useIsUrdu();
   const Icon = suggestion.icon;
   // Guard against a second fast tap re-firing the intent while the first
   // press is still being handled (run() also gates this, but this keeps the
-  // card itself from looking like it accepts repeat taps).
+  // tile itself from looking like it accepts repeat taps).
   const [pressed, setPressed] = useState(false);
   const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
   const handlePress = () => {
@@ -384,10 +344,12 @@ function SuggestionCard({ suggestion, delay, onPress }: { suggestion: Suggestion
     onPress();
   };
   return (
-    <Rise delay={delay}>
+    <Rise delay={delay} style={{ flex: 1 }}>
       <AnimatedPressable
         testID={`home-suggestion-${suggestion.key}`}
         accessibilityRole="button"
+        accessibilityLabel={suggestion.title}
+        accessibilityHint={suggestion.subtitle}
         onPress={handlePress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
@@ -397,20 +359,18 @@ function SuggestionCard({ suggestion, delay, onPress }: { suggestion: Suggestion
         <Card
           padding={0}
           style={{
-            borderRadius: radius.tile,
-            paddingHorizontal: 14, paddingVertical: space.m,
-            flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m,
-            minHeight: touch.min + 2 * space.m,
+            borderRadius: radius.button,
+            paddingLeft: urdu ? 12 : 8, paddingRight: urdu ? 8 : 12, paddingVertical: 8,
+            flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: 10,
+            minHeight: touch.min + 4,
           }}
         >
-          <View style={{ width: 40, height: 40, borderRadius: space.m, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon size={20} color={c.onAmber} strokeWidth={2} />
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon size={17} color={c.onAmber} strokeWidth={2.2} />
           </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="hl" style={{ fontSize: 15, lineHeight: urdu ? undefined : 19 }}>{suggestion.title}</Text>
-            <Text variant="foot" numberOfLines={1}>{suggestion.subtitle}</Text>
-          </View>
-          <ChevronRight size={18} color={c.ink3} strokeWidth={2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />
+          <Text variant="sub" weight={600} numberOfLines={2} style={{ flex: 1, fontSize: 14, lineHeight: urdu ? undefined : 18 }}>
+            {suggestion.title}
+          </Text>
         </Card>
       </AnimatedPressable>
     </Rise>

@@ -1,10 +1,11 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import {
-  User, Account, Card, Institution, Biller, Telco, Bill, Pocket, Transaction,
+  User, Account, Card, Institution, Biller, Telco, Bill, Pocket, Transaction, Recipient,
 } from '../models';
+import { resolveRecipient } from '../lib/resolveRecipient';
 import { config } from '../config';
-import { SEED_USERS, SEED_INSTITUTIONS, SEED_BILLERS, SEED_TELCOS, SPEND_TEMPLATES, SALARY_RS, AMMI } from './data';
+import { SEED_USERS, SEED_INSTITUTIONS, SEED_BILLERS, SEED_TELCOS, SPEND_TEMPLATES, SALARY_RS, AMMI, SEED_FAMILY } from './data';
 
 // Deterministic PRNG so the demo world is identical on every run.
 function mulberry32(seed: number) {
@@ -35,7 +36,7 @@ export async function runSeed() {
   const pinHash = await bcrypt.hash('1234', 10);
   const now = new Date();
 
-  await Institution.create([...SEED_INSTITUTIONS]);
+  const institutions = await Institution.create([...SEED_INSTITUTIONS]);
   const billers = await Biller.create([...SEED_BILLERS]);
   await Telco.create([...SEED_TELCOS]);
 
@@ -126,8 +127,21 @@ export async function runSeed() {
 
   await Pocket.create({ userId: ammi._id, ...AMMI.pocket });
 
-  // No recipients and no saved billers are pre-seeded — the point of v3 is that the
-  // user builds these up themselves (send/pay → "save?").
+  // v8: the family is pre-saved (Abbu / Ammi / Bilal / Sara) so "send money to my father"
+  // works on a fresh world. Everything else — Flow A's "Munsif", billers — is still built
+  // up live by the user (send/pay → "save?"), which is the point of v3.
+  const payo = institutions.find(i => i.code === 'PAYO')!;
+  for (const [i, fam] of SEED_FAMILY.entries()) {
+    const owner = users.find(u => u.email === fam.owner);
+    if (!owner) throw new Error(`SEED_FAMILY owner not seeded: ${fam.owner}`);
+    const resolved = await resolveRecipient(String(payo._id), fam.phone, String(owner._id));
+    await Recipient.create({
+      userId: owner._id, nickname: fam.nickname, institutionId: payo._id,
+      identifier: resolved.identifier, title: resolved.title, linkedUserId: resolved.linkedUserId,
+      // A week old, most-recent-first order preserved — so a live save lands on top.
+      lastUsedAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000 - i * 60_000),
+    });
+  }
 }
 
 // npm run seed — connect to local Mongo, seed, exit.

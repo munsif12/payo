@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { createApp } from '../../app';
 import { runSeed } from '../seed';
 import { User, Account, Transaction, Bill, Pocket, Institution, Biller, Telco, Recipient, SavedBiller } from '../../models';
-import { SEED_INSTITUTIONS, SEED_BILLERS } from '../data';
+import { SEED_INSTITUTIONS, SEED_BILLERS, SEED_USERS, SEED_FAMILY } from '../data';
 
 const app = createApp();
 
@@ -16,7 +16,7 @@ async function hasUniqueIndex(collection: string, key: Record<string, 1 | -1>) {
 test('seed builds the Contract 4 demo world', async () => {
   await runSeed();
 
-  expect(await User.countDocuments()).toBe(6);
+  expect(await User.countDocuments()).toBe(SEED_USERS.length);
   const ammi = (await User.findOne({ email: 'ammi@payo.demo' }))!;
   expect((await Account.findOne({ userId: ammi._id }))!.balancePaisa).toBe(8_450_000);
   expect(ammi.language).toBe('en');
@@ -40,8 +40,12 @@ test('seed builds the Contract 4 demo world', async () => {
   const billers = await Biller.find();
   expect(billers.every(b => typeof b.get('domain') === 'string' && b.get('domain').length > 0)).toBe(true);
   expect(await Telco.countDocuments()).toBe(4);
-  // v3: no recipients or saved billers are pre-seeded.
-  expect(await Recipient.countDocuments()).toBe(0);
+  // v8: the family is pre-saved with real PAYO titles; nothing else is (v3 — billers and
+  // the "Munsif" of Flow A are saved live by the user).
+  expect(await Recipient.countDocuments()).toBe(SEED_FAMILY.length);
+  const abbu = (await Recipient.findOne({ userId: ammi._id, nickname: 'Abbu' }))!;
+  expect(abbu.title).toBe('Abdul Rehman');
+  expect(String(abbu.linkedUserId)).toBe(String((await User.findOne({ email: 'abbu@payo.demo' }))!._id));
   expect(await SavedBiller.countDocuments()).toBe(0);
 
   // seeded users are already onboarded — phone + OTP + PIN, no signup step
@@ -63,7 +67,8 @@ test('seed builds the Contract 4 demo world', async () => {
 test('seed is idempotent — re-run lands on the same world', async () => {
   await runSeed();
   await runSeed();
-  expect(await User.countDocuments()).toBe(6);
+  expect(await User.countDocuments()).toBe(SEED_USERS.length);
+  expect(await Recipient.countDocuments()).toBe(SEED_FAMILY.length);
   const ammi = (await User.findOne({ email: 'ammi@payo.demo' }))!;
   expect((await Account.findOne({ userId: ammi._id }))!.balancePaisa).toBe(8_450_000);
 }, 120_000);

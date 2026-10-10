@@ -109,6 +109,34 @@ test('recipients: create resolves + stores, search, ownership-scoped list, dupli
   expect(deleteOthers.status).toBe(404);
 });
 
+test('recipients search understands family words: ?q=father finds the nickname "Abbu" (and Urdu/Roman Urdu)', async () => {
+  const [payo] = await seedInstitutions();
+  const a = await createVerifiedUser(app);
+  const dad = await createVerifiedUser(app);
+  const mum = await createVerifiedUser(app);
+  const friend = await createVerifiedUser(app);
+  for (const [nickname, who] of [['Abbu', dad], ['Ammi Jaan', mum], ['Munsif', friend]] as const) {
+    const r = await request(app).post('/api/v1/recipients')
+      .set('Authorization', `Bearer ${a.token}`)
+      .send({ nickname, institutionId: String(payo!._id), identifier: who.user.phone });
+    expect(r.status).toBe(201);
+  }
+  const get = (q: string) => request(app).get(`/api/v1/recipients?q=${encodeURIComponent(q)}`).set('Authorization', `Bearer ${a.token}`);
+
+  for (const q of ['father', 'my father', 'dad', 'abba', 'ابو', 'والد']) {
+    const res = await get(q);
+    expect(res.body.data.items.map((i: { nickname: string }) => i.nickname)).toEqual(['Abbu']);
+  }
+  for (const q of ['mother', 'ammi', 'amma', 'والدہ']) {
+    const res = await get(q);
+    expect(res.body.data.items.map((i: { nickname: string }) => i.nickname)).toEqual(['Ammi Jaan']);
+  }
+  // A relationship nobody is saved under finds nothing — never a guess.
+  expect((await get('brother')).body.data.items).toHaveLength(0);
+  // Plain nicknames still match as before.
+  expect((await get('munsif')).body.data.items).toHaveLength(1);
+});
+
 test('recipients list skips an item whose Institution was deleted (never a partial shape)', async () => {
   const [payo] = await seedInstitutions();
   const a = await createVerifiedUser(app);

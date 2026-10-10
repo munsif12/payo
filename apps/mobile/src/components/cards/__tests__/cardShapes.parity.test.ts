@@ -76,6 +76,7 @@ const REQUIRED: Record<string, string[]> = {
  *  InstitutionRef/InstitutionChip have a REAL `kind` field ('wallet' | 'bank')
  *  which is not a discriminator and is listed in REQUIRED above. */
 const OPTIONAL: Record<string, string[]> = {
+  StatementCard: ['txnCount'],
   ConfirmationCard: ['autoOpenPin'],
   TxnCounterparty: ['urduName', 'institutionLogoUrl'],
   InstitutionRef: ['urduName', 'logoUrl'],

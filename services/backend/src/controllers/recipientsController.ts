@@ -7,6 +7,7 @@ import { ok } from '../lib/respond';
 import { resolveRecipient } from '../lib/resolveRecipient';
 import { escapeRegExp } from '../lib/fmt';
 import { logoUrlFor } from '../lib/logos';
+import { relationAliases } from '../lib/relations';
 
 type RecipientDoc = InstanceType<typeof Recipient>;
 
@@ -34,7 +35,12 @@ export async function listRecipients(req: Request, res: Response) {
   const filter: Record<string, unknown> = { userId: req.userId };
   if (q) {
     const re = new RegExp(escapeRegExp(q), 'i');
-    filter.$or = [{ nickname: re }, { title: re }, { identifier: re }];
+    const or: Record<string, unknown>[] = [{ nickname: re }, { title: re }, { identifier: re }];
+    // "my father" / "ammi" / "والد": a family word matches every nickname that names that
+    // relationship (Abbu, Abba, Baba, …), so the AI can search with the word the user said.
+    const aliases = relationAliases(q);
+    if (aliases) or.push({ nickname: new RegExp(`^(${aliases.map(escapeRegExp).join('|')})(\\b|$)`, 'iu') });
+    filter.$or = or;
   }
   const items = await Recipient.find(filter).sort({ lastUsedAt: -1 });
   const dtos = await Promise.all(items.map(recipientDto));

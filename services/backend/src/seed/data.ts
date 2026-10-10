@@ -7,7 +7,30 @@ export const SEED_USERS = [
   { name: 'Sara Malik', urduName: 'سارہ ملک', email: 'sara.malik@payo.demo', phone: '+923001110004', targetBalancePaisa: 5_120_000, dateOfBirth: '1981-06-09', language: 'en' },
   { name: 'Hamza', urduName: 'حمزہ', email: 'hamza@payo.demo', phone: '+923001110005', targetBalancePaisa: 3_940_000, dateOfBirth: '1998-01-27', language: 'en' },
   { name: 'Ayesha', urduName: 'عائشہ', email: 'ayesha@payo.demo', phone: '+923001110006', targetBalancePaisa: 7_310_000, dateOfBirth: '2000-10-04', language: 'en' },
+  // v8: the father of the house, so "send money to my father" has somewhere real to go.
+  { name: 'Abdul Rehman', urduName: 'عبدالرحمٰن', email: 'abbu@payo.demo', phone: '+923001110007', targetBalancePaisa: 9_120_000, dateOfBirth: '1957-07-21', language: 'en' },
 ] as const;
+
+/**
+ * v8: the family is pre-saved, under the nicknames people actually use. "Send 2,000 to my
+ * father" resolves through `lib/relations.ts` (father → Abbu) to a saved PAYO recipient
+ * with a real account title, so the hero demo never stops to ask for a phone number.
+ * Everything else a user saves (Flow A's "Munsif", billers) is still built up live.
+ */
+export const SEED_FAMILY: readonly { owner: string; nickname: string; phone: string }[] = [
+  { owner: 'ammi@payo.demo', nickname: 'Abbu', phone: '+923001110007' },
+  { owner: 'ammi@payo.demo', nickname: 'Bilal', phone: '+923001110002' },
+  { owner: 'ammi@payo.demo', nickname: 'Sara', phone: '+923001110003' },
+  { owner: 'bilal@payo.demo', nickname: 'Ammi', phone: '+923001110001' },
+  { owner: 'bilal@payo.demo', nickname: 'Abbu', phone: '+923001110007' },
+  { owner: 'bilal@payo.demo', nickname: 'Sara', phone: '+923001110003' },
+  { owner: 'abbu@payo.demo', nickname: 'Ammi', phone: '+923001110001' },
+  { owner: 'abbu@payo.demo', nickname: 'Bilal', phone: '+923001110002' },
+  { owner: 'abbu@payo.demo', nickname: 'Sara', phone: '+923001110003' },
+  { owner: 'sara.khan@payo.demo', nickname: 'Ammi', phone: '+923001110001' },
+  { owner: 'sara.khan@payo.demo', nickname: 'Abbu', phone: '+923001110007' },
+  { owner: 'sara.khan@payo.demo', nickname: 'Bilal', phone: '+923001110002' },
+];
 
 // Wallets + banks per spec §2 — 5 wallets + 33 banks. `popular` = the 5 wallets plus
 // HBL, Meezan, UBL, MCB, Allied.
@@ -91,7 +114,7 @@ export const SPEND_TEMPLATES = [
   { category: 'health', name: 'Aga Khan Pharmacy', urduName: 'آغا خان فارمیسی', minRs: 300, maxRs: 2800 },
 ] as const;
 
-export const SALARY_RS = [120_000, 95_000, 85_000, 90_000, 70_000, 110_000] as const;
+export const SALARY_RS = [120_000, 95_000, 85_000, 90_000, 70_000, 110_000, 65_000] as const;
 
 export const AMMI = {
   dueBillConsumerNo: '0400012345678',

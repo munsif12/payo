@@ -313,6 +313,7 @@ async def get_statement(client: BackendClient, year: int, month: int | None = No
         totalInPaisa=s["totalInPaisa"],
         totalOutPaisa=s["totalOutPaisa"],
         downloadUrl=f"{settings.backend_base_url}/statements/{data['statementId']}/pdf",
+        txnCount=s.get("txnCount"),
     )
     return _ok(
         f"Statement for {s['period']['en']}: in {_rs(s['totalInPaisa'])}, out {_rs(s['totalOutPaisa'])}, "

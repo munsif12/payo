@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
-import { useSelector } from 'react-redux';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, FileText, Download } from 'lucide-react-native';
 import { Screen, Text, Card, Button, Pill, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space, radius } from '../../src/theme/tokens';
 import { useStatementsQuery, useGenerateStatementMutation, apiErr } from '../../src/api/client';
-import { apiBase } from '../../src/lib/backendUrl';
-import type { RootState } from '../../src/store';
+import { useOpenStatementPdf } from '../../src/lib/openStatementPdf';
 import { formatPaisa } from '../../src/lib/money';
 import { ltrIsolate } from '../../src/lib/bidi';
 
@@ -22,7 +19,6 @@ export default function Statements() {
   const { c } = useTheme();
   const urdu = useIsUrdu();
   const router = useRouter();
-  const token = useSelector((s: RootState) => s.auth.token);
   const { data } = useStatementsQuery();
   const [generate, { isLoading }] = useGenerateStatementMutation();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -53,28 +49,7 @@ export default function Statements() {
     }
   };
 
-  const openPdf = async (id: string) => {
-    // WebBrowser can't send Authorization headers; pass the token via query is not supported
-    // by the backend — so fetch to a data url is overkill for the demo: open via fetch+share.
-    try {
-      const url = `${apiBase()}/statements/${id}/pdf`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      const blob = await res.blob();
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const FileSystem = await import('expo-file-system/legacy');
-        const Sharing = await import('expo-sharing');
-        const base64 = String(reader.result).split(',')[1];
-        const path = `${FileSystem.cacheDirectory}statement-${id}.pdf`;
-        await FileSystem.writeAsStringAsync(path, base64, { encoding: 'base64' });
-        if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path, { mimeType: 'application/pdf' });
-        else await WebBrowser.openBrowserAsync(path);
-      };
-      reader.readAsDataURL(blob);
-    } catch {
-      Alert.alert('PDF', 'Could not open the PDF');
-    }
-  };
+  const openPdf = useOpenStatementPdf();
 
   return (
     <Screen>
