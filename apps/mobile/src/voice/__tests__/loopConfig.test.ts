@@ -7,8 +7,8 @@ import {
 test('loop constants match the documented spec values', () => {
   expect(PRE_SPEECH_TIMEOUT_MS).toBe(6000);
   expect(POST_SPEECH_SILENCE_MS).toBe(1200);
-  expect(SPEECH_THRESHOLD_DB).toBe(-30);
-  expect(SILENCE_DB).toBe(-35);
+  expect(SPEECH_THRESHOLD_DB).toBe(-42);
+  expect(SILENCE_DB).toBe(-48);
   expect(MAX_CLIP_MS).toBe(15000);
   expect(REARM_DELAY_MS).toBe(300);
   expect(MAX_SILENT_TURNS).toBe(2);

@@ -6,10 +6,12 @@
 export const PRE_SPEECH_TIMEOUT_MS = 6000;
 /** Speech heard, then quiet this long → send the clip. */
 export const POST_SPEECH_SILENCE_MS = 1200;
-/** Peak metering must reach this (dB) for a clip to count as speech. */
-export const SPEECH_THRESHOLD_DB = -30;
+/** Peak metering must reach this (dB) for a clip to count as speech. Tuned on a
+ *  real iPhone held at arm's length (peaks around -35 dBFS); the simulator's Mac mic
+ *  runs hotter, so it clears this comfortably too. */
+export const SPEECH_THRESHOLD_DB = -42;
 /** Below this (dB) counts as silence. */
-export const SILENCE_DB = -35;
+export const SILENCE_DB = -48;
 /** Hard cap per clip. */
 export const MAX_CLIP_MS = 15000;
 /** Gap after playback ends before the mic re-opens (audio tail). */
