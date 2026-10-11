@@ -83,7 +83,7 @@ DEMO_PIN = "1234"
 ROWS = [
     ("A1", "What is my balance?", "میرا بیلنس کیا ہے؟", "get_balance", "balance", None),
     ("A2", "Show my account details", "میرا اکاؤنٹ دکھائیں", "get_account", "account", None),
-    ("A3", "Change my name to Ammi Jaan", "میرا نام امی جان کر دیں", "update_profile", "profile", None),
+    ("A3", "Change my name to Maria", "میرا نام ماریہ کر دیں", "update_profile", "profile", None),
     ("A4", "Switch to English", "انگریزی میں بدلیں", "update_profile", "profile", None),
     ("A5", "What can you do?", "آپ کیا کیا کر سکتی ہیں؟", "help", "help", None),
     ("A5b", "What can I ask you?", "میں آپ سے کیا پوچھ سکتا ہوں؟", "help", "help", None),

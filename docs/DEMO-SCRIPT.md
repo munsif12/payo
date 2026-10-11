@@ -1,7 +1,7 @@
 # PAYO — Demo Script
 
 English-first pitch script. Each step lists **what you say** (EN, with the UR line you can
-use in either language mode) and **what the audience sees**. Demo persona: **Ammi Jaan** —
+use in either language mode) and **what the audience sees**. Demo persona: **Maria** —
 phone `+923001110001`, PIN `1234`, balance seeded with realistic history and a due
 K-Electric bill.
 
@@ -32,7 +32,7 @@ cd apps/mobile && npx expo start                              # open on simulato
 # routing gate — run it before you present:
 cd services/ai && uv run python scripts/ai-smoke.py --language both
 ```
-Sign in as Ammi: phone → OTP (demo echoes the code back) → PIN `1234`. Land on Home,
+Sign in as Maria: phone → OTP (demo echoes the code back) → PIN `1234`. Land on Home,
 English mode. Flow F needs a **second simulator** signed in as Bilal (`+923001110002`,
 PIN `1234`).
 
@@ -47,13 +47,13 @@ phone call — tap the mic once, then just speak and listen; it keeps the conver
 until your job is done."
 **اردو کے لیے:** «یہ PAYO ہے — ایک AI بینک، سب سے مشکل صارف کے لیے: ہمارے والدین۔ نہ
 پاس ورڈ، نہ فارم — بس فون نمبر اور پن۔»
-**Audience sees:** Home — the animated greeting ("Assalam o Alaikum, Ammi."), the amber
+**Audience sees:** Home — the animated greeting ("Assalam o Alaikum, Maria."), the amber
 voice orb, the family tiles (Abbu · Bilal · Sara) and the due bill, on navy glass. Tap the
 round «اردو» button top-right to flip the whole screen to Urdu, live.
 
 ## Flow A0 — "Send 2,000 to my father" (1 min) ⭐ the hands-free hero
 
-**Setup:** nothing — the seed pre-saves Ammi's family (Abbu · Bilal · Sara), shown as the
+**Setup:** nothing — the seed pre-saves Maria's family (Abbu · Bilal · Sara), shown as the
 **Family row** at the top of the Home sheet. Tap the mic once (the amber disc in the docked
 voice bar) so the conversation is hands-free, then just talk.
 **Say (en):** "Send two thousand rupees to my father." · **(اردو):** «ابو کو دو ہزار روپے بھیجو»
@@ -161,7 +161,7 @@ for the people I already pay."
 send this?" with "Large payment to someone new". Tap *No, this is my own idea*. The card turns
 into **Waiting for Bilal** with a 30-minute clock and a Remind button. No PIN yet.
 **On Bilal's phone:** say "anything waiting for my approval?" → the approval card → Approve →
-**his** PIN. **On Ammi's phone:** within three seconds the PIN sheet opens by itself — "Bilal
+**his** PIN. **On Maria's phone:** within three seconds the PIN sheet opens by itself — "Bilal
 approved — enter your PIN" → sent.
 **Say (en):** "Now the call every family fears." *say:* "Someone called and said my account
 will be blocked unless I send 5,000 rupees to 03001110004 right now." → Yes → the check-in

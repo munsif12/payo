@@ -17,7 +17,7 @@ test('seed builds the Contract 4 demo world', async () => {
   await runSeed();
 
   expect(await User.countDocuments()).toBe(SEED_USERS.length);
-  const ammi = (await User.findOne({ email: 'ammi@payo.demo' }))!;
+  const ammi = (await User.findOne({ email: 'maria@payo.demo' }))!;
   expect((await Account.findOne({ userId: ammi._id }))!.balancePaisa).toBe(8_450_000);
   expect(ammi.language).toBe('en');
 
@@ -69,6 +69,6 @@ test('seed is idempotent — re-run lands on the same world', async () => {
   await runSeed();
   expect(await User.countDocuments()).toBe(SEED_USERS.length);
   expect(await Recipient.countDocuments()).toBe(SEED_FAMILY.length);
-  const ammi = (await User.findOne({ email: 'ammi@payo.demo' }))!;
+  const ammi = (await User.findOne({ email: 'maria@payo.demo' }))!;
   expect((await Account.findOne({ userId: ammi._id }))!.balancePaisa).toBe(8_450_000);
 }, 120_000);

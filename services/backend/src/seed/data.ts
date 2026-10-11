@@ -1,7 +1,7 @@
-// `dateOfBirth` drives the senior scam check-in (src/lib/risk.ts). Ammi is deliberately
+// `dateOfBirth` drives the senior scam check-in (src/lib/risk.ts). Maria is deliberately
 // the only user over 60 — the v6 demo turns on her being asked and the others not.
 export const SEED_USERS = [
-  { name: 'Ammi Jaan', urduName: 'امی', email: 'ammi@payo.demo', phone: '+923001110001', targetBalancePaisa: 8_450_000, dateOfBirth: '1961-03-15', language: 'en' },
+  { name: 'Maria', urduName: 'ماریہ', email: 'maria@payo.demo', phone: '+923001110001', targetBalancePaisa: 8_450_000, dateOfBirth: '1961-03-15', language: 'en' },
   { name: 'Bilal Ahmed', urduName: 'بلال احمد', email: 'bilal@payo.demo', phone: '+923001110002', targetBalancePaisa: 6_230_000, dateOfBirth: '1993-08-02', language: 'en' },
   { name: 'Sara Khan', urduName: 'سارہ خان', email: 'sara.khan@payo.demo', phone: '+923001110003', targetBalancePaisa: 4_780_000, dateOfBirth: '1990-11-20', language: 'en' },
   { name: 'Sara Malik', urduName: 'سارہ ملک', email: 'sara.malik@payo.demo', phone: '+923001110004', targetBalancePaisa: 5_120_000, dateOfBirth: '1981-06-09', language: 'en' },
@@ -18,16 +18,16 @@ export const SEED_USERS = [
  * Everything else a user saves (Flow A's "Munsif", billers) is still built up live.
  */
 export const SEED_FAMILY: readonly { owner: string; nickname: string; urduNickname: string; phone: string }[] = [
-  { owner: 'ammi@payo.demo', nickname: 'Abbu', urduNickname: 'ابو', phone: '+923001110007' },
-  { owner: 'ammi@payo.demo', nickname: 'Bilal', urduNickname: 'بلال', phone: '+923001110002' },
-  { owner: 'ammi@payo.demo', nickname: 'Sara', urduNickname: 'سارہ', phone: '+923001110003' },
-  { owner: 'bilal@payo.demo', nickname: 'Ammi', urduNickname: 'امی', phone: '+923001110001' },
+  { owner: 'maria@payo.demo', nickname: 'Abbu', urduNickname: 'ابو', phone: '+923001110007' },
+  { owner: 'maria@payo.demo', nickname: 'Bilal', urduNickname: 'بلال', phone: '+923001110002' },
+  { owner: 'maria@payo.demo', nickname: 'Sara', urduNickname: 'سارہ', phone: '+923001110003' },
+  { owner: 'bilal@payo.demo', nickname: 'Maria', urduNickname: 'ماریہ', phone: '+923001110001' },
   { owner: 'bilal@payo.demo', nickname: 'Abbu', urduNickname: 'ابو', phone: '+923001110007' },
   { owner: 'bilal@payo.demo', nickname: 'Sara', urduNickname: 'سارہ', phone: '+923001110003' },
-  { owner: 'abbu@payo.demo', nickname: 'Ammi', urduNickname: 'امی', phone: '+923001110001' },
+  { owner: 'abbu@payo.demo', nickname: 'Maria', urduNickname: 'ماریہ', phone: '+923001110001' },
   { owner: 'abbu@payo.demo', nickname: 'Bilal', urduNickname: 'بلال', phone: '+923001110002' },
   { owner: 'abbu@payo.demo', nickname: 'Sara', urduNickname: 'سارہ', phone: '+923001110003' },
-  { owner: 'sara.khan@payo.demo', nickname: 'Ammi', urduNickname: 'امی', phone: '+923001110001' },
+  { owner: 'sara.khan@payo.demo', nickname: 'Maria', urduNickname: 'ماریہ', phone: '+923001110001' },
   { owner: 'sara.khan@payo.demo', nickname: 'Abbu', urduNickname: 'ابو', phone: '+923001110007' },
   { owner: 'sara.khan@payo.demo', nickname: 'Bilal', urduNickname: 'بلال', phone: '+923001110002' },
 ];
