@@ -12,8 +12,8 @@ export const POST_SPEECH_SILENCE_MS = 1200;
 export const SPEECH_THRESHOLD_DB = -42;
 /** Below this (dB) counts as silence. */
 export const SILENCE_DB = -48;
-/** Hard cap per clip. */
-export const MAX_CLIP_MS = 15000;
+/** Hard cap per clip — a room that never reads as quiet still sends after this. */
+export const MAX_CLIP_MS = 9000;
 /** Gap after playback ends before the mic re-opens (audio tail). */
 export const REARM_DELAY_MS = 300;
 /** Consecutive no-speech windows before the loop ends itself. */

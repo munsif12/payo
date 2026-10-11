@@ -28,7 +28,7 @@ test('hadSpeech stays latched once set, even while quiet', () => {
 });
 
 test('after speech, the pre-speech timeout no longer applies', () => {
-  const r = call({ now: T0 + PRE_SPEECH_TIMEOUT_MS + 5000, level: -10, hadSpeech: true });
+  const r = call({ now: T0 + PRE_SPEECH_TIMEOUT_MS + 1000, level: -10, hadSpeech: true });
   expect(r.decision).toBe('continue');
 });
 
@@ -63,4 +63,16 @@ test('the max-clip cap stops a clip even mid-speech', () => {
 test('a custom config overrides the defaults', () => {
   const cfg = { ...defaultSilenceConfig, preSpeechTimeoutMs: 100 };
   expect(call({ now: T0 + 150, cfg }).decision).toBe('stop');
+});
+
+test('with a noisy room, quiet means back near the noise floor', () => {
+  // Room floor −44 dB: the fixed −48 floor would never be reached, so after speech
+  // (−30) a level of −40 (just above the floor) must already count as quiet.
+  const afterSpeech = silenceDecision({ now: 2000, startedAt: 0, level: -40, hadSpeech: true, silenceSince: null, noiseFloorDb: -44 });
+  expect(afterSpeech.silenceSince).toBe(2000);
+  const stopped = silenceDecision({ now: 3300, startedAt: 0, level: -40, hadSpeech: true, silenceSince: 2000, noiseFloorDb: -44 });
+  expect(stopped.decision).toBe('stop');
+  // And a level barely above the floor is not speech.
+  expect(silenceDecision({ now: 500, startedAt: 0, level: -36, hadSpeech: false, silenceSince: null, noiseFloorDb: -44 }).hadSpeech).toBe(false);
+  expect(silenceDecision({ now: 500, startedAt: 0, level: -33, hadSpeech: false, silenceSince: null, noiseFloorDb: -44 }).hadSpeech).toBe(true);
 });
