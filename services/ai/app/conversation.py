@@ -364,8 +364,16 @@ async def converse_turn(
         # The reply language follows the input's own script when it's Urdu, even if the
         # UI language is English — e.g. a Roman-Urdu UI user who types/speaks Urdu script.
         turn_language = reply_language(text, language)
+        # The user's own name, in the reply's script, so the assistant addresses them by it.
+        user_name = None
+        try:
+            me = (await client.me()).get("user") or {}
+            user_name = (me.get("urduName") if turn_language == "ur" else None) or me.get("name")
+        except Exception:
+            user_name = None
         reply, cards = await run_agent(
-            client, history, text, turn_language, model=model, resolved_pairs=resolved_pairs
+            client, history, text, turn_language, model=model, resolved_pairs=resolved_pairs,
+            user_name=user_name,
         )
 
         for token in reply.split(" "):
