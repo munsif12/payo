@@ -828,6 +828,19 @@ async def run_agent(
                     lang_replies = PREPARED_REPLY.get(language, PREPARED_REPLY["en"])
                     return lang_replies.get(kind, lang_replies["confirmation"]), cards
 
+    # Pre-route (v8): a plain statement request with no period — "generate my e-statement
+    # for last month", «پچھلے مہینے کی ای اسٹیٹمنٹ بنا دو», "I need my statement". Seen live:
+    # deep into a conversation the model answered «یہ رہی آپ کی اسٹیٹمنٹ» without ever calling
+    # get_statement, so the card never came. Last month is the only reading of these, so
+    # the tool runs here and the model is not consulted. A named month or year goes to the model.
+    if _is_statement_request(user_text):
+        year, month = _last_month(date.today())
+        result = await t.get_statement(client, year, month)
+        card = result.get("card")
+        if card and not result["text"].startswith("ERROR"):
+            cards.append(card)
+            return STATEMENT_REPLY.get(language, STATEMENT_REPLY["en"]), cards
+
     # Pre-route (v8): a bare amount answering "how much?". The recipient was named one turn
     # ago and the amount is the whole message, so nothing is left to decide — and Gemini 2.5
     # Flash has been seen returning an EMPTY response (output_tokens 0, finish STOP) to a bare
@@ -1620,6 +1633,41 @@ PREPARED_REPLY = {
         "waiting_approval": "پہلے آپ کے بھروسے والے فرد کی منظوری چاہیے — میں نے انہیں بھیج دیا ہے۔",
     },
 }
+
+
+STATEMENT_REPLY = {
+    "en": "Here is last month's statement — tap Open PDF on the card.",
+    "ur": "یہ رہی پچھلے مہینے کی اسٹیٹمنٹ — کارڈ پر PDF کھولیں۔",
+}
+
+# A statement request that names NO period (or says "last month") in English, Urdu or
+# Roman Urdu. Anything with a month name, a year or "this month" falls through to the model.
+_STATEMENT_WORD_RE = re.compile(r"(e-?statement|statement|اسٹیٹمنٹ|سٹیٹمنٹ|istatement|statment)", re.I)
+_STATEMENT_PERIOD_RE = re.compile(
+    r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
+    r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|this month|this year|last year|yearly|annual|"
+    r"20\d\d|19\d\d|week|quarter|q[1-4])\b|"
+    r"(جنوری|فروری|مارچ|اپریل|مئی|جون|جولائی|اگست|ستمبر|اکتوبر|نومبر|دسمبر|اس مہینے|اس سال|پچھلے سال|سالانہ|ہفتے|[۰-۹]{4})",
+    re.I,
+)
+
+
+def _is_statement_request(user_text: str) -> bool:
+    """True for a statement request that can only mean last month (no explicit period)."""
+    text = user_text.strip()
+    if len(text) > 80 or not _STATEMENT_WORD_RE.search(text):
+        return False
+    if _STATEMENT_PERIOD_RE.search(text):
+        return False
+    # "statements" (plural, listing) is list_statements — leave it to the model.
+    if re.search(r"\bstatements\b|اسٹیٹمنٹس", text, re.I) and not re.search(r"بنا|generate|make|create|چاہیے|need|want", text, re.I):
+        return False
+    return True
+
+
+def _last_month(today: date) -> tuple[int, int]:
+    """(year, month) of the calendar month before `today`."""
+    return (today.year, today.month - 1) if today.month > 1 else (today.year - 1, 12)
 
 
 def _is_bare_amount(user_text: str) -> bool:
