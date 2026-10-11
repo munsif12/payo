@@ -27,6 +27,10 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
   const hadSpeech = useRef(false);
   const startedAt = useRef(0);
   const stopping = useRef(false);
+  // Whether this clip ever reported a real metering value. A device that never
+  // meters (seen on a physical iPhone in Expo Go) would otherwise make every clip
+  // look silent, so such a clip is sent as long as it ran past a short minimum.
+  const sawMetering = useRef(false);
   // 0..1 mic level for the listening Waveform (spec §3: "the waveform is real").
   // A SHARED value, not React state: metering polls every 300 ms and the bars
   // must not cost a render each time. Smoothed in JS (expo-audio's polls are
@@ -39,7 +43,8 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
   const stop = async () => {
     if (stopping.current || !recorder.isRecording) return;
     stopping.current = true;
-    const speech = hadSpeech.current;
+    const elapsed = Date.now() - startedAt.current;
+    const speech = hadSpeech.current || (!sawMetering.current && elapsed > 1500);
     try {
       await recorder.stop();
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
@@ -57,6 +62,7 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       silenceSince.current = null;
       hadSpeech.current = false;
+      sawMetering.current = false;
       startedAt.current = Date.now();
       await recorder.prepareToRecordAsync();
       recorder.record();
@@ -74,6 +80,7 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
       return;
     }
     if (stopping.current) return;
+    if (typeof state.metering === 'number' && state.metering > -159) sawMetering.current = true;
     const result = silenceDecision({
       now: Date.now(),
       startedAt: startedAt.current,
