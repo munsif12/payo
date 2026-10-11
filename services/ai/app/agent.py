@@ -75,7 +75,7 @@ call that tool — never answer with "I can help you with your banking needs"):
 
 SYSTEM_PROMPT_UR = """آپ PAYO کی مددگار ہیں — گھر کے بزرگوں کا بینک، جو بول کر چلتا ہے۔
 آپ کا لہجہ:
-- جی، اماں جی، ٹھیک ہے — گھر جیسی گرم جوشی سے بات کریں۔
+- «جی، ٹھیک ہے» — گھر جیسی گرم جوشی سے بات کریں۔ صارف کو اُن کے اپنے نام سے پکاریں (نیچے دیا ہے)؛ «اماں جی»، «امی»، «آنٹی» جیسے رشتے کے لفظ کبھی نام کی جگہ نہ لیں۔
 - ایک یا زیادہ سے زیادہ دو چھوٹے جملے۔ جواب بولا جائے گا، پڑھا نہیں جائے گا۔
 - رقم ہمیشہ بول کر کہیں: «اکیاسی ہزار آٹھ سو روپے»، ہندسے نہ لکھیں۔
 - سرکاری یا کتابی الفاظ بالکل نہ لکھیں۔ سیدھی، بولنے والی اردو لکھیں۔
@@ -269,15 +269,20 @@ Rules:
 URDU_MONTHS = ["جنوری", "فروری", "مارچ", "اپریل", "مئی", "جون", "جولائی", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"]
 
 
-def system_prompt(language: str, today: date | None = None) -> str:
-    """Base rules + today's date. Without the date the model resolves 'last month' against
-    its training cutoff and queries empty ranges (seen live: 'no food spending last month')."""
+def system_prompt(language: str, today: date | None = None, user_name: str | None = None) -> str:
+    """Base rules + today's date (+ the user's own name). Without the date the model resolves
+    'last month' against its training cutoff and queries empty ranges (seen live: 'no food
+    spending last month'). Without the name it fell back to the register example and called
+    every user «اماں جی»; with it, it addresses them as they are called."""
     today = today or date.today()
+    name = (user_name or "").strip()
     if language == "ur":
         line = f"آج کی تاریخ: {today.isoformat()} ({today.day} {URDU_MONTHS[today.month - 1]} {today.year})۔ «پچھلا مہینہ» = {today.month - 1 or 12}/{today.year if today.month > 1 else today.year - 1}۔ تاریخوں کے لیے from_date/to_date ISO (YYYY-MM-DD) میں دیں۔"
-        return f"{SYSTEM_PROMPT_UR}\n- {line}"
+        who = f"\n- صارف کا نام: «{name}»۔ انہیں اسی نام سے پکاریں۔" if name else ""
+        return f"{SYSTEM_PROMPT_UR}\n- {line}{who}"
     line = f"Today is {today.isoformat()}. 'Last month' means {today.month - 1 or 12}/{today.year if today.month > 1 else today.year - 1}. Pass from_date/to_date as ISO dates (YYYY-MM-DD)."
-    return f"{SYSTEM_PROMPT_EN}\n- {line}"
+    who = f"\n- The user's name is \"{name}\". Address them by that name, never by a relationship word (ammi, aunty, uncle)." if name else ""
+    return f"{SYSTEM_PROMPT_EN}\n- {line}{who}"
 
 
 def build_model() -> BaseChatModel:
@@ -770,6 +775,7 @@ async def run_agent(
     language: str = "ur",
     model: BaseChatModel | None = None,
     resolved_pairs: set[tuple[str, str]] | None = None,
+    user_name: str | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
     """Run one conversational turn. Returns (reply_text, cards).
 
@@ -865,7 +871,7 @@ async def run_agent(
     model = model or build_model()
     agent = create_react_agent(
         model, build_tools(client, cards, resolved_pairs, risk_context))
-    messages: list[BaseMessage] = [SystemMessage(content=system_prompt(language)), *history, HumanMessage(content=user_text)]
+    messages: list[BaseMessage] = [SystemMessage(content=system_prompt(language, user_name=user_name)), *history, HumanMessage(content=user_text)]
     base_len = len(messages)
     state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
     reply = strip_cards_marker(_last_reply(state, base_len))

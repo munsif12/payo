@@ -1478,3 +1478,12 @@ def test_statement_requests_with_no_period_pre_route_to_last_month():
         assert not _is_statement_request(text), text
     assert _last_month(date(2026, 10, 11)) == (2026, 9)
     assert _last_month(date(2026, 1, 5)) == (2025, 12)
+
+
+def test_system_prompt_names_the_user_instead_of_a_relationship_word():
+    from app.agent import system_prompt
+    ur = system_prompt("ur", user_name="ماریہ")
+    assert "«ماریہ»" in ur and "اسی نام سے پکاریں" in ur
+    en = system_prompt("en", user_name="Maria")
+    assert 'The user\'s name is "Maria"' in en
+    assert "The user's name" not in system_prompt("en")
