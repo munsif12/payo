@@ -22,7 +22,7 @@ classic wallet UI (tabs: Home / Wallet / Pay / More) covers every capability by 
 either language. Demo only: no real money movement, no payment gateways.
 
 **v8 (presentation build): family by voice, a docked voice bar, PDF-first statements.** The
-seed pre-saves each demo user's family (Abbu · Bilal · Sara · Ammi) with real PAYO titles, and
+seed pre-saves each demo user's family (Abbu · Bilal · Sara · Maria) with real PAYO titles, and
 `GET /recipients?q=` understands family words in English, Urdu script and Roman Urdu — *father*,
 *abbu*, *abba*, *baba*, *والد* all find the person saved as "Abbu"; an Urdu-script name (*بلال*)
 reaches a PAYO-linked recipient through their Urdu name. So **"Send 2,000 to my father"** goes
@@ -72,7 +72,7 @@ Docs: see the **Documents** index at the end of this file.
 | AI fallback without keys | `cd services/ai && uv run uvicorn mock_ai:app --port 8000 --app-dir ../../scripts/mock-ai` |
 | Mobile (Metro :8081) | `cd apps/mobile && npx expo start` → open in Expo Go on the iOS simulator (`i`) / Android emulator (`a`) |
 
-**Sign in:** phone `+923001110001` (Ammi Jaan; six more seeded users, same pattern — `…0007`
+**Sign in:** phone `+923001110001` (Maria; six more seeded users, same pattern — `…0007`
 is Abdul Rehman, "Abbu"), OTP is echoed back by the demo backend (`demoOtp`), PIN `1234`. New phone numbers go through
 Create PIN instead of Enter PIN. Then follow `docs/DEMO-SCRIPT.md`.
 
@@ -98,7 +98,7 @@ cd services/ai && uv run python scripts/ai-smoke.py --language both
 ### How to demo
 
 1. Bring up Mongo, backend, AI service, Metro (table above); seed the world once.
-2. Open the app in Expo Go — you land on Phone entry. Sign in as Ammi (or any seeded
+2. Open the app in Expo Go — you land on Phone entry. Sign in as Maria (or any seeded
    user) via OTP → PIN.
 3. Walk `docs/DEMO-SCRIPT.md` in its printed order — Flow A (bank-aware send with the PIN in
    chat), B (saved recipient + bill), C (the Urdu switch), E (the whole bank as cards), F (the

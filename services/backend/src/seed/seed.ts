@@ -129,7 +129,7 @@ export async function runSeed() {
 
   await Pocket.create({ userId: ammi._id, ...AMMI.pocket });
 
-  // v8: the family is pre-saved (Abbu / Ammi / Bilal / Sara) so "send money to my father"
+  // v8: the family is pre-saved (Abbu / Maria / Bilal / Sara) so "send money to my father"
   // works on a fresh world. Everything else — Flow A's "Munsif", billers — is still built
   // up live by the user (send/pay → "save?"), which is the point of v3.
   const payo = institutions.find(i => i.code === 'PAYO')!;
