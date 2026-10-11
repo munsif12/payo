@@ -88,12 +88,50 @@ async def speak(request: Request, authorization: Annotated[str | None, Header()]
     return {"url": f"/tts/{audio_id}"}
 
 
+def _range_response(data: bytes, range_header: str | None, head: bool = False) -> Response:
+    """Serve audio the way AVPlayer needs it: byte ranges (206 + Content-Range) and
+    HEAD. iOS refuses to play a progressive HTTP file whose server ignores Range —
+    seen on a physical iPhone, where the reply stayed silent while the simulator
+    had been lenient."""
+    total = len(data)
+    headers = {"Accept-Ranges": "bytes", "Cache-Control": "private, max-age=3600"}
+    if range_header and range_header.startswith("bytes="):
+        spec = range_header[6:].split(",")[0].strip()
+        start_s, _, end_s = spec.partition("-")
+        try:
+            if start_s:
+                start = int(start_s)
+                end = int(end_s) if end_s else total - 1
+            else:  # suffix range: the last N bytes
+                start = max(0, total - int(end_s))
+                end = total - 1
+        except ValueError:
+            start, end = 0, total - 1
+        end = min(end, total - 1)
+        if start > end or start >= total:
+            return Response(status_code=416, headers={**headers, "Content-Range": f"bytes */{total}"})
+        chunk = data[start:end + 1]
+        headers["Content-Range"] = f"bytes {start}-{end}/{total}"
+        headers["Content-Length"] = str(len(chunk))
+        return Response(content=b"" if head else chunk, status_code=206, media_type="audio/mpeg", headers=headers)
+    headers["Content-Length"] = str(total)
+    return Response(content=b"" if head else data, media_type="audio/mpeg", headers=headers)
+
+
 @app.get("/tts/{audio_id}")
-def tts_audio(audio_id: str):
+def tts_audio(audio_id: str, range: Annotated[str | None, Header()] = None):
     data = AUDIO_STORE.get(audio_id)
     if data is None:
         raise HTTPException(404, "Audio not found")
-    return Response(content=data, media_type="audio/mpeg")
+    return _range_response(data, range)
+
+
+@app.head("/tts/{audio_id}")
+def tts_audio_head(audio_id: str, range: Annotated[str | None, Header()] = None):
+    data = AUDIO_STORE.get(audio_id)
+    if data is None:
+        raise HTTPException(404, "Audio not found")
+    return _range_response(data, range, head=True)
 
 
 @app.on_event("startup")
