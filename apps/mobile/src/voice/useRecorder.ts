@@ -31,6 +31,7 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
   // meters (seen on a physical iPhone in Expo Go) would otherwise make every clip
   // look silent, so such a clip is sent as long as it ran past a short minimum.
   const sawMetering = useRef(false);
+  const noiseFloor = useRef<number | null>(null);
   // 0..1 mic level for the listening Waveform (spec §3: "the waveform is real").
   // A SHARED value, not React state: metering polls every 300 ms and the bars
   // must not cost a render each time. Smoothed in JS (expo-audio's polls are
@@ -63,6 +64,7 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
       silenceSince.current = null;
       hadSpeech.current = false;
       sawMetering.current = false;
+      noiseFloor.current = null;
       startedAt.current = Date.now();
       await recorder.prepareToRecordAsync();
       recorder.record();
@@ -80,13 +82,17 @@ export function useRecorder(onFinished: (r: RecordingResult) => void) {
       return;
     }
     if (stopping.current) return;
-    if (typeof state.metering === 'number' && state.metering > -159) sawMetering.current = true;
+    if (typeof state.metering === 'number' && state.metering > -159) {
+      sawMetering.current = true;
+      noiseFloor.current = noiseFloor.current == null ? state.metering : Math.min(noiseFloor.current, state.metering);
+    }
     const result = silenceDecision({
       now: Date.now(),
       startedAt: startedAt.current,
       level: state.metering ?? -160,
       hadSpeech: hadSpeech.current,
       silenceSince: silenceSince.current,
+      noiseFloorDb: noiseFloor.current ?? undefined,
     });
     hadSpeech.current = result.hadSpeech;
     silenceSince.current = result.silenceSince;

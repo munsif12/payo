@@ -119,13 +119,20 @@ export default function Home() {
   // when it is off, end it when it is live. The handler reads `live` through a
   // ref so the one registered on orbBus never goes stale.
   const liveRef = useRef(live);
+  const recordingRef = useRef(recording);
+  useEffect(() => {
+    recordingRef.current = recording;
+  }, [recording]);
   useEffect(() => {
     liveRef.current = live;
   }, [live]);
   const { start: startLoop, stop: stopLoop } = loop;
+  // While the mic is open, a tap SENDS what was said (the recorder stops and the
+  // clip goes out as if the pause had been detected); otherwise it toggles the loop.
+  const recorderStop = recorder.stop;
   const toggleLoop = useCallback(
-    () => (liveRef.current ? stopLoop('user') : startLoop()),
-    [startLoop, stopLoop],
+    () => (recordingRef.current ? recorderStop() : liveRef.current ? stopLoop('user') : startLoop()),
+    [startLoop, stopLoop, recorderStop],
   );
 
   // orbBus (GLASS-SPEC §3): while Home is focused the nav orb drives the loop

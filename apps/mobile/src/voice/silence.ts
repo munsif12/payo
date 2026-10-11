@@ -34,8 +34,16 @@ export interface SilenceInput {
   hadSpeech: boolean;
   /** When the current run of silence began, or null. */
   silenceSince: number | null;
+  /** The quietest level heard in this clip (dB) — the room's noise floor. A real
+   *  phone in a real room rarely drops below the fixed silence floor, so after
+   *  speech "quiet" means "back near the floor", and "speech" means "well above it". */
+  noiseFloorDb?: number;
   cfg?: SilenceConfig;
 }
+
+/** How far above the noise floor counts as speech / as quiet again. */
+export const SPEECH_ABOVE_FLOOR_DB = 10;
+export const SILENCE_ABOVE_FLOOR_DB = 5;
 
 export interface SilenceResult {
   decision: 'continue' | 'stop';
@@ -50,7 +58,10 @@ export function silenceDecision(input: SilenceInput): SilenceResult {
 
   // hadSpeech latches: once the peak crosses the speech threshold it stays true
   // for the rest of the clip, even if the speaker goes quiet again.
-  const hadSpeech = input.hadSpeech || level >= cfg.speechThresholdDb;
+  const floor = input.noiseFloorDb;
+  const speechDb = floor == null ? cfg.speechThresholdDb : Math.max(cfg.speechThresholdDb, floor + SPEECH_ABOVE_FLOOR_DB);
+  const silenceDb = floor == null ? cfg.silenceDb : Math.max(cfg.silenceDb, floor + SILENCE_ABOVE_FLOOR_DB);
+  const hadSpeech = input.hadSpeech || level >= speechDb;
 
   if (elapsed >= cfg.maxClipMs) return { decision: 'stop', hadSpeech, silenceSince: input.silenceSince };
 
@@ -60,7 +71,7 @@ export function silenceDecision(input: SilenceInput): SilenceResult {
     return { decision: 'continue', hadSpeech, silenceSince: null };
   }
 
-  if (level < cfg.silenceDb) {
+  if (level < silenceDb) {
     const silenceSince = input.silenceSince ?? now;
     if (now - silenceSince >= cfg.postSpeechSilenceMs) return { decision: 'stop', hadSpeech, silenceSince };
     return { decision: 'continue', hadSpeech, silenceSince };
