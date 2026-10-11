@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Plus } from 'lucide-react-native';
-import Animated from 'react-native-reanimated';
-import { Screen, Text, Card, Input, Button, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, Input, Button, useIsUrdu, SHEET_RADIUS } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space, radius, touch } from '../../src/theme/tokens';
-import { usePressScale } from '../../src/motion/usePressScale';
+import { space, radius, touch, glassTokens } from '../../src/theme/tokens';
 import { usePocketsQuery, usePocketMoveMutation, apiErr } from '../../src/api/client';
 import { holdAction } from '../../src/store/pendingActionHolder';
 import { formatPaisa } from '../../src/lib/money';
 import { ltrIsolate } from '../../src/lib/bidi';
 import type { PocketDto } from '../../src/api/types';
 
+/** The pocket's emoji square (GLASS-SPEC §2 tile icon sizes) and the progress bar. */
+const EMOJI_SQUARE = 56;
+const PROGRESS_HEIGHT = 8;
+
+// Pockets — GLASS-SPEC §5 B22: the total-saved glass card, one glass card per
+// pocket (emoji square, name, "balance of goal", amber percentage, an amber
+// progress bar on an `amberTint` track, Add money / Take out), and the amber
+// "New pocket" primary. The move sheet is the PIN-sheet vocabulary: `navyDeep`
+// body, 28 pt top corners, a glass line on top, black 0.5 backdrop.
 export default function Pockets() {
   const { t } = useTranslation();
   const { c } = useTheme();
@@ -24,6 +31,7 @@ export default function Pockets() {
   const [rupees, setRupees] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pocketMove, { isLoading }] = usePocketMoveMutation();
+  const rowDir = urdu ? 'row-reverse' : 'row';
 
   const pockets = data?.items ?? [];
   const totalPaisa = pockets.reduce((sum, p) => sum + p.balancePaisa, 0);
@@ -41,33 +49,35 @@ export default function Pockets() {
     }
   };
 
+  const roundGlass = {
+    width: touch.min, height: touch.min, borderRadius: touch.min / 2, backgroundColor: c.surface,
+    borderWidth: glassTokens.line, borderColor: c.separator, alignItems: 'center' as const, justifyContent: 'center' as const,
+  };
+
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: space.l, marginBottom: space.l }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m }}>
-          <Pressable testID="pockets-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-            <ChevronLeft size={24} color={c.ink} strokeWidth={2} />
+      <View style={{ flexDirection: rowDir, alignItems: 'center', justifyContent: 'space-between', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <View style={{ flexDirection: rowDir, alignItems: 'center', gap: space.m, flex: 1, minWidth: 0 }}>
+          <Pressable testID="pockets-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={8} style={roundGlass}>
+            <ChevronLeft size={22} color={c.ink} strokeWidth={2.2} />
           </Pressable>
-          <Text variant="h2">{t('pockets.title')}</Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="h1" numberOfLines={1}>{t('pockets.title')}</Text>
+            <Text variant="sub" numberOfLines={1}>{t('pockets.subtitle')}</Text>
+          </View>
         </View>
-        <Pressable
-          testID="pocket-new"
-          accessibilityRole="button"
-          onPress={() => router.push('/pockets/new')}
-          hitSlop={8}
-          style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Plus size={22} color={c.ink} strokeWidth={2} />
+        <Pressable testID="pocket-new" accessibilityRole="button" accessibilityLabel={t('pockets.new')} onPress={() => router.push('/pockets/new')} hitSlop={8} style={roundGlass}>
+          <Plus size={22} color={c.ink} strokeWidth={2.2} />
         </Pressable>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.l, paddingBottom: space.xl }}>
-        <Card style={{ backgroundColor: c.navy }}>
-          <Text variant="cap" color="rgba(255,255,255,0.6)">{t('pockets.totalSaved')}</Text>
-          <Text variant="money" weight={800} color={c.white} style={{ fontSize: 36, lineHeight: 42, marginTop: 4 }}>
+        <Card>
+          <Text variant="cap">{t('pockets.totalSaved')}</Text>
+          <Text variant="money" weight={800} color={c.ink} style={{ fontSize: 36, lineHeight: 44, marginTop: 4, writingDirection: 'ltr' }}>
             {ltrIsolate(formatPaisa(totalPaisa))}
           </Text>
-          <Text variant="foot" color="rgba(255,255,255,0.6)" style={{ marginTop: 4 }}>
+          <Text variant="sub" style={{ marginTop: 4 }}>
             {t('pockets.totalSavedFoot', { count: pockets.length })}
           </Text>
         </Card>
@@ -78,29 +88,39 @@ export default function Pockets() {
           const pct = p.goalPaisa ? Math.min(1, p.balancePaisa / p.goalPaisa) : 0;
           return (
             <Card key={p.id} style={{ gap: space.m }}>
-              <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m }}>
-                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Text style={{ fontSize: 20 }}>{p.emoji}</Text>
+              <View style={{ flexDirection: rowDir, alignItems: 'center', gap: space.m }}>
+                <View
+                  style={{
+                    width: EMOJI_SQUARE, height: EMOJI_SQUARE, borderRadius: 16, backgroundColor: c.surface2,
+                    borderWidth: glassTokens.line, borderColor: c.separator, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}
+                >
+                  <Text style={{ fontSize: 26, lineHeight: 32 }}>{p.emoji}</Text>
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text variant="hl" numberOfLines={1}>{urdu && p.urduName ? p.urduName : p.name}</Text>
-                  {p.goalPaisa ? (
-                    <Text variant="foot" numberOfLines={1}>{t('pockets.goalFoot', { goal: ltrIsolate(formatPaisa(p.goalPaisa)) })}</Text>
-                  ) : null}
+                  <Text variant="hl" weight={700} numberOfLines={1}>{urdu && p.urduName ? p.urduName : p.name}</Text>
+                  <Text variant="sub" numberOfLines={1}>
+                    {p.goalPaisa
+                      ? t('pockets.ofGoal', { balance: ltrIsolate(formatPaisa(p.balancePaisa)), goal: ltrIsolate(formatPaisa(p.goalPaisa)) })
+                      : ltrIsolate(formatPaisa(p.balancePaisa))}
+                  </Text>
                 </View>
-                <Text variant="hl">{ltrIsolate(formatPaisa(p.balancePaisa))}</Text>
+                {p.goalPaisa ? (
+                  <Text weight={800} color={c.amber} style={{ fontSize: 22, lineHeight: 28, writingDirection: 'ltr' }}>{ltrIsolate(`${Math.round(pct * 100)}%`)}</Text>
+                ) : null}
               </View>
 
               {p.goalPaisa ? (
-                <View style={{ gap: 6 }}>
-                  <View style={{ height: 6, borderRadius: 3, backgroundColor: c.surface2, overflow: 'hidden' }}>
-                    <View style={{ width: `${pct * 100}%`, height: 6, borderRadius: 3, backgroundColor: c.amber }} />
-                  </View>
-                  <Text variant="foot">{t('pockets.pctThere', { pct: Math.round(pct * 100) })}</Text>
+                <View
+                  accessible
+                  accessibilityLabel={t('pockets.pctThere', { pct: Math.round(pct * 100) })}
+                  style={{ height: PROGRESS_HEIGHT, borderRadius: PROGRESS_HEIGHT / 2, backgroundColor: c.amberTint, overflow: 'hidden', flexDirection: rowDir }}
+                >
+                  <View style={{ width: `${pct * 100}%`, height: PROGRESS_HEIGHT, borderRadius: PROGRESS_HEIGHT / 2, backgroundColor: c.amber }} />
                 </View>
               ) : null}
 
-              <View style={{ flexDirection: 'row', gap: space.s }}>
+              <View style={{ flexDirection: rowDir, gap: space.s }}>
                 <View style={{ flex: 1 }}>
                   <Button testID={`pocket-deposit-${p.id}`} label={t('pockets.deposit')} onPress={() => setMove({ pocket: p, op: 'deposit' })} />
                 </View>
@@ -112,63 +132,38 @@ export default function Pockets() {
           );
         })}
 
-        <TertiaryButton
+        <Button
           testID="pocket-new-bottom"
           label={t('pockets.new')}
-          icon={<Plus size={20} color={c.white} strokeWidth={2} />}
+          icon={<Plus size={20} color={c.onAmber} strokeWidth={2.4} />}
           onPress={() => router.push('/pockets/new')}
         />
+        <Text variant="foot" color={c.ink3} center>{t('pockets.newHint')}</Text>
       </ScrollView>
 
       <Modal visible={!!move} transparent animationType="slide" onRequestClose={() => setMove(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <View style={{ backgroundColor: c.surface, borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.l, gap: space.m }}>
-            <Text variant="h2" center>
-              {move ? t(move.op === 'deposit' ? 'pockets.deposit' : 'pockets.withdraw') : ''}
-            </Text>
-            <Input testID="pocket-amount" placeholder={t('common.amount')} keyboardType="number-pad" value={rupees} onChangeText={setRupees} />
-            {error ? <Text color={c.red} center>{error}</Text> : null}
-            <Button testID="pocket-move-next" label={t('common.next')} onPress={submitMove} disabled={!(Number(rupees) > 0)} loading={isLoading} />
-            <Button variant="ghost" label={t('common.cancel')} onPress={() => { setMove(null); setError(null); }} />
-          </View>
-        </KeyboardAvoidingView>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: glassTokens.backdrop.color, opacity: glassTokens.backdrop.opacity }]} />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View
+              style={{
+                backgroundColor: c.navyDeep, borderTopLeftRadius: SHEET_RADIUS, borderTopRightRadius: SHEET_RADIUS,
+                borderTopWidth: glassTokens.line, borderColor: c.separator, padding: space.xl, paddingBottom: space.xxxl, gap: space.m,
+              }}
+            >
+              <View style={{ alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: c.surface2, marginBottom: space.xs }} />
+              <Text variant="h2" center>
+                {move ? t(move.op === 'deposit' ? 'pockets.deposit' : 'pockets.withdraw') : ''}
+              </Text>
+              {move ? <Text variant="sub" center>{urdu && move.pocket.urduName ? move.pocket.urduName : move.pocket.name}</Text> : null}
+              <Input testID="pocket-amount" placeholder={t('common.amount')} keyboardType="number-pad" value={rupees} onChangeText={setRupees} />
+              {error ? <Text variant="sub" color={c.red} center>{error}</Text> : null}
+              <Button testID="pocket-move-next" label={t('common.next')} onPress={submitMove} disabled={!(Number(rupees) > 0)} loading={isLoading} />
+              <Button variant="ghost" label={t('common.cancel')} onPress={() => { setMove(null); setError(null); }} />
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </Screen>
-  );
-}
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-// Pockets.dc.html "New pocket": a navy-filled pill — the app's third button
-// weight (primary amber / secondary cream / this, tertiary navy) alongside
-// the shared Button component's variants.
-function TertiaryButton({ label, icon, onPress, testID }: {
-  label: string;
-  icon?: React.ReactNode;
-  onPress: () => void;
-  testID?: string;
-}) {
-  const { c } = useTheme();
-  const { style, onPressIn, onPressOut } = usePressScale();
-  return (
-    <AnimatedPressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      onPressIn={onPressIn}
-      onPressOut={onPressOut}
-      style={[
-        {
-          height: touch.primary, minHeight: touch.min, borderRadius: radius.button,
-          backgroundColor: c.navy, alignItems: 'center', justifyContent: 'center',
-          flexDirection: 'row', gap: 8,
-        },
-        style,
-      ]}
-    >
-      {icon}
-      <Text variant="hl" weight={700} color={c.white}>{label}</Text>
-    </AnimatedPressable>
   );
 }

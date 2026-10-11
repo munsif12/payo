@@ -1,6 +1,8 @@
-// PAYO revamp design tokens — verbatim from docs/2026-09-02-payo-revamp-design.md §2
-// and docs/design/revamp-v1/Foundations.dc.html. Do not invent new values here;
-// every color/size must trace back to those two sources.
+// PAYO Direction B ("glass / voice orb") design tokens — verbatim from
+// docs/design/v8-pen/GLASS-SPEC.md (§1 palette, §2 glass objects, §3 orb,
+// §4 nav). Do not invent new values here; every colour/size must trace back to
+// that file. The app is one dark navy theme: `light` and `dark` are aliases of
+// `glass` so every existing import (`dark as onNavy`, …) resolves to the same inks.
 
 export interface Palette {
   bg: string;
@@ -18,6 +20,10 @@ export interface Palette {
   red: string;
   redTint: string;
   navy: string;
+  /** Gradient bottom, PIN sheet body. */
+  navyDeep: string;
+  /** People-you-pay avatars (navy initials). */
+  cream: string;
   onAmber: string;
   avatarBlueTint: string;
   avatarBlue: string;
@@ -26,57 +32,85 @@ export interface Palette {
   white: string;
 }
 
-export const light: Palette = {
-  bg: '#F7F4EE',
-  surface: '#FFFFFF',
-  surface2: '#F1EDE4',
-  separator: '#E7E1D6',
-  ink: '#0E2233',
-  ink2: '#5B6B78',
-  ink3: '#8A98A4',
+// GLASS-SPEC.md §1 — the one palette.
+export const glass: Palette = {
+  navy: '#0D2A3D',
+  navyDeep: '#071A28',
+  bg: '#0D2A3D',
+  surface: 'rgba(255,255,255,0.08)',
+  surface2: 'rgba(255,255,255,0.14)',
+  separator: 'rgba(255,255,255,0.15)',
+  ink: '#F7F4EE',
+  ink2: '#C9D8E6',
+  ink3: '#8FB8D6',
   amber: '#F2A93B',
-  amberDeep: '#D98F1F',
-  amberTint: '#FBEBD0',
-  green: '#1F9D6A',
-  greenTint: '#DDF3E9',
-  red: '#D64545',
-  redTint: '#FBE3E3',
-  navy: '#0D2A3D',
-  onAmber: '#0D2A3D',
-  avatarBlueTint: '#E3EEF7',
-  avatarBlue: '#2E5B7A',
-  avatarVioletTint: '#EEE6F7',
-  avatarViolet: '#6B4E9B',
-  white: '#FFFFFF',
-};
-
-export const dark: Palette = {
-  bg: '#0B141C',
-  surface: '#14202A',
-  surface2: '#1C2A35',
-  separator: '#243441',
-  ink: '#F3F6F8',
-  ink2: '#A7B4BF',
-  ink3: '#6F7E8A',
-  amber: '#F5B34D',
-  amberDeep: '#E19A2A',
-  amberTint: '#3A2E19',
+  amberDeep: '#F2A93B',
+  amberTint: 'rgba(242,169,59,0.18)',
+  cream: '#FBEBD0',
   green: '#3FC48A',
-  greenTint: '#153826',
+  greenTint: 'rgba(63,196,138,0.18)',
   red: '#F06A6A',
-  redTint: '#3A1C1C',
-  // Dark keeps the same navy — Wallet.dc.html / Main.dc.html AI bar & bubbles
-  // stay navy in both themes (it is already dark).
-  navy: '#0D2A3D',
-  onAmber: '#F3F6F8',
-  avatarBlueTint: '#1C2A35',
-  avatarBlue: '#8FB8D6',
+  redTint: 'rgba(240,106,106,0.18)',
+  onAmber: '#0D2A3D',
+  avatarBlueTint: '#1E4A66',
+  avatarBlue: '#F7F4EE',
   avatarVioletTint: '#2A2236',
   avatarViolet: '#B9A3DA',
   white: '#FFFFFF',
 };
 
-// Type scale — Foundations.dc.html .money/.h1/.h2/.hl/.body/.sub/.foot/.cap
+/** Aliases — the design has no light mode (spec §1). Kept so screens that
+ *  import `dark as onNavy` (text on navy) keep compiling and resolve to glass. */
+export const light: Palette = glass;
+export const dark: Palette = glass;
+
+// Geometry and tints the glass objects share (spec §2–§4). Numbers used by
+// exactly one screen stay at that screen's use site.
+export const glassTokens = {
+  /** Every glass object carries a 1 px `separator` line (§6 rule 2). */
+  line: 1,
+  /** Input focus ring (§2). */
+  inputFocusLine: 1.5,
+  /** §4 — the floating nav pill. `fill` is glass over the gradient that must
+   *  stay legible, so it is navy-tinted rather than plain white glass. */
+  nav: {
+    height: 72,
+    radius: 36,
+    marginH: 16,
+    marginBottom: 8,
+    fill: 'rgba(16,40,58,0.92)',
+    activeHalo: 56,
+    icon: 24,
+    label: 11,
+  },
+  /** §3 — the orb in its three sizes, and its glow. */
+  orb: {
+    hero: 120,
+    nav: 60,
+    mini: 56,
+    /** The nav orb sits this much above the pill's top edge. */
+    navRaise: 10,
+    glow: {
+      shadowColor: '#F2A93B',
+      shadowOpacity: 0.55,
+      shadowRadius: 28,
+      shadowOffset: { width: 0, height: 0 },
+    },
+    /** Android has no coloured shadow: a translucent amber disc behind the orb,
+     *  150 pt for the 120 pt hero (×1.25). */
+    androidHalo: 'rgba(242,169,59,0.25)',
+    androidHaloScale: 1.25,
+  },
+  /** §2 — the due-bill card's amber tint. */
+  dueBill: {
+    fill: 'rgba(242,169,59,0.10)',
+    line: 'rgba(242,169,59,0.35)',
+  },
+  /** §5 PIN sheet — "Backdrop black 0.5". */
+  backdrop: { color: '#000000', opacity: 0.5 },
+} as const;
+
+// Type scale — unchanged from Foundations .money/.h1/.h2/.hl/.body/.sub/.foot/.cap
 export const type = {
   money: { fontSize: 40, lineHeight: 48, fontWeight: '800' as const, letterSpacing: -1 },
   h1: { fontSize: 28, lineHeight: 34, fontWeight: '800' as const, letterSpacing: -0.4 },
@@ -98,17 +132,17 @@ export const type = {
   maxFontSizeMultiplier: 1.6,
 } as const;
 
-// Radii — Foundations.dc.html "Radii: card 20 · button 28 (pill) · input 16 · tile 18 · avatar circle"
+// Radii — GLASS-SPEC §2: card 24 · tile 20 · button 28 (pill) · input 16 · avatar circle
 export const radius = {
-  card: 20,
+  card: 24,
   button: 28,
   input: 16,
-  tile: 18,
+  tile: 20,
   avatar: 999,
   pill: 999,
 } as const;
 
-// Spacing — Foundations.dc.html "Spacing: 4/8/12/16/20/24/32 · screen gutter 20"
+// Spacing — "4/8/12/16/20/24/32 · screen gutter 20"
 export const space = {
   xs: 4,
   s: 8,
@@ -120,7 +154,7 @@ export const space = {
   gutter: 20,
 } as const;
 
-// Touch targets — "Touch targets ≥ 44pt, primary CTAs 56pt"
+// Touch targets — "Touch targets ≥ 44pt, primary CTAs 56pt"; keys 64 (72 on PIN)
 export const touch = {
   min: 44,
   primary: 56,
@@ -128,7 +162,10 @@ export const touch = {
   keyLarge: 72,
 } as const;
 
-// Card shadow — "0 8 24 rgba(14,34,51,.06) on cards; none in dark"
+// Shadows — GLASS-SPEC §6 rule 2: no drop shadows except the orb glow.
+// `useTheme().dark` is always true, so every `dark ? shadow.card.dark :
+// shadow.card.light` resolves to the no-shadow variant; `light` stays for API
+// compatibility only.
 export const shadow = {
   card: {
     light: {
@@ -147,4 +184,3 @@ export const shadow = {
     },
   },
 } as const;
-

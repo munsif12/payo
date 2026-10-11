@@ -4,9 +4,9 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Zap, Flame, Wifi, Droplet, Smartphone, Receipt } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { Screen, Text, Card, ListRow, Pill, InstitutionLogo, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, ListRow, InstitutionLogo, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space } from '../../src/theme/tokens';
+import { space, touch, glassTokens } from '../../src/theme/tokens';
 import {
   useBillersQuery, useDueBillsQuery, useSavedBillersQuery, useDeleteSavedBillerMutation,
   useLookupBillMutation, usePayBillMutation, apiErr,
@@ -22,18 +22,14 @@ const CAT_ICON: Record<string, LucideIcon> = {
 };
 const CATEGORY_ORDER = ['electricity', 'gas', 'internet', 'water', 'mobile'];
 
-function categoryVisual(category: string | undefined, c: ReturnType<typeof useTheme>['c']) {
-  const Icon = CAT_ICON[category ?? ''] ?? Receipt;
-  switch (category) {
-    case 'electricity': return { Icon, bg: c.redTint, color: c.red };
-    case 'gas': return { Icon, bg: c.amberTint, color: c.amberDeep };
-    case 'internet': return { Icon, bg: c.surface2, color: c.ink2 };
-    case 'water': return { Icon, bg: c.surface2, color: c.ink2 };
-    case 'mobile': return { Icon, bg: c.greenTint, color: c.green };
-    default: return { Icon, bg: c.surface2, color: c.ink2 };
-  }
-}
+/** GLASS-SPEC §2 tile icon: a 44 pt `amberTint` square (radius 14) with an amber icon. */
+const ICON_SQUARE = 44;
+const ICON_SQUARE_RADIUS = 14;
 
+// Bills — GLASS-SPEC §5 B20: 44 pt round glass back button + "Pay bills" 28/800
+// and a sub-line, the DUE NOW card tinted amber (`glassTokens.dueBill`) with an
+// amber Pay pill, then saved billers and every biller as glass rows with an
+// `InstitutionLogo` (or the amber category icon) and a chevron.
 export default function Billers() {
   const { t } = useTranslation();
   const { c } = useTheme();
@@ -50,6 +46,7 @@ export default function Billers() {
   const dueBill = due?.items?.[0];
   const allBillers = useMemo(() => data?.items ?? [], [data]);
   const savedItems = saved?.items ?? [];
+  const rowDir = urdu ? 'row-reverse' : 'row';
 
   const grouped = useMemo(() => {
     const byCat = new Map<string, NamedItem[]>();
@@ -88,50 +85,73 @@ export default function Billers() {
     );
   };
 
+  const iconSquare = (Icon: LucideIcon) => (
+    <View style={{ width: ICON_SQUARE, height: ICON_SQUARE, borderRadius: ICON_SQUARE_RADIUS, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <Icon size={22} color={c.amber} strokeWidth={2} />
+    </View>
+  );
+
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
-        <Pressable testID="bills-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-          <ChevronLeft size={24} color={c.ink} strokeWidth={2} />
+      <View style={{ flexDirection: rowDir, alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+        <Pressable
+          testID="bills-back"
+          accessibilityRole="button"
+          onPress={() => router.back()}
+          hitSlop={8}
+          style={{
+            width: touch.min, height: touch.min, borderRadius: touch.min / 2, backgroundColor: c.surface,
+            borderWidth: glassTokens.line, borderColor: c.separator, alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <ChevronLeft size={22} color={c.ink} strokeWidth={2.2} />
         </Pressable>
-        <Text variant="h2">{t('bills.title')}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="h1" numberOfLines={1}>{t('bills.title')}</Text>
+          <Text variant="sub" numberOfLines={1}>{t('bills.subtitle')}</Text>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.m, paddingBottom: space.xl }}>
         {dueBill ? (
-          <Card style={{ backgroundColor: c.amberTint }} padding={space.m}>
-            <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m, minHeight: 44 }}>
-              {dueBill.biller.logoUrl ? (
-                <InstitutionLogo size={40} shape="rounded" name={dueBill.biller.name} code={dueBill.biller.code ?? dueBill.biller.id} logoUrl={dueBill.biller.logoUrl} />
-              ) : (
-                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Zap size={20} color={c.navy} strokeWidth={2} />
-                </View>
-              )}
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text variant="hl" weight={600} numberOfLines={1}>{urdu ? dueBill.biller.urduName : dueBill.biller.name}</Text>
-                <Text variant="foot" numberOfLines={1}>
-                  {ltrIsolate(`${t('bills.dueCard.due', { date: formatShortDate(dueBill.dueDate) })} · ${formatPaisa(dueBill.amountPaisa)}`)}
-                </Text>
-              </View>
-              <Pressable
-                testID="bills-due-pay"
-                onPress={() => openBiller(
-                  { id: dueBill.biller.id, name: dueBill.biller.name, urduName: dueBill.biller.urduName },
-                  dueBill.consumerNo,
+          <View>
+            <Text variant="cap" style={{ marginBottom: 6 }}>{t('bills.dueNow')}</Text>
+            <Card padding={14} style={{ backgroundColor: glassTokens.dueBill.fill, borderColor: glassTokens.dueBill.line }}>
+              <View style={{ flexDirection: rowDir, alignItems: 'center', gap: space.m, minHeight: touch.min }}>
+                {dueBill.biller.logoUrl ? (
+                  <InstitutionLogo size={40} shape="rounded" name={dueBill.biller.name} code={dueBill.biller.code ?? dueBill.biller.id} logoUrl={dueBill.biller.logoUrl} />
+                ) : (
+                  <Zap size={26} color={c.amber} strokeWidth={2.2} />
                 )}
-              >
-                <Pill label={t('bills.dueCard.pay')} bg={c.amber} color={c.navy} />
-              </Pressable>
-            </View>
-          </Card>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text variant="hl" weight={700} numberOfLines={1}>
+                    {`${urdu ? dueBill.biller.urduName : dueBill.biller.name} · ${t('bills.dueCard.due', { date: ltrIsolate(formatShortDate(dueBill.dueDate)) })}`}
+                  </Text>
+                  <Text variant="foot" color={c.ink2} numberOfLines={1}>
+                    {`${ltrIsolate(formatPaisa(dueBill.amountPaisa))} · ${t('bills.dueCard.consumer', { last4: ltrIsolate(dueBill.consumerNo.slice(-4)), month: dueBill.month })}`}
+                  </Text>
+                </View>
+                <Pressable
+                  testID="bills-due-pay"
+                  accessibilityRole="button"
+                  onPress={() => openBiller(
+                    { id: dueBill.biller.id, name: dueBill.biller.name, urduName: dueBill.biller.urduName },
+                    dueBill.consumerNo,
+                  )}
+                  style={{ height: 40, paddingHorizontal: 18, borderRadius: 20, backgroundColor: c.amber, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text variant="sub" weight={700} color={c.onAmber} style={{ lineHeight: undefined }}>{t('bills.dueCard.pay')}</Text>
+                </Pressable>
+              </View>
+            </Card>
+          </View>
         ) : null}
 
         {error ? <Text variant="sub" color={c.red} center>{error}</Text> : null}
 
         {savedItems.length > 0 ? (
           <View>
-            <Text variant="cap" style={{ marginBottom: 4 }}>{t('bills.saved.title')}</Text>
+            <Text variant="cap" style={{ marginBottom: 6 }}>{t('bills.saved.title')}</Text>
             <Card padding={0} style={{ paddingHorizontal: space.l }}>
               {savedItems.map((sb, i) => (
                 <ListRow
@@ -152,46 +172,37 @@ export default function Billers() {
 
         {grouped.map(({ category, items }) => (
           <View key={category}>
-            <Text variant="cap" style={{ marginBottom: 4 }}>{t(`bills.category.${category}`, { defaultValue: category })}</Text>
+            <Text variant="cap" style={{ marginBottom: 6 }}>{t(`bills.category.${category}`, { defaultValue: category })}</Text>
             <Card padding={0} style={{ paddingHorizontal: space.l }}>
-              {items.map((b, i) => {
-                const { Icon, bg, color } = categoryVisual(b.category, c);
-                return (
-                  <ListRow
-                    key={b.id}
-                    testID={`biller-${b.name.replace(/\s/g, '-')}`}
-                    onPress={() => openBiller(b)}
-                    left={b.logoUrl ? (
-                      <InstitutionLogo size={40} shape="rounded" name={b.name} code={b.code ?? b.id} logoUrl={b.logoUrl} />
-                    ) : (
-                      // No mark for this biller — the category icon is a better
-                      // fallback here than initials, and it is what shipped before.
-                      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: bg, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Icon size={20} color={color} strokeWidth={2} />
-                      </View>
-                    )}
-                    title={urdu ? b.urduName : b.name}
-                    subtitle={t(`bills.category.${b.category ?? 'other'}`, { defaultValue: b.category ?? '' })}
-                    showChevron
-                    separator={i < items.length - 1}
-                  />
-                );
-              })}
+              {items.map((b, i) => (
+                <ListRow
+                  key={b.id}
+                  testID={`biller-${b.name.replace(/\s/g, '-')}`}
+                  onPress={() => openBiller(b)}
+                  left={b.logoUrl ? (
+                    <InstitutionLogo size={40} shape="rounded" name={b.name} code={b.code ?? b.id} logoUrl={b.logoUrl} />
+                  ) : (
+                    // No mark for this biller — the amber category icon is a better
+                    // fallback here than initials, and it is what shipped before.
+                    iconSquare(CAT_ICON[b.category ?? ''] ?? Receipt)
+                  )}
+                  title={urdu ? b.urduName : b.name}
+                  subtitle={t(`bills.category.${b.category ?? 'other'}`, { defaultValue: b.category ?? '' })}
+                  showChevron
+                  separator={i < items.length - 1}
+                />
+              ))}
             </Card>
           </View>
         ))}
 
         <View>
-          <Text variant="cap" style={{ marginBottom: 4 }}>{t('bills.mobileTopup.title')}</Text>
+          <Text variant="cap" style={{ marginBottom: 6 }}>{t('bills.mobileTopup.title')}</Text>
           <Card padding={0} style={{ paddingHorizontal: space.l }}>
             <ListRow
               testID="bills-mobile-topup"
               onPress={() => router.push('/recharge')}
-              left={
-                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.greenTint, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Smartphone size={20} color={c.green} strokeWidth={2} />
-                </View>
-              }
+              left={iconSquare(Smartphone)}
               title={t('bills.mobileTopup.title')}
               subtitle={t('bills.mobileTopup.foot')}
               showChevron

@@ -39,7 +39,7 @@ function Dot({ filled, size, reducedMotion }: { filled: boolean; size: number; r
           height: size,
           borderRadius: size / 2,
           borderWidth: 2,
-          borderColor: filled ? c.amber : c.ink3,
+          borderColor: filled ? c.amber : c.separator,
           backgroundColor: filled ? c.amber : 'transparent',
         },
         style,
@@ -61,8 +61,8 @@ export interface PinDotsProps {
   style?: StyleProp<ViewStyle>;
 }
 
-// PinDots — Foundations.dc.html .dot/.dotOn: 16pt dots (18pt on the PIN
-// screens), border ink3, amber fill on entry with a 150ms scale-up settle.
+// PinDots — GLASS-SPEC §2: 16 pt dots (18 pt on the PIN screens); empty = a
+// 2 px glass (`separator`) ring, filled = amber, with a 150 ms scale-up settle.
 // Wrong PIN: call ref.shake() for a 4px/200ms shake, then clear the pin.
 export const PinDots = forwardRef<PinDotsHandle, PinDotsProps>(function PinDots(
   { length = 4, filled, size = 18, gap = 20, style },

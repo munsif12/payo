@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, View, StyleProp, ViewStyle } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import Animated from 'react-native-reanimated';
 import { useTheme } from '../theme/useTheme';
 import { usePressScale } from '../motion/usePressScale';
@@ -36,7 +36,8 @@ export function ListRow({ left, title, subtitle, right, onPress, onLongPress, sh
         {subtitle ? (typeof subtitle === 'string' ? <Text variant="foot" numberOfLines={1}>{subtitle}</Text> : subtitle) : null}
       </View>
       {right}
-      {showChevron ? <ChevronRight size={20} color={c.ink3} strokeWidth={2} /> : null}
+      {/* The chevron points the way the row reads — left in Urdu. */}
+      {showChevron ? (urdu ? <ChevronLeft size={20} color={c.ink3} strokeWidth={2} /> : <ChevronRight size={20} color={c.ink3} strokeWidth={2} />) : null}
     </>
   );
 

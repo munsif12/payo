@@ -1461,3 +1461,20 @@ def test_number_words_in_english_roman_urdu_and_urdu():
     assert _agent._parse_amount_words("ek lakh") == 100_000
     assert _agent._parse_amount_words("do hazaar") == 2_000
     assert _agent._parse_amount_words("hello") is None
+
+
+def test_statement_requests_with_no_period_pre_route_to_last_month():
+    from datetime import date
+    from app.agent import _is_statement_request, _last_month
+    for text in [
+        "Generate my e-statement for last month", "I need my statement", "make me a statement",
+        "پچھلے مہینے کی ای اسٹیٹمنٹ بنا دو", "مجھے اسٹیٹمنٹ چاہیے", "meri statement bana do",
+    ]:
+        assert _is_statement_request(text), text
+    for text in [
+        "statement for August", "my statement for 2025", "this month's statement",
+        "اگست کی اسٹیٹمنٹ", "list my statements", "What is my balance?", "Send 2,000 to Abbu",
+    ]:
+        assert not _is_statement_request(text), text
+    assert _last_month(date(2026, 10, 11)) == (2026, 9)
+    assert _last_month(date(2026, 1, 5)) == (2025, 12)

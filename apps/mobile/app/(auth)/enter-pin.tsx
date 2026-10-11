@@ -3,19 +3,24 @@ import { View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
-import { Screen, Text, Avatar, PinDots, Keypad } from '../../src/ui';
+import { Screen, Text, PinDots, Keypad, useIsUrdu } from '../../src/ui';
 import type { PinDotsHandle } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space } from '../../src/theme/tokens';
+import { space, radius } from '../../src/theme/tokens';
 import type { RootState } from '../../src/store';
 import { useVerifyPinWithOtpMutation, apiErr } from '../../src/api/client';
 import { signedIn, cacheUserName, pendingCleared } from '../../src/store/authSlice';
+import { BrandMark } from './phone';
 
 const PIN_LENGTH = 4;
 
+// Enter PIN — GLASS-SPEC §5 B8: orb + wordmark, "Welcome back" title, amber /
+// glass PIN dots, the 72 pt glass keypad, "Forgot PIN?" as an amber ghost link,
+// and the typed-never-spoken footnote.
 export default function EnterPin() {
   const { t } = useTranslation();
   const { c } = useTheme();
+  const urdu = useIsUrdu();
   const router = useRouter();
   const dispatch = useDispatch();
   const otpToken = useSelector((s: RootState) => s.auth.otpToken);
@@ -79,27 +84,24 @@ export default function EnterPin() {
 
   return (
     <Screen>
-      <View style={{ paddingTop: space.xxxl, gap: 12, alignItems: 'center' }}>
-        <Avatar name={pendingName ?? 'PAYO user'} size={64} />
+      <View style={{ paddingTop: space.xl, gap: space.l, alignItems: 'center' }}>
+        <BrandMark center />
 
         <View>
-          <Text variant="h1" center>
+          <Text variant="h1" center style={{ fontSize: 32, lineHeight: urdu ? undefined : 38 }}>
             {firstName ? t('auth.pin.welcomeBack', { name: firstName }) : t('auth.pin.welcomeGeneric')}
           </Text>
-          <Text variant="sub" center style={{ marginTop: 6 }}>{t('auth.pin.enterToOpen')}</Text>
+          <Text variant="body" color={c.ink2} center style={{ marginTop: 6 }}>{t('auth.pin.enterToOpen')}</Text>
         </View>
 
-        <View style={{ marginTop: 10 }}>
-          <PinDots ref={dotsRef} filled={pin.length} />
-        </View>
+        <PinDots ref={dotsRef} filled={pin.length} size={20} gap={24} />
 
         {error ? (
-          <View style={{ backgroundColor: c.redTint, borderRadius: 16, padding: 14, width: '100%' }}>
+          <View style={{ backgroundColor: c.redTint, borderRadius: radius.input, padding: 14, width: '100%' }}>
             <Text variant="sub" color={c.red} center>{error}</Text>
           </View>
         ) : null}
 
-        <View style={{ height: space.l }} />
         <Keypad
           size={72}
           onDigit={onDigit}
@@ -108,15 +110,17 @@ export default function EnterPin() {
           style={{ width: '100%' }}
         />
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Pressable testID="enter-pin-forgot" onPress={notYou} hitSlop={8}>
-            <Text variant="foot" color={c.ink3}>{t('auth.pin.forgot')}</Text>
+        <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+          <Pressable testID="enter-pin-forgot" accessibilityRole="button" onPress={notYou} hitSlop={8}>
+            <Text variant="sub" weight={700} color={c.amber}>{t('auth.pin.forgot')}</Text>
           </Pressable>
-          <Text variant="foot" color={c.ink3}>·</Text>
+          <Text variant="sub" color={c.ink3}>·</Text>
           <Pressable testID="enter-pin-not-you" accessibilityRole="button" onPress={notYou} hitSlop={8}>
-            <Text variant="foot" color={c.ink3}>{t('auth.pin.notYou')}</Text>
+            <Text variant="sub" color={c.ink2}>{t('auth.pin.notYou')}</Text>
           </Pressable>
         </View>
+
+        <Text variant="foot" color={c.ink3} center>{t('auth.pin.typedNotSpoken')}</Text>
       </View>
     </Screen>
   );

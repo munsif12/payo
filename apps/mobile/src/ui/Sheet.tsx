@@ -32,17 +32,21 @@ export interface SheetProps {
   /** False renders the settled state with no animation. Callers pass
    *  `useFirstPaint()`: a tab re-focus or a re-render must never replay it. */
   animate?: boolean;
-  /** Hide the grab handle (the sheet is not draggable — it is the page). */
+  /** Show the grab handle. Off by default: the glass sheet is the page, not a
+   *  draggable surface. */
   handle?: boolean;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
   testID?: string;
 }
 
-// Sheet — the cream sheet every v7 screen sits on (spec §4): radius 28, grab
-// handle, and a D_SHEET settle from 24 pt on first paint only. Transform only,
-// on the UI thread. Reduced motion: a D_MICRO opacity fade, no travel.
-export function Sheet({ children, delay = 0, animate = true, handle = true, style, contentStyle, testID }: SheetProps) {
+// Sheet — the page every screen's content sits on. Under Direction B
+// (GLASS-SPEC §1) it is transparent: the gradient behind the head runs on
+// under it, so there is no fill and the grab handle is hidden by default.
+// Geometry (radius 28, paddings, SHEET_OVERLAP) and the D_SHEET settle from
+// 24 pt on first paint are unchanged. Transform only, on the UI thread.
+// Reduced motion: a D_MICRO opacity fade, no travel.
+export function Sheet({ children, delay = 0, animate = true, handle = false, style, contentStyle, testID }: SheetProps) {
   const { c } = useTheme();
   const reducedMotion = useReducedMotion();
   // Latched at mount: useFirstPaint flips to false right after the first
@@ -76,7 +80,7 @@ export function Sheet({ children, delay = 0, animate = true, handle = true, styl
       style={[
         {
           flex: 1,
-          backgroundColor: c.bg,
+          backgroundColor: 'transparent',
           borderTopLeftRadius: SHEET_RADIUS,
           borderTopRightRadius: SHEET_RADIUS,
           paddingTop: SHEET_PADDING_TOP,

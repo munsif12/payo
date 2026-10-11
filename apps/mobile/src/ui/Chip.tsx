@@ -3,14 +3,14 @@ import { Pressable, StyleProp, ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../theme/useTheme';
+import { glassTokens } from '../theme/tokens';
 import { usePressScale } from '../motion/usePressScale';
 import { Text } from './Text';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Chip — Foundations.dc.html .chip / .chipOn: 36pt tall, 18 radius pill,
-// surface2 bg by default, navy bg + white text when selected (e.g. Activity
-// filters).
+// Chip — GLASS-SPEC §2: a 36 pt glass pill with the 1 px line; selected =
+// amber fill, navy text (e.g. the Activity filters).
 export function Chip({ label, selected, onPress, style, testID }: {
   label: string;
   selected?: boolean;
@@ -38,7 +38,9 @@ export function Chip({ label, selected, onPress, style, testID }: {
           height: 36,
           paddingHorizontal: 14,
           borderRadius: 18,
-          backgroundColor: selected ? c.navy : c.surface2,
+          backgroundColor: selected ? c.amber : c.surface,
+          borderWidth: glassTokens.line,
+          borderColor: selected ? c.amber : c.separator,
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'row',
@@ -48,7 +50,7 @@ export function Chip({ label, selected, onPress, style, testID }: {
         style,
       ]}
     >
-      <Text variant="sub" weight={600} color={selected ? c.white : c.ink2} style={{ lineHeight: undefined, fontSize: 14 }}>
+      <Text variant="sub" weight={600} color={selected ? c.onAmber : c.ink} style={{ lineHeight: undefined, fontSize: 14 }}>
         {label}
       </Text>
     </AnimatedPressable>

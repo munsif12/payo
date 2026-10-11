@@ -2,7 +2,8 @@
 // import, so these run without a store, network mocking, or a native-module
 // transform. `useHomeGreeting` / `buildSuggestions` (which also need the
 // lucide icon set) are exercised indirectly via the Home screen.
-import { greetingBucket, billSubtitle, firstName } from '../homeGreetingLogic';
+import { greetingBucket, billSubtitle, firstName, dueBillTitle } from '../homeGreetingLogic';
+import { ltrIsolate } from '../../lib/bidi';
 import type { DueBill } from '../../api/types';
 
 const t = (key: string, opts?: Record<string, unknown>) => {
@@ -58,3 +59,16 @@ test('billSubtitle: uses the Urdu biller name when urdu is true', () => {
   );
 });
 
+
+// B11 due-bill card: "K-Electric ₨4,320 due Sep 10".
+test('dueBillTitle: biller + amount + short date (English)', () => {
+  expect(dueBillTitle(bill, false, t)).toBe(
+    'home.orb.billTitle:' + JSON.stringify({ biller: 'K-Electric', amount: '₨4,320', date: 'Sep 10' }),
+  );
+});
+
+test('dueBillTitle: Urdu biller name, with the amount and date isolated LTR', () => {
+  expect(dueBillTitle(bill, true, t)).toBe(
+    'home.orb.billTitle:' + JSON.stringify({ biller: 'کے الیکٹرک', amount: ltrIsolate('₨4,320'), date: ltrIsolate('10 ستمبر') }),
+  );
+});

@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Send, Zap, Wallet, Smartphone, FileText, HelpCircle, type LucideIcon } from 'lucide-react-native';
 import { useMeQuery, useDueBillsQuery } from '../api/client';
-import { greetingBucket, billSubtitle, firstName, type Translate } from './homeGreetingLogic';
+import { greetingBucket, billSubtitle, firstName, dueBillTitle, type Translate } from './homeGreetingLogic';
 import type { DueBill } from '../api/types';
 
-export { greetingBucket, billSubtitle, firstName };
+export { greetingBucket, billSubtitle, firstName, dueBillTitle };
 
 export interface Suggestion {
   key: 'send' | 'bill' | 'balance' | 'topup' | 'statement' | 'help';
@@ -76,5 +76,7 @@ export function useHomeGreeting() {
     greetingMessage: t('home.greeting.hello', { name: firstName(name) }),
     suggestions,
     balancePaisa: me?.account.balancePaisa ?? 0,
+    // The first due bill, for the Home due-bill card (hidden when undefined).
+    dueBill,
   };
 }

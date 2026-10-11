@@ -1,25 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { ChevronLeft, Sparkles } from 'lucide-react-native';
-import { Screen, Text, Button, Keypad } from '../../src/ui';
+import { Screen, Text, Button, Keypad, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
-import { space } from '../../src/theme/tokens';
+import { space, radius, touch, glassTokens } from '../../src/theme/tokens';
 import type { RootState } from '../../src/store';
 import { useRequestOtpMutation, useVerifyOtpMutation, apiErr } from '../../src/api/client';
 import { otpVerified, pendingNameLoaded, getCachedName } from '../../src/store/authSlice';
 import { ltrIsolate } from '../../src/lib/bidi';
+import { BrandMark } from './phone';
 
 const CODE_LENGTH = 6;
 const RESEND_SECONDS = 42;
 
 const formatCountdown = (s: number) => `0:${String(s).padStart(2, '0')}`;
 
+// OTP — GLASS-SPEC §5 B12: orb + wordmark, title, six glass code boxes (a filled
+// box wears the 1.5 px amber line), the demo-code strip as an amber-tinted glass
+// card, the glass keypad with the resend countdown in its left slot, amber Verify.
 export default function Otp() {
   const { t } = useTranslation();
   const { c } = useTheme();
+  const urdu = useIsUrdu();
   const router = useRouter();
   const dispatch = useDispatch();
   const { demoOtp: initialDemoOtp } = useLocalSearchParams<{ demoOtp: string }>();
@@ -82,30 +87,45 @@ export default function Otp() {
 
   return (
     <Screen>
-      <View style={{ paddingTop: space.xl, gap: 22 }}>
-        <Pressable testID="otp-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12} style={{ paddingVertical: 4 }}>
-          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
-        </Pressable>
+      <ScrollView bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, paddingTop: space.l, paddingBottom: space.l, gap: space.l }}>
+        {/* The brand row never mirrors; only the back button follows the reading edge. */}
+        <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m }}>
+          <Pressable
+            testID="otp-back"
+            accessibilityRole="button"
+            onPress={() => router.back()}
+            hitSlop={8}
+            style={{
+              width: touch.min, height: touch.min, borderRadius: touch.min / 2, backgroundColor: c.surface,
+              borderWidth: glassTokens.line, borderColor: c.separator, alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <ChevronLeft size={22} color={c.ink} strokeWidth={2.2} />
+          </Pressable>
+          <BrandMark />
+        </View>
 
         <View>
-          <Text variant="h1">{t('auth.otp.title')}</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 6 }}>
+          <Text variant="h1" style={{ fontSize: 32, lineHeight: urdu ? undefined : 38 }}>{t('auth.otp.title')}</Text>
+          <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 6 }}>
             <Text variant="sub">{t('auth.otp.sentTo', { phone: ltrIsolate(pendingPhone ?? '') })}</Text>
             <Text variant="sub">·</Text>
             <Pressable testID="otp-change" onPress={() => router.back()} hitSlop={8}>
-              <Text variant="sub" weight={700} color={c.amberDeep}>{t('auth.otp.change')}</Text>
+              <Text variant="sub" weight={700} color={c.amber}>{t('auth.otp.change')}</Text>
             </Pressable>
           </View>
         </View>
 
+        {/* A code reads left-to-right in both languages — the boxes do not mirror. */}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {Array.from({ length: CODE_LENGTH }).map((_, i) => (
             <View
               key={i}
               testID={`otp-box-${i}`}
               style={{
-                flex: 1, height: 56, borderRadius: 14, backgroundColor: c.surface,
-                borderWidth: 1.5, borderColor: code[i] ? c.amber : c.separator,
+                flex: 1, height: 56, borderRadius: radius.input, backgroundColor: c.surface,
+                borderWidth: code[i] ? glassTokens.inputFocusLine : glassTokens.line,
+                borderColor: code[i] ? c.amber : c.separator,
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
@@ -115,30 +135,39 @@ export default function Otp() {
         </View>
 
         {error ? (
-          <View style={{ backgroundColor: c.redTint, borderRadius: 16, padding: 14 }}>
+          <View style={{ backgroundColor: c.redTint, borderRadius: radius.input, padding: 14 }}>
             <Text variant="sub" color={c.red} center>{error}</Text>
           </View>
         ) : (
-          <View style={{ backgroundColor: c.amberTint, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Sparkles size={18} color={c.onAmber} strokeWidth={2.2} />
-            <Text variant="sub" weight={600} color={c.onAmber} style={{ flex: 1 }}>
+          <View
+            style={{
+              backgroundColor: glassTokens.dueBill.fill, borderWidth: glassTokens.line, borderColor: glassTokens.dueBill.line,
+              borderRadius: radius.input, paddingVertical: 12, paddingHorizontal: 14,
+              flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: 10,
+            }}
+          >
+            <Sparkles size={18} color={c.amber} strokeWidth={2.2} />
+            <Text variant="sub" weight={600} color={c.ink} style={{ flex: 1 }}>
               {t('auth.otp.demoCode', { code: ltrIsolate(demoOtp) })}
             </Text>
           </View>
         )}
 
         <Keypad
+          size={64}
           onDigit={onDigit}
           onBackspace={onBackspace}
           disabled={isVerifying || locked}
           leftSlot={
-            seconds > 0 || locked ? (
-              <Text variant="foot" color={c.ink2}>{t('auth.otp.resend', { time: ltrIsolate(formatCountdown(seconds)) })}</Text>
-            ) : (
-              <Pressable testID="otp-resend" onPress={resend} hitSlop={8} disabled={isResending}>
-                <Text variant="foot" weight={700} color={c.amberDeep}>{t('auth.otp.resendNow')}</Text>
-              </Pressable>
-            )
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              {seconds > 0 || locked ? (
+                <Text variant="foot" color={c.ink3} center>{t('auth.otp.resend', { time: ltrIsolate(formatCountdown(seconds)) })}</Text>
+              ) : (
+                <Pressable testID="otp-resend" onPress={resend} hitSlop={8} disabled={isResending}>
+                  <Text variant="foot" weight={700} color={c.amber} center>{t('auth.otp.resendNow')}</Text>
+                </Pressable>
+              )}
+            </View>
           }
         />
 
@@ -149,7 +178,7 @@ export default function Otp() {
           disabled={code.length !== CODE_LENGTH || locked}
           loading={isVerifying}
         />
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

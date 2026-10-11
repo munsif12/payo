@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TextInput, View, StyleProp, ViewStyle, TextInputProps } from 'react-native';
 import { useTheme } from '../theme/useTheme';
-import { radius, type } from '../theme/tokens';
+import { radius, type, glassTokens } from '../theme/tokens';
 import { useIsUrdu } from './Text';
 
 export interface InputProps extends TextInputProps {
@@ -9,8 +9,8 @@ export interface InputProps extends TextInputProps {
   containerStyle?: StyleProp<ViewStyle>;
 }
 
-// Input — Foundations.dc.html .input/.inputOn: 56pt, 16 radius, 1.5px
-// separator border that turns amber on focus, optional left icon slot.
+// Input — GLASS-SPEC §2: a 56 pt glass field, 1 px line, radius 16; focus =
+// 1.5 px amber line. Placeholder ink3. Optional leading icon slot.
 export function Input({ icon, containerStyle, style, onFocus, onBlur, ...rest }: InputProps) {
   const { c } = useTheme();
   const urdu = useIsUrdu();
@@ -23,7 +23,7 @@ export function Input({ icon, containerStyle, style, onFocus, onBlur, ...rest }:
           height: 56,
           borderRadius: radius.input,
           backgroundColor: c.surface,
-          borderWidth: 1.5,
+          borderWidth: focused ? glassTokens.inputFocusLine : glassTokens.line,
           borderColor: focused ? c.amber : c.separator,
           flexDirection: urdu ? 'row-reverse' : 'row',
           alignItems: 'center',
@@ -36,6 +36,7 @@ export function Input({ icon, containerStyle, style, onFocus, onBlur, ...rest }:
       {icon}
       <TextInput
         placeholderTextColor={c.ink3}
+        selectionColor={c.amber}
         allowFontScaling
         maxFontSizeMultiplier={type.maxFontSizeMultiplier}
         onFocus={(e) => { setFocused(true); onFocus?.(e); }}

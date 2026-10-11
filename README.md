@@ -27,13 +27,14 @@ seed pre-saves each demo user's family (Abbu · Bilal · Sara · Ammi) with real
 *abbu*, *abba*, *baba*, *والد* all find the person saved as "Abbu"; an Urdu-script name (*بلال*)
 reaches a PAYO-linked recipient through their Urdu name. So **"Send 2,000 to my father"** goes
 straight to the confirmation card and the PIN sheet — no bank question, no "shall I send?", no
-phone number — and the card names them the way you do ("Abbu (Abdul Rehman)"). Home carries a
-**Family row** (tap Abbu → "Send money to Abbu"), a two-column grid of suggestion chips, and a
-**docked voice bar** (amber mic · hint · keyboard) in place of the floating mic. **"Generate my
+phone number — and the card names them the way you do ("Abbu (Abdul Rehman)"). Home is the
+**voice orb**: one amber orb over a navy glass layout, **family tiles** (tap Abbu → "Send money
+to Abbu"), the due bill, and a floating glass nav with the orb in the middle. **"Generate my
 e-statement for last month"** answers with a card that reads like the PDF's first page (period,
 transaction count, money in/out) and whose *Open PDF* hands the real file to the iOS share sheet
-from inside the chat. Design samples for this build (three directions × four screens) are in
-`docs/design/v8-pen/` (Pencil file + PNG exports); the shipped UI is Direction A.
+from inside the chat. Design samples for this build are in `docs/design/v8-pen/` (Pencil file + PNG exports);
+the shipped UI is **Direction B — glass / voice orb** (spec: `docs/design/v8-pen/GLASS-SPEC.md`),
+on every screen, in English and Urdu.
 
 **Send money works like a Pakistani wallet** (Easypaisa/JazzCash model): a recipient is
 *identifier + institution* — a phone number for PAYO/Easypaisa/JazzCash/SadaPay/NayaPay,
@@ -120,7 +121,7 @@ cd services/ai && uv run python scripts/ai-smoke.py --language both
 | `docs/DEMO-SCRIPT.md` | The bilingual pitch script — flow order, what you say, what the audience sees, presenter recovery notes |
 | `docs/BLOCKERS.md` | Build blockers and the demo-time gotchas they left behind |
 | `docs/plans/2026-09-01-payo-roadmap.md` | Cross-service contracts (REST API, SSE protocol, card schemas, seed world) and the phase/status index |
-| `docs/design/v8-pen/` | v8 design samples — `payo-v8-samples.pen` (open in Pencil) and `exports/*.png`: Direction A (navy head, evolved — shipped), B (voice orb), C (daylight) |
+| `docs/design/v8-pen/` | v8 design samples — `payo-v8-samples.pen` (open in Pencil) and `exports/*.png`: Direction A (navy head, evolved — the first build), B (voice orb, glass — **shipped**, see `GLASS-SPEC.md`), C (daylight) |
 | `docs/plans/*.md` | Per-phase and per-version execution plans |
 
 Design specs (each builds on the one before; anything a later spec does not mention stays as built):

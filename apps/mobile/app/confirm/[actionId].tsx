@@ -3,14 +3,22 @@ import { ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Lock } from 'lucide-react-native';
-import { Screen, Text, Card, Button, useIsUrdu } from '../../src/ui';
+import { Screen, Text, Card, Avatar, Button, useIsUrdu } from '../../src/ui';
 import { useTheme } from '../../src/theme/useTheme';
 import { space } from '../../src/theme/tokens';
 import { takeAction, markActionDone } from '../../src/store/pendingActionHolder';
 import { usePinSheet } from '../../src/pin/usePinSheet';
 import { useCancelActionMutation, useExecuteActionMutation, apiErr } from '../../src/api/client';
+import { actionHead } from '../../src/components/cards/CardView';
 import { formatPaisa } from '../../src/lib/money';
+import { ltrIsolate } from '../../src/lib/bidi';
 import type { Txn } from '../../src/api/types';
+
+/** B3 confirmation head row: a 48 pt cream avatar beside the name. */
+const HEAD_AVATAR = 48;
+/** Backend line labels already rendered as the big amount / the fee line, so
+ *  they are not repeated in the details card. */
+const SHOWN_LABELS = new Set(['Amount', 'Fee']);
 
 export default function ConfirmAction() {
   const { t } = useTranslation();
@@ -31,6 +39,12 @@ export default function ConfirmAction() {
   }
 
   const summaryText = urdu ? action.summary.ur : action.summary.en;
+  const head = actionHead(action.lines);
+  const detailLines = action.lines.filter((l, i) => !(i === 0 && head) && !SHOWN_LABELS.has(l.label.en));
+  const feeLine = action.feePaisa > 0
+    ? t('confirm.feeTotal', { fee: ltrIsolate(formatPaisa(action.feePaisa)), total: ltrIsolate(formatPaisa(action.amountPaisa + action.feePaisa)) })
+    : t('confirm.feeInstant', { fee: ltrIsolate(formatPaisa(0)) });
+  const row = { flexDirection: urdu ? 'row-reverse' : 'row' } as const;
 
   // `transaction` is null for a PIN-gated action that moves no money
   // (card_unfreeze — see PinSheetResolution). The success screen is built
@@ -96,37 +110,49 @@ export default function ConfirmAction() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: space.xl, paddingVertical: space.xl }}>
-        <Card style={{ alignItems: 'center', gap: 10 }}>
-          <Text variant="hl" center>{summaryText}</Text>
-          <Text variant="money" center style={{ marginTop: 6 }}>{formatPaisa(action.amountPaisa)}</Text>
-        </Card>
-
-        <Card padding={0} style={{ paddingHorizontal: space.l }}>
-          {action.lines.map((l, i) => (
-            <View
-              key={i}
-              style={{
-                flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12,
-                borderBottomWidth: 1, borderBottomColor: c.separator,
-              }}
-            >
-              <Text variant="sub">{urdu ? l.label.ur : l.label.en}</Text>
-              <Text variant="hl">{l.value}</Text>
-            </View>
-          ))}
-          {action.feePaisa > 0 ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.separator }}>
-              <Text variant="sub">{t('common.fee')}</Text>
-              <Text variant="hl">{formatPaisa(action.feePaisa)}</Text>
+        {/* B3 / GLASS-SPEC §5: the summary card — cream avatar + name, the
+            sentence being confirmed (Nastaliq keeps its own line height), then
+            "Sending" over the amount and the fee line. */}
+        <Card style={{ gap: space.l }}>
+          {head ? (
+            <View style={[row, { alignItems: 'center', gap: space.m }]}>
+              <Avatar name={head.name} size={HEAD_AVATAR} bg={c.cream} color={c.navy} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="hl" weight={700} numberOfLines={1}>{head.name}</Text>
+                {head.sub ? <Text variant="sub" color={c.ink2} numberOfLines={1}>{ltrIsolate(head.sub)}</Text> : null}
+              </View>
             </View>
           ) : null}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }}>
-            <Text variant="hl">{t('confirm.total')}</Text>
-            <Text variant="hl">{formatPaisa(action.amountPaisa + action.feePaisa)}</Text>
+          <Text variant="sub" color={c.ink2}>{summaryText}</Text>
+          <View style={{ gap: space.xs }}>
+            <Text variant="sub" color={c.ink2}>{t('confirm.sending')}</Text>
+            <Text variant="money">{ltrIsolate(formatPaisa(action.amountPaisa))}</Text>
+            <Text variant="foot" color={c.ink3}>{feeLine}</Text>
           </View>
         </Card>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 4 }}>
+        {detailLines.length > 0 || action.feePaisa > 0 ? (
+          <Card padding={0} style={{ paddingHorizontal: space.l }}>
+            {detailLines.map((l, i) => (
+              <View
+                key={i}
+                style={[row, {
+                  justifyContent: 'space-between', gap: space.s, paddingVertical: 12,
+                  borderBottomWidth: 1, borderBottomColor: c.separator,
+                }]}
+              >
+                <Text variant="sub">{urdu ? l.label.ur : l.label.en}</Text>
+                <Text variant="hl" numberOfLines={1} style={{ flexShrink: 1 }}>{ltrIsolate(l.value)}</Text>
+              </View>
+            ))}
+            <View style={[row, { justifyContent: 'space-between', paddingVertical: 12 }]}>
+              <Text variant="hl">{t('confirm.total')}</Text>
+              <Text variant="hl">{ltrIsolate(formatPaisa(action.amountPaisa + action.feePaisa))}</Text>
+            </View>
+          </Card>
+        ) : null}
+
+        <View style={[row, { alignItems: 'center', gap: 10, paddingHorizontal: 4 }]}>
           <Lock size={18} color={c.ink3} strokeWidth={2} />
           <Text variant="foot" style={{ flex: 1 }}>{t('confirm.pinFootnote')}</Text>
         </View>

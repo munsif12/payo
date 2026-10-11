@@ -2,17 +2,15 @@ import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import {
-  ChevronLeft, Wallet as WalletIcon, Zap, Smartphone, PiggyBank, ArrowLeftRight, type LucideIcon,
-} from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import { Screen, Text, Card, Chip, Avatar, InstitutionLogo, useIsUrdu } from '../src/ui';
 import { useTheme } from '../src/theme/useTheme';
-import { space } from '../src/theme/tokens';
-import { useTransactionsQuery } from '../src/api/client';
+import { space, touch, glassTokens } from '../src/theme/tokens';
+import { useTransactionsQuery, useRecipientsQuery } from '../src/api/client';
 import { formatPaisa } from '../src/lib/money';
-import { formatRelativeDay } from '../src/lib/dates';
+import { formatRelativeDay, monthName } from '../src/lib/dates';
 import { ltrIsolate } from '../src/lib/bidi';
-import type { Txn } from '../src/api/types';
+import type { RecipientDto, Txn } from '../src/api/types';
 
 const FILTERS = [
   { key: 'all', labelKey: 'activity.all' },
@@ -22,11 +20,7 @@ const FILTERS = [
   { key: 'savings', labelKey: 'activity.filter.savings', category: 'savings' },
 ] as const;
 
-// Short month names for the group headers ("Today" / "August") — matches the
-// small localized-month-array pattern already used by statements/index.tsx,
-// since Intl month names aren't reliably available for 'ur' on-device.
-const EN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const UR_MONTHS = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'];
+const ROW_AVATAR = 44;
 
 function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -44,25 +38,21 @@ function txnTypeLabel(type: Txn['type'], t: (k: string) => string): string {
   }
 }
 
-// Icon-circle rows follow theme tokens only (amberTint/onAmber neutral, redTint/red
-// for bills) rather than Activity.dc.html's extra blue swatch, which isn't a
-// Palette token — see r6b-report.md for this deviation.
-function txnVisual(type: Txn['type']): { icon: LucideIcon | null } {
-  switch (type) {
-    case 'bank_transfer': return { icon: WalletIcon };
-    case 'bill': return { icon: Zap };
-    case 'recharge': return { icon: Smartphone };
-    case 'pocket_deposit':
-    case 'pocket_withdraw': return { icon: PiggyBank };
-    case 'request_settlement': return { icon: ArrowLeftRight };
-    default: return { icon: null }; // p2p → avatar initials
-  }
+/** v8 Urdu QA: an outgoing send carries no `urduName` — the backend writes the
+ *  recipient's title + identifier only (transferExecutors.ts) — so the saved
+ *  recipient is looked up by identifier (then by title) and the row names the
+ *  person the way the user says it in Urdu (urduNickname, else urduTitle). */
+function urduCounterpartyName(txn: Txn, recipients: RecipientDto[] | undefined): string | undefined {
+  if (txn.counterparty.urduName) return txn.counterparty.urduName;
+  const r = recipients?.find((x) => x.identifier === txn.counterparty.detail)
+    ?? recipients?.find((x) => x.title === txn.counterparty.name);
+  return r?.urduNickname || r?.urduTitle || undefined;
 }
 
-interface Group { label: string; items: Txn[] }
+interface Group { key: string; label: string; items: Txn[] }
 
-function groupByPeriod(items: Txn[], now: Date, urdu: boolean, t: (k: string) => string): Group[] {
-  const months = urdu ? UR_MONTHS : EN_MONTHS;
+/** "Today", then one group per calendar month ("October", "September 2025"). */
+function groupByPeriod(items: Txn[], now: Date, lang: 'en' | 'ur', t: (k: string) => string): Group[] {
   const groups = new Map<string, Group>();
   for (const txn of items) {
     const d = new Date(txn.createdAt);
@@ -74,17 +64,20 @@ function groupByPeriod(items: Txn[], now: Date, urdu: boolean, t: (k: string) =>
     } else {
       const yearSuffix = d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : '';
       key = `${d.getFullYear()}-${d.getMonth()}`;
-      label = months[d.getMonth()] + yearSuffix;
+      label = monthName(d.getMonth(), lang) + yearSuffix;
     }
     const g = groups.get(key);
     if (g) g.items.push(txn);
-    else groups.set(key, { label, items: [txn] });
+    else groups.set(key, { key, label, items: [txn] });
   }
   return Array.from(groups.values());
 }
 
-type Row = { kind: 'header'; label: string } | { kind: 'txn'; txn: Txn };
-
+// Activity — GLASS-SPEC §5 B15. Glass back button + title with the "All
+// transactions" sub-line, the filter chips (glass / amber when selected), then
+// one glass card per period holding its rows: 44 pt initials disc, name 17/700,
+// "when · type" 14 ink2, and the amount (−cream / +green). Pagination and
+// pull-to-refresh are unchanged.
 export default function Activity() {
   const { t } = useTranslation();
   const { c } = useTheme();
@@ -93,47 +86,21 @@ export default function Activity() {
   const [filter, setFilter] = useState<{ key: string; labelKey: string; category?: string }>(FILTERS[0]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const { data, isFetching, refetch } = useTransactionsQuery({ category: filter.category, cursor });
-  // Separate, unfiltered feed for the month summary card so switching a
-  // filter chip doesn't change "Spent in September" — best-effort from the
-  // first loaded page; there's no dedicated stats endpoint yet.
-  const { data: allData } = useTransactionsQuery({});
+  // Only Urdu needs the recipient lookup (see urduCounterpartyName).
+  const { data: recipients } = useRecipientsQuery(undefined, { skip: !urdu });
 
   const items = data?.items ?? [];
   const now = useMemo(() => new Date(), []);
+  const lang = urdu ? 'ur' : 'en';
 
-  const monthName = (urdu ? UR_MONTHS : EN_MONTHS)[now.getMonth()];
-  const { spentPaisa, receivedPaisa } = useMemo(() => {
-    let spent = 0;
-    let received = 0;
-    for (const txn of allData?.items ?? []) {
-      const d = new Date(txn.createdAt);
-      if (d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth()) continue;
-      if (txn.direction === 'in') received += txn.amountPaisa;
-      else spent += txn.amountPaisa;
-    }
-    return { spentPaisa: spent, receivedPaisa: received };
-  }, [allData, now]);
-
-  const rows: Row[] = useMemo(() => {
-    const groups = groupByPeriod(items, now, urdu, t);
-    const out: Row[] = [];
-    for (const g of groups) {
-      out.push({ kind: 'header', label: g.label });
-      for (const txn of g.items) out.push({ kind: 'txn', txn });
-    }
-    return out;
-  }, [items, now, urdu, t]);
+  const groups = useMemo(() => groupByPeriod(items, now, lang, t), [items, now, lang, t]);
+  const row = { flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center' } as const;
 
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
-        <Pressable testID="activity-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-          <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} />
-        </Pressable>
-        <Text variant="h2">{t('activity.title')}</Text>
-      </View>
+      <BackHeader testID="activity-back" title={t('activity.title')} sub={t('activity.headSub')} onBack={() => router.back()} />
 
-      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s, marginBottom: space.l, flexWrap: 'wrap' }}>
+      <View style={[row, { gap: space.s, marginBottom: space.l, flexWrap: 'wrap' }]}>
         {FILTERS.map((f) => (
           <Chip
             key={f.key}
@@ -145,20 +112,9 @@ export default function Activity() {
         ))}
       </View>
 
-      <Card padding={space.m} style={{ flexDirection: urdu ? 'row-reverse' : 'row', justifyContent: 'space-between', marginBottom: space.l }}>
-        <View>
-          <Text variant="cap">{t('activity.spentIn', { month: monthName })}</Text>
-          <Text variant="h2" style={{ marginTop: 4 }}>{ltrIsolate(formatPaisa(spentPaisa))}</Text>
-        </View>
-        <View style={{ alignItems: urdu ? 'flex-start' : 'flex-end' }}>
-          <Text variant="cap">{t('activity.in')}</Text>
-          <Text variant="h2" color={c.green} style={{ marginTop: 4 }}>{ltrIsolate(formatPaisa(receivedPaisa))}</Text>
-        </View>
-      </Card>
-
       <FlatList
-        data={rows}
-        keyExtractor={(r, i) => (r.kind === 'header' ? `h-${r.label}-${i}` : r.txn.id)}
+        data={groups}
+        keyExtractor={(g) => g.key}
         refreshing={isFetching && !cursor}
         onRefresh={() => { setCursor(undefined); refetch(); }}
         onEndReachedThreshold={0.4}
@@ -166,51 +122,96 @@ export default function Activity() {
           if (data?.nextCursor && !isFetching) setCursor(data.nextCursor);
         }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ gap: space.l, paddingBottom: space.xxxl }}
         ListEmptyComponent={
-          <Text color={c.ink3} center>{isFetching ? t('common.loading') : t('activity.empty')}</Text>
+          <Text variant="sub" center style={{ paddingVertical: space.xl }}>{isFetching ? t('common.loading') : t('activity.empty')}</Text>
         }
-        renderItem={({ item }) => {
-          if (item.kind === 'header') {
-            return <Text variant="cap" style={{ marginTop: space.m, marginBottom: 6 }}>{item.label}</Text>;
-          }
-          const txn = item.txn;
-          const name = urdu && txn.counterparty.urduName ? txn.counterparty.urduName : txn.counterparty.name;
-          const { icon: Icon } = txnVisual(txn.type);
-          const amountColor = txn.direction === 'in' ? c.green : c.ink;
-          const sign = txn.direction === 'in' ? '+' : '−';
-          const amount = sign + formatPaisa(txn.amountPaisa);
-
-          return (
-            <Pressable
-              testID={`txn-${txn.refNo}`}
-              onPress={() => router.push({ pathname: '/txn/[id]', params: { id: txn.id, data: JSON.stringify(txn) } })}
-              style={{
-                flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: 14,
-                paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.separator,
-              }}
-            >
-              {txn.counterparty.institutionLogoUrl ? (
-                // A real mark beats both the type icon and the initials disc.
-                <InstitutionLogo size={40} shape="circle" name={name} logoUrl={txn.counterparty.institutionLogoUrl} />
-              ) : Icon ? (
-                <View style={{
-                  width: 44, height: 44, borderRadius: 22, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: txn.type === 'bill' ? c.redTint : c.amberTint,
-                }}>
-                  <Icon size={22} color={txn.type === 'bill' ? c.red : c.onAmber} strokeWidth={2} />
-                </View>
-              ) : (
-                <Avatar name={name} />
-              )}
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text variant="hl" numberOfLines={1}>{name}</Text>
-                <Text variant="foot" numberOfLines={1}>{formatRelativeDay(txn.createdAt)} · {txnTypeLabel(txn.type, t)}</Text>
-              </View>
-              <Text variant="hl" color={amountColor}>{urdu ? ltrIsolate(amount) : amount}</Text>
-            </Pressable>
-          );
-        }}
+        renderItem={({ item: group }) => (
+          <View style={{ gap: space.s }}>
+            <Text variant="cap" style={{ letterSpacing: urdu ? undefined : 0.96 }}>{group.label}</Text>
+            <Card padding={0} style={{ paddingHorizontal: space.l }}>
+              {group.items.map((txn, i) => (
+                <TxnRow
+                  key={txn.id}
+                  txn={txn}
+                  recipients={recipients?.items}
+                  lang={lang}
+                  separator={i < group.items.length - 1}
+                  onPress={() => router.push({ pathname: '/txn/[id]', params: { id: txn.id, data: JSON.stringify(txn) } })}
+                />
+              ))}
+            </Card>
+          </View>
+        )}
       />
     </Screen>
+  );
+}
+
+function TxnRow({ txn, recipients, lang, separator, onPress }: {
+  txn: Txn;
+  recipients: RecipientDto[] | undefined;
+  lang: 'en' | 'ur';
+  separator: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const urdu = lang === 'ur';
+  const name = (urdu ? urduCounterpartyName(txn, recipients) : undefined) ?? txn.counterparty.name;
+  const amountColor = txn.direction === 'in' ? c.green : c.ink;
+  const sign = txn.direction === 'in' ? '+' : '−';
+  const amount = sign + formatPaisa(txn.amountPaisa);
+  const when = formatRelativeDay(txn.createdAt, new Date(), lang);
+
+  return (
+    <Pressable
+      testID={`txn-${txn.refNo}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={{
+        flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m,
+        paddingVertical: space.l, borderBottomWidth: separator ? glassTokens.line : 0, borderBottomColor: c.separator,
+      }}
+    >
+      {txn.type !== 'p2p' && txn.counterparty.institutionLogoUrl ? (
+        // A real mark beats the initials disc — except for a person on PAYO (p2p),
+        // whose wallet logo says nothing about who they are.
+        <InstitutionLogo size={40} shape="circle" name={txn.counterparty.name} logoUrl={txn.counterparty.institutionLogoUrl} />
+      ) : (
+        // Initials from the Latin name so the disc reads "AB" in both languages (B15).
+        <Avatar name={txn.counterparty.name} size={ROW_AVATAR} />
+      )}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="hl" weight={700} numberOfLines={1}>{name}</Text>
+        <Text variant="sub" color={c.ink2} numberOfLines={1} style={{ fontSize: 14, lineHeight: urdu ? undefined : 18 }}>
+          {`${when} · ${txnTypeLabel(txn.type, t)}`}
+        </Text>
+      </View>
+      <Text variant="hl" weight={700} color={amountColor}>{urdu ? ltrIsolate(amount) : amount}</Text>
+    </Pressable>
+  );
+}
+
+/** Stack-screen header: a 44 pt round glass back button, the 28/800 title and a sub-line. */
+function BackHeader({ testID, title, sub, onBack }: { testID: string; title: string; sub?: string; onBack: () => void }) {
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  return (
+    <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+      <Pressable
+        testID={testID}
+        accessibilityRole="button"
+        onPress={onBack}
+        hitSlop={8}
+        style={{ width: touch.min, height: touch.min, borderRadius: touch.min / 2, backgroundColor: c.surface, borderWidth: glassTokens.line, borderColor: c.separator, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />
+      </Pressable>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="h1" weight={800} color={c.ink} numberOfLines={1} style={{ lineHeight: urdu ? undefined : 34 }}>{title}</Text>
+        {sub ? <Text variant="sub" color={c.ink2} numberOfLines={1}>{sub}</Text> : null}
+      </View>
+    </View>
   );
 }

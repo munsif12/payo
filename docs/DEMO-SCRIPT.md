@@ -47,8 +47,9 @@ phone call — tap the mic once, then just speak and listen; it keeps the conver
 until your job is done."
 **اردو کے لیے:** «یہ PAYO ہے — ایک AI بینک، سب سے مشکل صارف کے لیے: ہمارے والدین۔ نہ
 پاس ورڈ، نہ فارم — بس فون نمبر اور پن۔»
-**Audience sees:** Home screen — animated greeting ("Good morning, Ammi Jaan"), balance
-pill, five suggestion cards staggering in.
+**Audience sees:** Home — the animated greeting ("Assalam o Alaikum, Ammi."), the amber
+voice orb, the family tiles (Abbu · Bilal · Sara) and the due bill, on navy glass. Tap the
+round «اردو» button top-right to flip the whole screen to Urdu, live.
 
 ## Flow A0 — "Send 2,000 to my father" (1 min) ⭐ the hands-free hero
 
@@ -174,8 +175,10 @@ question, at the one moment it matters, and it knows who to call."
 
 **Say (en):** "Everything the AI can do, your hands can do too — that's the second
 layer, always one tab away."
-**Do:** tap **Wallet** → balance card, Send/Request/QR actions, pockets. Tap
-**Activity** → grouped-by-month transaction history with category chips.
+**Do:** tap **Wallet** in the floating nav → balance, Send/Request/QR, the four quick
+tiles, the due bill and recent activity on glass cards. Tap **See all** → Activity, grouped
+by period with filter chips. The amber orb in the middle of the nav starts a conversation
+from any tab.
 **Audience sees:** the same new design system — same tokens, same motion — applied to
 every screen, not just the AI surface.
 

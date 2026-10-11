@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Phone, ShieldCheck, Sparkles, Users, Wallet } from 'lucide-react-native';
-import { Screen, Text, Card, Button, Input, ListRow, useIsUrdu } from '../src/ui';
+import { ChevronLeft, Phone, ShieldCheck, Sparkles, Users, Wallet, type LucideIcon } from 'lucide-react-native';
+import { Screen, Text, Card, Button, Input, ListRow, Avatar, useIsUrdu } from '../src/ui';
 import { useTheme } from '../src/theme/useTheme';
-import { space, touch } from '../src/theme/tokens';
+import { space, touch, glassTokens } from '../src/theme/tokens';
 import { usePinSheet } from '../src/pin/usePinSheet';
 import {
   useGuardianQuery, useSetGuardianMutation, useRemoveGuardianMutation, useUpdateCeilingMutation,
@@ -16,6 +16,10 @@ import { formatPaisa } from '../src/lib/money';
 import { ltrIsolate } from '../src/lib/bidi';
 import i18n from '../src/i18n';
 import type { PendingAction } from '../src/api/types';
+
+/** B10: the trusted contact's 56 pt avatar. */
+const GUARDIAN_AVATAR = 56;
+const ROW_ICON = 24;
 
 /** The PIN sheet renders a bilingual summary, so a guardian change needs one in both
  *  languages regardless of the current UI language — same approach as save_prompt. */
@@ -33,10 +37,12 @@ const pinAction = (id: string, summaryKey: string, opts?: Record<string, unknown
   expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(), status: 'pending',
 });
 
-// Settings — More → Settings (spec §4): trusted contact, approval ceiling, and the
-// "PAYO speaks first" switch. Every guardian change is PIN-gated; tightening
-// (setting a guardian, lowering the ceiling) applies at once, loosening (removing,
-// raising) cools off first and the screen says when it will take effect.
+// Settings — More → Settings (spec §4), skinned per GLASS-SPEC §5 B10: a glass
+// back button + 28/800 title, the TRUSTED CONTACT card (avatar, name, phone,
+// glass "Change" / red "Remove"), the approval-limit card with the amber
+// amount, and the ASSISTANT card (speaks-first switch, age protection). Every
+// guardian change is PIN-gated; tightening applies at once, loosening cools
+// off first and the screen says when it will take effect. Behaviour unchanged.
 export default function Settings() {
   const { t } = useTranslation();
   const { c } = useTheme();
@@ -130,36 +136,36 @@ export default function Settings() {
     (paisa) => ltrIsolate(formatPaisa(paisa)),
   );
 
+  const row = { flexDirection: urdu ? 'row-reverse' : 'row' } as const;
+  const sub = (text: string) => <Text variant="sub" color={c.ink2} numberOfLines={1}>{text}</Text>;
+
   return (
     <Screen>
-      <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
-        <Pressable testID="settings-back" accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-          <ChevronLeft size={24} color={c.ink} strokeWidth={2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />
-        </Pressable>
-        <Text variant="h2">{t('settings.title')}</Text>
-      </View>
+      <BackHeader testID="settings-back" title={t('settings.title')} onBack={() => router.back()} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: space.l, paddingBottom: space.xxxl }}>
-        <Card padding={0} style={{ paddingHorizontal: space.l }}>
+        <Card style={{ gap: space.m }}>
+          <SectionLabel>{t('settings.trustedContact')}</SectionLabel>
           <ListRow
             testID="settings-guardian"
-            left={<RowIcon icon={ShieldCheck} c={c} />}
-            title={t('settings.trustedContact')}
-            subtitle={isLoading
-              ? t('common.loading')
-              : guardian
-                ? `${guardian.name} · ${ltrIsolate(guardian.phone)}`
-                : t('guardian.none')}
+            left={<Avatar name={guardian?.name || '?'} size={GUARDIAN_AVATAR} />}
+            title={(
+              <Text variant="h2" color={c.ink} numberOfLines={1}>
+                {isLoading ? t('common.loading') : guardian ? guardian.name : t('settings.trustedContact')}
+              </Text>
+            )}
+            subtitle={sub(guardian ? ltrIsolate(guardian.phone) : isLoading ? '' : t('guardian.none'))}
             separator={false}
+            style={{ paddingVertical: 0 }}
           />
           {pendingLine ? (
-            <Text testID="settings-guardian-pending" variant="foot" color={c.amberDeep} style={{ paddingBottom: space.m }}>
+            <Text testID="settings-guardian-pending" variant="sub" color={c.amber}>
               {pendingLine}
             </Text>
           ) : null}
 
           {phoneOpen ? (
-            <View style={{ gap: space.s, paddingBottom: space.l }}>
+            <View style={{ gap: space.s }}>
               <Input
                 testID="settings-guardian-phone"
                 icon={<Phone size={18} color={c.ink3} strokeWidth={2} />}
@@ -169,7 +175,7 @@ export default function Settings() {
                 keyboardType="phone-pad"
                 autoCapitalize="none"
               />
-              <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s }}>
+              <View style={[row, { gap: space.s }]}>
                 <Button
                   testID="settings-guardian-save"
                   label={t('common.save')}
@@ -187,7 +193,7 @@ export default function Settings() {
               </View>
             </View>
           ) : (
-            <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s, paddingBottom: space.l }}>
+            <View style={[row, { gap: space.s }]}>
               <Button
                 testID="settings-guardian-edit"
                 variant="secondary"
@@ -209,16 +215,20 @@ export default function Settings() {
           )}
         </Card>
 
-        <Card padding={0} style={{ paddingHorizontal: space.l }}>
+        <Card style={{ gap: space.m }}>
           <ListRow
             testID="settings-ceiling"
-            left={<RowIcon icon={Wallet} c={c} />}
+            left={<RowIcon icon={Wallet} />}
             title={t('settings.ceiling')}
-            subtitle={t('settings.ceilingFoot', { amount: ltrIsolate(formatPaisa(ceilingPaisa)) })}
+            subtitle={sub(t('settings.ceilingFoot', { amount: ltrIsolate(formatPaisa(ceilingPaisa)) }))}
+            right={(
+              <Text variant="hl" weight={700} color={c.amber}>{ltrIsolate(formatPaisa(ceilingPaisa))}</Text>
+            )}
             separator={false}
+            style={{ paddingVertical: 0 }}
           />
           {ceilingOpen ? (
-            <View style={{ gap: space.s, paddingBottom: space.l }}>
+            <View style={{ gap: space.s }}>
               <Input
                 testID="settings-ceiling-input"
                 placeholder={t('settings.ceilingPlaceholder')}
@@ -229,7 +239,7 @@ export default function Settings() {
               <Text variant="foot">
                 {Number(ceilingRupees || '0') * 100 > ceilingPaisa ? t('settings.raiseNote') : t('settings.lowerNote')}
               </Text>
-              <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', gap: space.s }}>
+              <View style={[row, { gap: space.s }]}>
                 <Button
                   testID="settings-ceiling-save"
                   label={t('common.save')}
@@ -253,38 +263,37 @@ export default function Settings() {
               label={t('settings.changeCeiling')}
               onPress={() => { setCeilingOpen(true); setCeilingRupees(String(Math.round(ceilingPaisa / 100))); }}
               disabled={!guardian}
-              style={{ marginBottom: space.l, minHeight: touch.min }}
+              style={{ minHeight: touch.min }}
             />
           )}
         </Card>
 
-        <Card padding={0} style={{ paddingHorizontal: space.l }}>
-          <ListRow
-            testID="settings-speaks-first"
-            left={<RowIcon icon={Sparkles} c={c} />}
-            title={t('settings.speaksFirst')}
-            subtitle={t('settings.speaksFirstFoot')}
-            right={
-              <Switch
-                testID="settings-speaks-first-switch"
-                value={speaksFirst}
-                onValueChange={onToggleSpeaksFirst}
-                trackColor={{ true: c.amber, false: c.separator }}
-              />
-            }
-            separator={false}
-          />
-        </Card>
-
-        <Card padding={0} style={{ paddingHorizontal: space.l }}>
-          <ListRow
-            testID="settings-age-protection"
-            left={<RowIcon icon={Users} c={c} />}
-            title={t('settings.ageProtection.title')}
-            subtitle={t('settings.ageProtection.foot')}
-            separator={false}
-          />
-        </Card>
+        <View style={{ gap: space.s }}>
+          <SectionLabel>{t('settings.section.assistant')}</SectionLabel>
+          <Card padding={0} style={{ paddingHorizontal: space.l }}>
+            <ListRow
+              testID="settings-speaks-first"
+              left={<RowIcon icon={Sparkles} />}
+              title={t('settings.speaksFirst')}
+              subtitle={sub(t('settings.speaksFirstFoot'))}
+              right={
+                <Switch
+                  testID="settings-speaks-first-switch"
+                  value={speaksFirst}
+                  onValueChange={onToggleSpeaksFirst}
+                  trackColor={{ true: c.amber, false: c.separator }}
+                />
+              }
+            />
+            <ListRow
+              testID="settings-age-protection"
+              left={<RowIcon icon={Users} />}
+              title={t('settings.ageProtection.title')}
+              subtitle={sub(t('settings.ageProtection.foot'))}
+              separator={false}
+            />
+          </Card>
+        </View>
 
         {error ? <Text testID="settings-error" variant="sub" color={c.red} center>{error}</Text> : null}
       </ScrollView>
@@ -292,10 +301,38 @@ export default function Settings() {
   );
 }
 
-function RowIcon({ icon: Icon, c }: { icon: typeof ShieldCheck; c: ReturnType<typeof useTheme>['c'] }) {
+/** B10 rows carry a bare 24 pt amber icon (no square — that is the More screen's vocabulary). */
+function RowIcon({ icon: Icon }: { icon: LucideIcon }) {
+  const { c } = useTheme();
   return (
-    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.amberTint, alignItems: 'center', justifyContent: 'center' }}>
-      <Icon size={20} color={c.navy} strokeWidth={2} />
+    <View style={{ width: 32, alignItems: 'center', justifyContent: 'center' }}>
+      <Icon size={ROW_ICON} color={c.amber} strokeWidth={2} />
+    </View>
+  );
+}
+
+/** Section label — 12/600 uppercase, letter-spacing 0.96, ink3 (§2). */
+function SectionLabel({ children }: { children: string }) {
+  const urdu = useIsUrdu();
+  return <Text variant="cap" style={{ letterSpacing: urdu ? undefined : 0.96 }}>{children}</Text>;
+}
+
+/** Stack-screen header: a 44 pt round glass back button and the 28/800 title. */
+function BackHeader({ testID, title, onBack }: { testID: string; title: string; onBack: () => void }) {
+  const { c } = useTheme();
+  const urdu = useIsUrdu();
+  return (
+    <View style={{ flexDirection: urdu ? 'row-reverse' : 'row', alignItems: 'center', gap: space.m, paddingTop: space.l, marginBottom: space.l }}>
+      <Pressable
+        testID={testID}
+        accessibilityRole="button"
+        onPress={onBack}
+        hitSlop={8}
+        style={{ width: touch.min, height: touch.min, borderRadius: touch.min / 2, backgroundColor: c.surface, borderWidth: glassTokens.line, borderColor: c.separator, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <ChevronLeft size={24} color={c.ink} strokeWidth={2.2} style={urdu ? { transform: [{ scaleX: -1 }] } : undefined} />
+      </Pressable>
+      <Text variant="h1" weight={800} color={c.ink} numberOfLines={1} style={{ flex: 1, lineHeight: urdu ? undefined : 34 }}>{title}</Text>
     </View>
   );
 }
